@@ -15,7 +15,7 @@
   border: 0;
   color: var(--slk-label-tertiary);
   background: transparent;
-  font: 550 calc(var(--slk-font-secondary) - 1px)/20px var(--slk-font-family);
+  font: 550 var(--text-body-12)/20px var(--font-ui);
   text-align: left;
 }
 
@@ -32,8 +32,8 @@
 }
 
 .headLabel > svg {
-  width: 13px;
-  height: 13px;
+  width: var(--icon-sm);
+  height: var(--icon-sm);
 }
 
 .headLabel em {
@@ -41,15 +41,15 @@
   border-radius: var(--slk-radius-xs);
   color: var(--slk-label-secondary);
   background: var(--slk-bg-sunken);
-  font-family: var(--slk-font-code);
-  font-size: 10px;
+  font-family: var(--font-mono);
+  font-size: var(--text-caption-10);
   font-style: normal;
   line-height: 16px;
 }
 
 .headChevron {
-  width: 13px;
-  height: 13px;
+  width: var(--icon-sm);
+  height: var(--icon-sm);
   transition: transform var(--slk-dur) var(--slk-ease);
 }
 
@@ -76,7 +76,7 @@
   overflow: hidden;
   padding: 8px 10px;
   color: var(--slk-label-secondary);
-  font-size: 11px;
+  font-size: var(--text-caption-11);
   line-height: 15px;
   text-align: left;
 }
@@ -100,8 +100,8 @@
 }
 
 .locate > svg {
-  width: 13px;
-  height: 13px;
+  width: var(--icon-sm);
+  height: var(--icon-sm);
 }
 
 @media (hover: hover) {

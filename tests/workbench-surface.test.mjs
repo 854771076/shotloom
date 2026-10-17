@@ -79,7 +79,7 @@ test('文本界面与导演台详情铺满内容区，不是压暗背景上的�
   assert.doesNotMatch(rule(directorStyles, '\\.director-detail-backdrop'), /backdrop-filter|place-items: center|padding/);
   assert.doesNotMatch(rule(directorStyles, '\\.director-detail-window'), /box-shadow|border-radius|min\(1600px/);
   // 图片与视频预览仍是真正的灯箱：压暗背景保留。
-  assert.match(viewerStyles, /\.media-viewer-backdrop:not\(\.is-text\) \{[\s\S]*?background: rgba\(18, 18, 18, \.88\)/);
+  assert.match(viewerStyles, /\.media-viewer-backdrop:not\(\.is-text\) \{[\s\S]*?background: var\(--overlay-media\)/);
 });
 
 test('应用级巨层级只留给真正的窗口浮层', () => {
@@ -87,5 +87,5 @@ test('应用级巨层级只留给真正的窗口浮层', () => {
   assert.doesNotMatch(editorFoundation, /body\.video-editor-open/);
   assert.doesNotMatch(editorLayout, /z-index:\s*(1[0-9]{3,}|[2-9][0-9]{3,})/);
   assert.doesNotMatch(viewerStyles, /\.media-viewer-backdrop \{[\s\S]*?z-index:\s*240/);
-  assert.match(viewerStyles, /\.project-search-backdrop \{[\s\S]*?position: fixed;\n  inset: 0;\n  z-index: 300;/);
+  assert.match(viewerStyles, /\.project-search-backdrop \{[\s\S]*?position: fixed;\n  inset: 0;\n  z-index: var\(--layer-modal\);/);
 });

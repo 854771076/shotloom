@@ -4,10 +4,10 @@
   height: 100%;
   box-sizing: border-box;
   overflow: hidden;
-  border: 1px solid #d9d9dc;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, .88);
-  box-shadow: 0 2px 8px #0000000f;
+  border: 1px solid var(--line-solid);
+  border-radius: var(--radius);
+  background: var(--elevated-surface);
+  box-shadow: var(--shadow);
 }
 
 .director-node-label {
@@ -20,7 +20,7 @@
   align-items: center;
   gap: calc(4px * var(--node-label-zoom, 1));
   padding: 0 calc(2px * var(--node-label-zoom, 1));
-  color: #55565b;
+  color: var(--muted);
   pointer-events: none;
 }
 
@@ -60,12 +60,12 @@
   border: 0;
   border-radius: calc(6px * var(--node-label-zoom, 1));
   padding: 0;
-  color: #777;
+  color: var(--muted);
   background: transparent;
   pointer-events: auto;
 }
 
-.director-node-label button:hover { color: #b42318; background: #f7eeee; }
+.director-node-label button:hover { color: var(--bad); background: var(--bad-wash); }
 .director-node-label button svg {
   width: calc(var(--canvas-node-icon-size) * var(--node-label-zoom, 1));
   height: calc(var(--canvas-node-icon-size) * var(--node-label-zoom, 1));
@@ -91,8 +91,8 @@
   justify-content: space-between;
   gap: 4px;
   padding: 0 6px 0 4px;
-  border-bottom: 1px solid #ededee;
-  background: #fafafa;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
 }
 
 .director-node-drag-handle {
@@ -101,7 +101,7 @@
   flex: none;
   display: grid;
   place-items: center;
-  color: #92949a;
+  color: var(--faint);
   cursor: grab;
   touch-action: none;
 }
@@ -119,7 +119,7 @@
 }
 
 .director-node-drag-handle:hover {
-  color: #55565b;
+  color: var(--muted);
 }
 
 .director-node-drag-handle:active {
@@ -132,7 +132,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  color: #55565b;
+  color: var(--muted);
 }
 
 .director-node-kind svg {
@@ -147,7 +147,7 @@
   padding: 0;
   border: 0;
   outline: 0;
-  color: #55565b;
+  color: var(--muted);
   background: transparent;
   font-size: var(--canvas-node-title-size);
   font-weight: 600;
@@ -159,14 +159,14 @@
   display: grid;
   place-items: center;
   border: 0;
-  border-radius: 6px;
-  color: #777;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
   background: transparent;
 }
 
 .director-node-head button:hover {
-  color: #b42318;
-  background: #f7eeee;
+  color: var(--bad);
+  background: var(--bad-wash);
 }
 
 .director-node-head button svg {
@@ -184,12 +184,12 @@
   overflow: hidden;
   display: grid;
   place-items: center;
-  background: rgba(255, 255, 255, .88);
+  background: var(--surface);
 }
 
 .director-node.selected {
-  border-color: rgba(38, 43, 51, 0.38);
-  box-shadow: 0 0 0 1px rgba(38, 43, 51, 0.08);
+  border-color: var(--canvas-node-border-selected);
+  box-shadow: 0 0 0 1px var(--line);
 }
 
 .director-node-placeholder {
@@ -202,26 +202,26 @@
   box-sizing: border-box;
   padding: 24px;
   text-align: center;
-  color: #696a70;
+  color: var(--muted);
 }
 
 .director-node-placeholder > svg {
   width: var(--canvas-node-state-icon-size);
   height: var(--canvas-node-state-icon-size);
   margin-bottom: 12px;
-  color: #d9dadd;
+  color: var(--line-solid);
   stroke-width: 1.4;
 }
 
 .director-node-placeholder strong {
-  color: #27282c;
+  color: var(--type-primary);
   font-size: var(--canvas-node-hero-size);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .director-node-placeholder p {
   margin: 10px 0 18px;
-  color: #73747a;
+  color: var(--muted);
   font-size: var(--canvas-node-body-size);
 }
 
@@ -230,16 +230,16 @@
   height: 34px;
   padding: 0 18px;
   border: 0;
-  border-radius: 8px;
-  color: #2d2e33;
-  background: #f0f0f1;
+  border-radius: var(--radius-md);
+  color: var(--type-primary);
+  background: var(--button-subtle-bg);
   font-size: var(--canvas-node-body-size);
   cursor: pointer;
 }
 
 .director-node-open-button:hover,
 .director-node-open-button:focus-visible {
-  background: #e6e6e8;
+  background: var(--button-subtle-hover);
 }
 
 .director-node-head button.director-node-done-button {
@@ -247,16 +247,16 @@
   min-width: 34px;
   height: var(--canvas-node-action-size);
   padding: 0 6px;
-  border-radius: 6px;
-  color: #55565b;
-  background: #f2f3f5;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  background: var(--surface-2);
   font-size: var(--canvas-node-title-size);
   cursor: pointer;
 }
 
 .director-node-head button.director-node-done-button:hover {
-  color: #171717;
-  background: #e7e8eb;
+  color: var(--type-primary);
+  background: var(--button-subtle-hover);
 }
 
 /* An iframe owns a separate pointer event surface. Disable it during an outer
@@ -271,7 +271,7 @@
   inset: 0;
   z-index: 20;
   display: grid;
-  background: #fff;
+  background: var(--surface);
 }
 .director-detail-window {
   /* 导演台自带顶栏（标题、视角切换、导出、关闭），这里不再叠一层宿主标题栏。 */
@@ -280,7 +280,7 @@
   display: grid;
   grid-template-rows: minmax(0, 1fr);
   overflow: hidden;
-  background: #fff;
+  background: var(--surface);
 }
 .director-detail-frame {
   display: block;
@@ -289,5 +289,5 @@
   min-width: 0;
   min-height: 0;
   border: 0;
-  background: #f7f8fa;
+  background: var(--surface-2);
 }

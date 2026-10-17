@@ -30,14 +30,14 @@ test('画布节点优先显示可辨识名称且空节点回退到简短类型�
   assert.match(source, /genericNames\.has\(stem\)/);
   assert.match(source, /return typeLabel\.replace\(\/生成\$\/, ""\) \|\| "节点"/);
   assert.match(source, /<div className="work-visual-block">/);
-  assert.match(styles, /\.work-node-kicker \{[\s\S]*?inset: -20px 0 auto/);
+  assert.match(styles, /\.work-node-kicker \{[\s\S]*?inset: -28px 0 auto/);
   assert.doesNotMatch(styles, /\.work-visual-block\.has-kicker-label/);
   assert.match(source, /CanvasNodeLabelRootContext/);
   assert.match(source, /labelRoot && createPortal\(nodeLabel, labelRoot\)/);
   assert.match(source, /className="work-node-type-icon" name=\{metaIcon\}[\s\S]*?<span title=\{displayTitle\}>\{displayTitle\}<\/span>[\s\S]*?className="work-node-kicker-actions"/);
   assert.match(styles, /\.canvas-node-label-anchor \.work-node-kicker \{[\s\S]*?inset: 0;[\s\S]*?height: 100%/);
   assert.match(styles, /\.canvas-node-label-anchor \.work-node-kicker > svg \{[\s\S]*?var\(--node-label-zoom, 1\)/);
-  assert.match(styles, /\.work-node-kicker > \.work-node-type-icon \{[\s\S]*?background: #6f7680/);
+  assert.match(styles, /\.work-node-kicker > \.work-node-type-icon \{[\s\S]*?background: var\(--muted\)/);
 });
 test('节点输入面板固定在屏幕空间，不跟随画布倍率缩放', () => {
   assert.match(source, /ScreenSpaceComposer/);
@@ -45,22 +45,27 @@ test('节点输入面板固定在屏幕空间，不跟随画布倍率缩放', ()
   assert.match(source, /CanvasOverlayRootContext/);
   assert.match(source, /viewportX \+ .* \* zoom/);
   assert.match(styles, /\.work-composer \{[\s\S]*?position:\s*relative/);
-  assert.match(styles, /\.work-composer-anchor \{[\s\S]*?z-index:\s*120/);
+  assert.match(styles, /\.work-composer-anchor \{[\s\S]*?z-index:\s*var\(--layer-canvas-composer\)/);
   assert.doesNotMatch(styles, /\.work-composer \{[\s\S]*?top:\s*calc\(100% \+ 10px\)/);
 });
 
 test('节点输入面板使用四分之三紧凑尺寸', () => {
   assert.match(source, /Math\.min\(570, Math\.max\(320, rootWidth - 24\)\)/);
   assert.match(styles, /\.work-composer \{[\s\S]*?height:\s*186px/);
-  assert.match(styles, /\.work-composer-add \{[\s\S]*?width:\s*36px;[\s\S]*?height:\s*36px/);
-  assert.match(styles, /\.work-composer-input \{[\s\S]*?width:\s*36px;[\s\S]*?height:\s*36px/);
+  assert.match(styles, /\.work-composer-add \{[\s\S]*?width:\s*var\(--canvas-slot-size\);[\s\S]*?height:\s*var\(--canvas-slot-size\)/);
+  assert.match(styles, /\.work-composer-input \{[\s\S]*?width:\s*var\(--canvas-slot-size\);[\s\S]*?height:\s*var\(--canvas-slot-size\)/);
+  // 缩略图行只在触发器在场时让位，让的宽度由触发器自身尺寸派生。
+  assert.doesNotMatch(styles, /width:\s*calc\(100% - 160px\)/);
+  assert.match(styles, /\.work-composer:has\(\.preset-picker\) \.work-composer-inputs \{ width: calc\(100% - var\(--canvas-composer-trigger-reserve\)\); \}/);
 });
 
 test('长提示词滚动时不会进入参考素材区域', () => {
   assert.match(styles, /\.work-prompt-shell \{[^}]*?display:\s*flex;[^}]*?flex-direction:\s*column/);
-  assert.match(styles, /\.work-composer-inputs \{[\s\S]*?position:\s*relative;[\s\S]*?flex:\s*0 0 38px/);
+  assert.match(styles, /\.work-composer-inputs \{[\s\S]*?position:\s*relative;[\s\S]*?flex:\s*0 0 var\(--canvas-slot-size\)/);
   assert.match(styles, /\.work-prompt-shell textarea \{[^}]*?flex:\s*1 1 auto/);
   assert.doesNotMatch(styles, /\.work-prompt-shell textarea \{[^}]*?padding:\s*47px/);
+  // 输入面板高度固定，没有参考槽位的节点（纯文本生成）不能让空行白占一整档行高。
+  assert.match(styles, /\.work-composer-inputs:empty \{ display: none; \}/);
 });
 
 test('节点输入面板层级被限制在画布内且不会盖住剪辑工作区', () => {
@@ -99,11 +104,11 @@ test('生成参数收纳到分组面板且发送按钮保持在底栏', () => {
   assert.match(source, /control === "select"/);
   assert.match(source, /className="generation-settings-group-title"/);
   assert.match(source, /className="generation-settings-input nodrag nopan"/);
-  assert.match(styles, /\.generation-settings-panel \{[\s\S]*?width:\s*380px/);
+  assert.match(styles, /\.generation-settings-panel \{[\s\S]*?width:\s*384px/);
   assert.match(styles, /\.generation-settings-input \{/);
   assert.match(styles, /\.generation-settings-slider \{/);
   assert.match(styles, /\.generation-settings-group-title \{/);
-  assert.match(styles, /\.work-run-btn \{[^}]*?flex:\s*0 0 32px/);
+  assert.match(styles, /\.work-run-btn \{[^}]*?flex:\s*0 0 var\(--canvas-slot-size\)/);
   assert.match(styles, /\.work-composer \{[\s\S]*?width:\s*100%/);
   assert.match(source, /className="work-composer nodrag nopan nowheel"[\s\S]*?onPointerDown=\{\(event\) => event\.stopPropagation\(\)\}/);
   assert.match(source, /className="generation-settings-panel nodrag nopan nowheel"/);

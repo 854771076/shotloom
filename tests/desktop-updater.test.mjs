@@ -36,8 +36,11 @@ test('desktop updater keeps the checked update for download and installation', (
   assert.match(dialog, /data\.phase !== "downloading"/);
   assert.doesNotMatch(dialog, />\s*下载中\s*<\/button>/);
   assert.doesNotMatch(dialog, /SHOTLOOM DESKTOP/);
-  assert.match(styles, /\.update-modal \{[\s\S]*border-radius: 22px/);
-  assert.match(styles, /\.progress-track span \{[\s\S]*background: #59616a/);
+  // 更新对话框只是 .modal 的一个宽度变体，圆角/底色/抬升沿用应用级模态框契约。
+  assert.match(styles, /\.update-modal \{\s*width: min\(456px[^}]*\}/);
+  assert.match(styles, /\.modal \{[\s\S]*?border-radius: var\(--radius-lg\)[\s\S]*?box-shadow: var\(--shadow-modal\)/);
+  assert.match(styles, /\.update-modal-head \.icon-btn \{[^}]*border-radius: var\(--radius-control\)/);
+  assert.match(styles, /\.progress-track span \{[\s\S]*background: var\(--brand\)/);
 });
 
 test('release workflow publishes signed updater packages for every desktop target', () => {

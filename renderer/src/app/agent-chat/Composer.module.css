@@ -12,13 +12,13 @@
   margin-bottom: 8px;
   padding: 10px 12px;
   border-radius: var(--slk-radius-md);
-  background: var(--slk-static-amber-100);
-  color: var(--slk-static-amber-900);
+  background: var(--warn-wash);
+  color: var(--slk-label-warn);
 }
 
 .warning > svg {
-  width: 15px;
-  height: 15px;
+  width: var(--icon-md);
+  height: var(--icon-md);
   flex: 0 0 auto;
   margin-top: 3px;
 }
@@ -30,12 +30,12 @@
 }
 
 .warning strong {
-  font-size: calc(12px + var(--slk-font-delta));
+  font-size: var(--text-body-12);
   font-weight: 600;
 }
 
 .warning small {
-  font-size: calc(11px + var(--slk-font-delta));
+  font-size: var(--text-caption-11);
   line-height: 16px;
   opacity: 0.8;
 }
@@ -50,7 +50,7 @@
   border: 0;
   border-radius: var(--slk-radius-panel);
   background: var(--slk-bg-raised);
-  box-shadow: var(--slk-elevation-soft);
+  box-shadow: var(--slk-elevation-panel);
   transition: box-shadow var(--slk-dur) var(--slk-ease);
 }
 
@@ -91,7 +91,7 @@
   border-radius: 0;
   color: var(--slk-label-primary);
   background: transparent;
-  font: 400 var(--slk-content-font-size)/24px var(--slk-font-family);
+  font: 400 var(--text-body-14)/24px var(--font-ui);
   overflow-y: auto;
   resize: none;
   scrollbar-width: thin;
@@ -154,15 +154,15 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: calc(12px + var(--slk-font-delta));
-  font-weight: 550;
+  font-size: var(--text-body-12);
+  font-weight: 500;
 }
 
 .mentionMenu > button > span {
   grid-column: 2;
   grid-row: 1;
   color: var(--slk-label-accent);
-  font-size: calc(11px + var(--slk-font-delta));
+  font-size: var(--text-caption-11);
   font-variant-numeric: tabular-nums;
 }
 
@@ -170,7 +170,7 @@
   grid-column: 1 / -1;
   grid-row: 2;
   color: var(--slk-label-caption);
-  font-size: calc(10px + var(--slk-font-delta));
+  font-size: var(--text-caption-10);
   font-style: normal;
 }
 
@@ -213,8 +213,8 @@
 }
 
 .add > svg {
-  width: 16px;
-  height: 16px;
+  width: var(--icon-md);
+  height: var(--icon-md);
 }
 
 @media (hover: hover) {
@@ -246,15 +246,15 @@
   border-radius: 999px;
   color: var(--slk-label-secondary);
   background: transparent;
-  font: 500 calc(12px + var(--slk-font-delta))/1 var(--slk-font-family);
+  font: 500 var(--text-body-12)/1 var(--font-ui);
   transition:
     color var(--slk-dur-fast) var(--slk-ease),
     background-color var(--slk-dur-fast) var(--slk-ease);
 }
 
 .chip > svg {
-  width: 14px;
-  height: 14px;
+  width: var(--icon-sm);
+  height: var(--icon-sm);
   flex: 0 0 auto;
 }
 
@@ -266,8 +266,8 @@
 }
 
 .chip .chipChevron {
-  width: 11px;
-  height: 11px;
+  width: var(--icon-xs);
+  height: var(--icon-xs);
   flex: 0 0 auto;
   opacity: 0.5;
   transition: transform var(--slk-dur-fast) var(--slk-ease);
@@ -279,7 +279,7 @@
 
 .chip[data-active] {
   color: var(--slk-label-accent);
-  background: var(--slk-static-accent-50);
+  background: var(--brand-accent-wash);
 }
 
 @media (hover: hover) {
@@ -358,8 +358,8 @@
 }
 
 .menuIcon {
-  width: 15px;
-  height: 15px;
+  width: var(--icon-sm);
+  height: var(--icon-sm);
   flex: 0 0 auto;
   color: var(--slk-label-tertiary);
 }
@@ -375,8 +375,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: calc(12px + var(--slk-font-delta));
-  font-weight: 550;
+  font-size: var(--text-body-12);
+  font-weight: 500;
 }
 
 .menuCopy small {
@@ -384,13 +384,13 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--slk-label-caption);
-  font-size: calc(10.5px + var(--slk-font-delta));
+  font-size: var(--text-caption-11);
   line-height: 15px;
 }
 
 .menuCheck {
-  width: 14px;
-  height: 14px;
+  width: var(--icon-sm);
+  height: var(--icon-sm);
   flex: 0 0 auto;
   color: var(--slk-label-accent);
 }
@@ -412,8 +412,8 @@
 }
 
 .send > svg {
-  width: 17px;
-  height: 17px;
+  width: var(--icon-md);
+  height: var(--icon-md);
 }
 
 @media (hover: hover) {
@@ -427,7 +427,7 @@
 }
 
 .send[data-stop] {
-  background: var(--slk-static-n-1000);
+  background: var(--brand);
 }
 
 .send:disabled {

@@ -12,8 +12,8 @@ test('项目任务使用平面信息行且不混入助手运行中心', () => {
   assert.match(view, /<StatusPill status=\{status\} \/>/);
   assert.match(view, /className="task-search"/);
   assert.match(view, /className="task-list-summary"/);
-  assert.match(migrationStyles, /\.task-record \{[\s\S]*?border-bottom:\s*1px solid #f0f0f0/);
-  assert.match(migrationStyles, /\.task-record-title > span:not\(\.pill\)[\s\S]*?border:\s*1px solid #e2e2e2/);
+  assert.match(migrationStyles, /\.task-record \{[\s\S]*?border-bottom:\s*1px solid var\(--line\)/);
+  assert.match(migrationStyles, /\.task-record-title > span:not\(\.pill\)[\s\S]*?border:\s*1px solid var\(--line\)/);
   assert.doesNotMatch(view, /助手运行中心/);
 });
 test('任务操作默认收起并在悬停或键盘聚焦时出现', () => {

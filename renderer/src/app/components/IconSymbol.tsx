@@ -36,6 +36,15 @@ const paths = {
     '<path d="m12 2 9 5-9 5-9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/>',
   lock:
     '<rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',
+  bold:
+    '<path d="M13 12a4 4 0 0 0 0-8H7v8"/><path d="M13 12a4 4 0 0 1 0 8H7v-8"/><path d="M7 12h6"/>',
+  italic: '<path d="M19 4h-9"/><path d="M14 20H5"/><path d="M15 4 9 20"/>',
+  "list-bullet":
+    '<circle cx="4.5" cy="6" r="1.4" fill="currentColor" stroke="none"/><circle cx="4.5" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="4.5" cy="18" r="1.4" fill="currentColor" stroke="none"/><path d="M10 6h11"/><path d="M10 12h11"/><path d="M10 18h11"/>',
+  "list-ordered":
+    '<path d="M3.6 4.8 5 3.8v4.7"/><path d="M3.4 11.4a1.7 1.7 0 1 1 3 1.2L3.4 14.5h3"/><path d="M3.4 15.9h3.1l-2.2 2.1h.9a1.5 1.5 0 1 1-1.5 1.7"/><path d="M10 6h11"/><path d="M10 12h11"/><path d="M10 18h11"/>',
+  table:
+    '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M12 3v18"/>',
   list: '<path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/>',
   maximize:
     '<path d="M15 3h6v6"/><path d="M21 3l-7 7"/><path d="M9 21H3v-6"/><path d="M3 21l7-7"/>',

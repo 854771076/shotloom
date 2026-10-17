@@ -107,7 +107,7 @@ export function ImageAnnotationEditor({ imageUrl, imageWidth, imageHeight, seman
   const dispatcher = useMemo(() => ({ call: (name: string, ...args: unknown[]) => { if (name === "onCancel") onCancel(); if (name === "onSave" || name === "onOk") onSave({ blob: args[0] as Blob, bounds: args[1] as ImageAnnotationSave["bounds"] }); }, setHistory, setBounds: () => undefined, setCursor: () => undefined, setOperation }), [onCancel, onSave]);
   const context = useMemo<ContextValue>(() => ({ store, dispatcher }), [store, dispatcher]);
   if (!root) return null;
-  return createPortal(<div className="canvas-image-annotation-editor nodrag nopan nowheel" style={{ left: screenRect.left, top: screenRect.top, width, height, "--canvas-annotation-toolbar-scale": "1" } as CSSProperties} onPointerDown={(event) => event.stopPropagation()}>
+  return createPortal(<div className="canvas-image-annotation-editor nodrag nopan nowheel" style={{ left: screenRect.left, top: screenRect.top, width, height, "--canvas-annotation-toolbar-scale": "1", "--canvas-annotation-zoom": String(semanticZoom) } as CSSProperties} onPointerDown={(event) => event.stopPropagation()}>
     <ScreenshotsContext.Provider value={context}>
       {image && <ScreenshotsCanvas ref={canvasContextRef} />}
       {image && <ScreenshotsOperations />}

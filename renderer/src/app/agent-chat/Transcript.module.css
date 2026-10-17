@@ -52,11 +52,11 @@
 /* 尺寸由 .sidebar-brand-logo 统一声明为 32px，这里只管空状态自己的间距和圆角。 */
 .emptyMark {
   margin-bottom: 10px;
-  border-radius: 13px;
+  border-radius: var(--radius);
 }
 
 .empty strong {
-  font-size: calc(15px + var(--slk-font-delta));
+  font-size: var(--text-title-16);
   font-weight: 600;
   line-height: 24px;
   color: var(--slk-label-primary);
@@ -66,7 +66,7 @@
   max-width: 320px;
   margin: 0;
   color: var(--slk-label-tertiary);
-  font-size: calc(13px + var(--slk-font-delta));
+  font-size: var(--text-body-13);
   line-height: 20px;
 }
 
@@ -86,8 +86,8 @@
   border-radius: var(--slk-radius-xl);
   color: var(--slk-label-primary);
   background: var(--slk-bg-bubble);
-  font-size: calc(var(--slk-content-font-size) - 1px);
-  line-height: calc(22px + var(--slk-font-delta));
+  font-size: var(--text-body-13);
+  line-height: 22px;
   overflow-wrap: anywhere;
 }
 
@@ -126,13 +126,13 @@
   border: 0;
   color: var(--slk-label-accent);
   background: transparent;
-  font: 500 12px/18px var(--slk-font-family);
+  font: 500 var(--text-body-12)/18px var(--font-ui);
 }
 
 .deliveryError {
   padding-right: 14px;
   color: var(--slk-state-error);
-  font-size: 11px;
+  font-size: var(--text-caption-11);
   line-height: 16px;
 }
 
@@ -153,7 +153,7 @@
   flex-wrap: wrap;
   gap: 4px 8px;
   color: var(--slk-label-caption);
-  font-size: calc(var(--slk-font-secondary));
+  font-size: var(--text-body-13);
   line-height: 18px;
 }
 
@@ -166,8 +166,8 @@
 /* ---------- Markdown ---------- */
 .markdown {
   color: var(--slk-label-primary);
-  font-size: var(--slk-content-font-size);
-  line-height: calc(24px + var(--slk-font-delta));
+  font-size: var(--text-body-14);
+  line-height: 24px;
   overflow-wrap: anywhere;
 }
 
@@ -185,20 +185,20 @@
 .markdown h3,
 .markdown h4 {
   margin: 20px 0 10px;
-  font-weight: 650;
+  font-weight: 600;
 }
 .markdown h1 {
-  font-size: calc(19px + var(--slk-font-delta));
-  line-height: calc(28px + var(--slk-font-delta));
+  font-size: var(--text-title-20);
+  line-height: var(--text-title-20--line-height);
 }
 .markdown h2 {
-  font-size: calc(17px + var(--slk-font-delta));
-  line-height: calc(26px + var(--slk-font-delta));
+  font-size: var(--text-title-18);
+  line-height: var(--text-title-18--line-height);
 }
 .markdown h3,
 .markdown h4 {
-  font-size: calc(15px + var(--slk-font-delta));
-  line-height: calc(24px + var(--slk-font-delta));
+  font-size: var(--text-title-16);
+  line-height: 24px;
 }
 .markdown ul,
 .markdown ol {
@@ -224,15 +224,15 @@
   }
 }
 .markdown strong {
-  font-weight: 650;
+  font-weight: 600;
 }
 .markdown code {
   padding: 1px 5px;
   border: 0.5px solid var(--slk-border-l1);
   border-radius: var(--slk-radius-sm);
   background: var(--slk-bg-inline-code);
-  font-family: var(--slk-font-code);
-  font-size: 0.875em;
+  font-family: var(--font-mono);
+  font-size: var(--text-caption-11);
 }
 .markdown pre {
   margin: 0 0 12px;
@@ -246,8 +246,8 @@
   padding: 0;
   border: 0;
   background: transparent;
-  font-size: calc(var(--slk-code-font-size) + var(--slk-code-delta));
-  line-height: calc(19px + var(--slk-code-delta));
+  font-size: var(--text-caption-11);
+  line-height: 19px;
   white-space: pre;
 }
 .markdown blockquote {
@@ -285,21 +285,21 @@
 
 .failureCopy > strong {
   color: var(--slk-state-error);
-  font-size: calc(var(--slk-font-secondary));
+  font-size: var(--text-body-13);
   font-weight: 600;
   line-height: 20px;
 }
 
 .failureCopy details {
   color: var(--slk-label-secondary);
-  font-size: calc(var(--slk-font-secondary) - 1px);
+  font-size: var(--text-body-12);
   line-height: 19px;
 }
 
 .failureCopy summary {
   cursor: pointer;
   color: var(--slk-label-tertiary);
-  font-size: 11px;
+  font-size: var(--text-caption-11);
   list-style: none;
 }
 
@@ -313,8 +313,8 @@
   padding: 6px 8px;
   border-radius: var(--slk-radius-sm);
   background: var(--slk-bg-code);
-  font-family: var(--slk-font-code);
-  font-size: calc(var(--slk-code-font-size) + var(--slk-code-delta));
+  font-family: var(--font-mono);
+  font-size: var(--text-caption-11);
   line-height: 17px;
   white-space: pre-wrap;
   word-break: break-word;
@@ -322,7 +322,7 @@
 
 .failureRepeat {
   color: var(--slk-label-caption);
-  font-size: 11px;
+  font-size: var(--text-caption-11);
   line-height: 20px;
   white-space: nowrap;
 }
@@ -333,7 +333,7 @@
   border-radius: 999px;
   color: var(--slk-label-inverted);
   background: var(--slk-state-error);
-  font: 500 12px/18px var(--slk-font-family);
+  font: 500 var(--text-body-12)/18px var(--font-ui);
   white-space: nowrap;
 }
 
@@ -344,7 +344,7 @@
   padding: 9px 11px;
   border-radius: var(--slk-radius-md);
   background: var(--slk-bg-sunken);
-  font-size: calc(var(--slk-font-secondary));
+  font-size: var(--text-body-13);
   line-height: 20px;
 }
 
@@ -360,8 +360,8 @@
 
 .diagnosis small {
   color: var(--slk-label-caption);
-  font-family: var(--slk-font-code);
-  font-size: 11px;
+  font-family: var(--font-mono);
+  font-size: var(--text-caption-11);
 }
 
 /* ---------- 运行中 ---------- */
@@ -369,7 +369,7 @@
   padding: 2px 0 0;
   border-top: 0.5px solid var(--slk-border-l1);
   padding-top: 10px;
-  font-size: calc(var(--slk-font-secondary));
+  font-size: var(--text-body-13);
 }
 
 .busy {

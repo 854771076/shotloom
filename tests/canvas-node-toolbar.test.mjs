@@ -36,7 +36,7 @@ test('加入对话只在节点选中工具栏中显示', () => {
   // 3D 导演台节点不挂引用入口，工具栏整体不渲染，而不是留下一个空壳。
   assert.match(toolbar, /node\.type === "threeDDirector" \? null : mentionInCopilot/);
   assert.match(toolbar, /hasToolbar = isTextNode \|\| canUpload \|\| mentionNode \|\|/);
-  assert.match(styles, /\.canvas-node-selection-toolbar \{[\s\S]*?z-index: 110/);
+  assert.match(styles, /\.canvas-node-selection-toolbar \{[\s\S]*?z-index: var\(--layer-canvas-control\)/);
   for (const source of [generation, basicNodes, director]) {
     assert.doesNotMatch(source, /className="node-mention-btn/);
   }
@@ -77,7 +77,7 @@ test('媒体节点工具栏提供真实入库与音频分离', () => {
   assert.match(adapter, /assetDetails = \{[\s\S]*?category,[\s\S]*?promoteMaterialToLocalLibrary/);
   assert.match(adapter, /scope === "project"[\s\S]*?ensureMaterialStoredInProjectAssets\(projectMaterial\)[\s\S]*?addMaterialToAssetLibrary/);
   assert.match(styles, /\.canvas-node-asset-scope-menu \{[\s\S]*?width:\s*220px/);
-  assert.match(styles, /\.canvas-node-asset-scope-menu--portal \{[\s\S]*?z-index:\s*121/);
+  assert.match(styles, /\.canvas-node-asset-scope-menu--portal \{[\s\S]*?z-index:\s*calc\(var\(--layer-canvas-composer\) \+ 1\)/);
   assert.match(styles, /\.react-workflow-canvas \{[\s\S]*?isolation:\s*isolate/);
   assert.match(adapter, /async function extractAudio\(id: string\)[\s\S]*?separateAudioToProject[\s\S]*?addNode\("videoGeneration"\)[\s\S]*?addNode\("audioGeneration"\)/);
   assert.match(adapter, /sourceDimensions = canvasNodeDimensions\(source\)[\s\S]*?silentVideo\.y \+ canvasNodeDimensions\(silentVideo\)\.height \+ 48/);
@@ -103,7 +103,7 @@ test('本地图片节点提供原图裁剪并创建保留来源连线的新节�
   assert.match(imageRust, /pub async fn file_crop_image[\s\S]*?spawn_blocking/);
   assert.match(imageRust, /fn crop_image[\s\S]*?apply_orientation[\s\S]*?crop_imm[\s\S]*?ImageFormat::Png/);
   assert.match(styles, /\.canvas-image-crop-layer \{/);
-  assert.match(styles, /\.canvas-image-crop-toolbar \{[^}]*z-index:\s*120/);
+  assert.match(styles, /\.canvas-image-crop-toolbar \{[^}]*z-index:\s*var\(--layer-canvas-composer\)/);
 });
 
 test('本地图片节点使用 react-screenshots 完成标注并保存合成图片', () => {
@@ -116,6 +116,11 @@ test('本地图片节点使用 react-screenshots 完成标注并保存合成图�
   assert.match(generation, /saveDataUrlToProject/);
   assert.match(generation, /annotationImagePath/);
   assert.match(styles, /\.canvas-image-annotation-editor \.screenshots \{/);
+  // 标注浮层必须自己裁圆角：卡片靠 --canvas-node-radius 裁图，浮层不裁就在四个角露出方角画布。
+  assert.match(styles, /\.canvas-image-annotation-editor \.screenshots,\s*\n\.canvas-image-annotation-editor \.screenshots-canvas \{ border-radius: calc\(var\(--canvas-node-radius\) \* var\(--canvas-annotation-zoom, 1\)\); \}/);
+  assert.match(annotationEditor, /"--canvas-annotation-zoom": String\(semanticZoom\)/);
+  // 只裁图像层，外层容器仍要 visible，否则操作条浮不到图片之外。
+  assert.match(styles, /\.canvas-image-annotation-editor \{\n(?:[^}\n]*\n)*?  overflow: visible;/);
   assert.match(annotationEditor, /ScreenshotsContext\.Provider/);
 });
 
@@ -129,18 +134,18 @@ test('空媒体节点从顶部工具栏上传且节点内部只保留占位图�
   assert.match(styles, /--canvas-node-state-icon-size:\s*34px/);
   assert.match(styles, /\.work-preview \.work-empty-type-icon \{[^}]*width:\s*var\(--canvas-node-state-icon-size\)[^}]*height:\s*var\(--canvas-node-state-icon-size\)/);
   assert.match(styles, /\.canvas-node-selection-toolbar--subtle \{[\s\S]*?background:\s*transparent;[\s\S]*?box-shadow:\s*none/);
-  assert.match(styles, /\.canvas-node-selection-toolbar--subtle button \{[\s\S]*?height:\s*26px;[\s\S]*?font-size:\s*11px/);
+  assert.match(styles, /\.canvas-node-selection-toolbar--subtle button \{[\s\S]*?height:\s*var\(--canvas-toolbar-action-compact\);[\s\S]*?font-size:\s*var\(--text-body-12\)/);
 });
 
 test('节点顶部工具栏保持屏幕字号并随名称高度避让', () => {
-  assert.equal(nodeChrome.canvasNodeToolbarOffset(0.55, true), 18);
-  assert.equal(nodeChrome.canvasNodeToolbarOffset(1, true), 26);
-  assert.equal(nodeChrome.canvasNodeToolbarOffset(1.8, true), 42);
-  assert.equal(nodeChrome.canvasNodeToolbarOffset(0.55, false), 30);
-  assert.equal(nodeChrome.canvasNodeToolbarOffset(1, false), 30);
-  assert.equal(nodeChrome.canvasNodeToolbarOffset(1.8, false), 46);
-  assert.match(canvas, /top: -CANVAS_NODE_LABEL_HEIGHT \* semanticZoom/);
+  assert.equal(nodeChrome.canvasNodeToolbarOffset(0.55, true), 26);
+  assert.equal(nodeChrome.canvasNodeToolbarOffset(1, true), 34);
+  assert.equal(nodeChrome.canvasNodeToolbarOffset(1.8, true), 56.4);
+  assert.equal(nodeChrome.canvasNodeToolbarOffset(0.55, false), 38);
+  assert.equal(nodeChrome.canvasNodeToolbarOffset(1, false), 38);
+  assert.equal(nodeChrome.canvasNodeToolbarOffset(1.8, false), 60.4);
+  assert.match(canvas, /top: -CANVAS_NODE_LABEL_OFFSET \* semanticZoom/);
   assert.match(canvas, /height: CANVAS_NODE_LABEL_HEIGHT \* semanticZoom/);
-  assert.match(styles, /\.canvas-node-selection-toolbar--subtle button \{[^}]*font-size:\s*11px/);
+  assert.match(styles, /\.canvas-node-selection-toolbar--subtle button \{[^}]*font-size:\s*var\(--text-body-12\)/);
   assert.doesNotMatch(styles, /canvas-node-selection-toolbar[^}]*transform:\s*scale/);
 });

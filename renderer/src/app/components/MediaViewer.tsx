@@ -302,16 +302,16 @@ export function MediaViewer() {
               <button title="一级标题" onMouseDown={(event) => { event.preventDefault(); editCommand("formatBlock", "h1"); }}>H<sub>1</sub></button>
               <button title="二级标题" onMouseDown={(event) => { event.preventDefault(); editCommand("formatBlock", "h2"); }}>H<sub>2</sub></button>
               <button title="三级标题" onMouseDown={(event) => { event.preventDefault(); editCommand("formatBlock", "h3"); }}>H<sub>3</sub></button>
-              <button title="正文" onMouseDown={(event) => { event.preventDefault(); editCommand("formatBlock", "p"); }}>¶</button>
+              <button title="正文" onMouseDown={(event) => { event.preventDefault(); editCommand("formatBlock", "p"); }}><IconSymbol name="text" /></button>
               <span />
-              <button title="粗体" onMouseDown={(event) => { event.preventDefault(); editCommand("bold"); }}><b>B</b></button>
-              <button title="斜体" onMouseDown={(event) => { event.preventDefault(); editCommand("italic"); }}><i>I</i></button>
+              <button title="粗体" onMouseDown={(event) => { event.preventDefault(); editCommand("bold"); }}><IconSymbol name="bold" /></button>
+              <button title="斜体" onMouseDown={(event) => { event.preventDefault(); editCommand("italic"); }}><IconSymbol name="italic" /></button>
               <span />
-              <button title="无序列表" onMouseDown={(event) => { event.preventDefault(); editCommand("insertUnorderedList"); }} className="text-format-list">•<i>≡</i></button>
-              <button title="有序列表" onMouseDown={(event) => { event.preventDefault(); editCommand("insertOrderedList"); }} className="text-format-list"><small>1</small><i>≡</i></button>
-              <button title="分隔线" onMouseDown={(event) => { event.preventDefault(); editCommand("insertHorizontalRule"); }}>—</button>
+              <button title="无序列表" onMouseDown={(event) => { event.preventDefault(); editCommand("insertUnorderedList"); }}><IconSymbol name="list-bullet" /></button>
+              <button title="有序列表" onMouseDown={(event) => { event.preventDefault(); editCommand("insertOrderedList"); }}><IconSymbol name="list-ordered" /></button>
+              <button title="分隔线" onMouseDown={(event) => { event.preventDefault(); editCommand("insertHorizontalRule"); }}><IconSymbol name="minus" /></button>
               <span />
-              <button title="插入表格" className="text-format-table" onMouseDown={(event) => { event.preventDefault(); insertTable(); }}>▦</button>
+              <button title="插入表格" onMouseDown={(event) => { event.preventDefault(); insertTable(); }}><IconSymbol name="table" /></button>
             </div>
             <div className="text-editor-actions">
               {media.getTextVersions && <button title="版本历史" aria-label="版本历史" aria-pressed={historyOpen} onClick={() => setHistoryOpen((value) => !value)}><IconSymbol name="refresh" /></button>}

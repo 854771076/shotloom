@@ -3226,7 +3226,7 @@ textarea:focus-visible {
 }
 
 .viewport-error-card span {
-  color: rgb(var(--muted-rgb));
+  color: rgb(var(--text-muted-rgb));
   font-size: 12px;
 }
 

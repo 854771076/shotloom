@@ -185,6 +185,7 @@ test('剪辑工作区用真实媒体元数据补齐主轨并提供本地文件�
     'VideoEditorWorkspace.foundation.css',
     'VideoEditorWorkspace.layout.css',
     'VideoEditorWorkspace.theme.css',
+    'VideoEditorWorkspace.css',
   ].map((name) => readFile(new URL(`../renderer/src/app/editor/${name}`, import.meta.url), 'utf8')))).join('\n');
   assert.match(workspace, /hydrateSourceProject/);
   assert.match(workspace, /onLoadedMetadata/);
@@ -203,26 +204,32 @@ test('剪辑工作区用真实媒体元数据补齐主轨并提供本地文件�
     /runtimeMediaUrls\[asset\.id\] \|\|[\s\S]*?asset\.id === primaryVideoAssetId \? playbackUrl : asset\.sourceUrl/,
   );
   assert.match(workspace, /const video = fallbackRef\.current/);
-  assert.match(styles, /--ov-bg: #f7f7f8/);
-  assert.match(styles, /same restrained, light workspace language/);
+  assert.match(styles, /\.ov-editor \{\n\s*display: grid;\n\}/);
+  assert.match(styles, /指向 tokens\.css/);
+  assert.doesNotMatch(styles, /--ov-(bg|ink|panel2):/);
   assert.match(workspace, /createPortal/);
   assert.match(workspace, /useWorkbenchSurfaceRoot/);
   assert.doesNotMatch(styles, /position: fixed/);
   assert.match(
     styles,
-    /grid-template-columns: 42px minmax\(230px, \.95fr\) minmax\(440px, 2fr\) minmax\(260px, 1fr\)/,
+    /grid-template-columns: 322px minmax\(0, 1fr\) 420px/,
   );
   assert.match(styles, /flex-direction: column/);
   assert.match(styles, /font-family:\s*inherit/);
   assert.match(styles, /\.ov-track\.type-video,\s*\.ov-track\.type-audio \{ height: 55px; \}/);
   assert.match(styles, /grid-template-columns: 112px 1fr/);
   assert.match(styles, /\.ov-ruler \{ height: 22px/);
-  assert.match(styles, /\.ov-clip i \{ font-size: 11\.5px/);
+  assert.match(styles, /\.ov-clip i \{\n\s*font-size: var\(--text-body-12\)/);
   assert.match(workspace, /ov-clip-media/);
   assert.match(styles, /--ov-text:\s*var\(--type-primary\)/);
   assert.match(styles, /--ov-panel:\s*var\(--surface\)/);
-  assert.match(styles, /--ov-workspace:\s*var\(--window-shell\)/);
-  assert.match(styles, /--ov-accent:\s*var\(--accent\)/);
+  // 剪辑台调色板只保留真实被消费的变量，未使用的条目一律删除。
+  assert.doesNotMatch(styles, /--ov-(workspace|accent-soft):/);
+  assert.match(styles, /--ov-accent:\s*var\(--brand-accent\)/);
+  assert.match(styles, /--ov-playhead:\s*#ff604f/);
+  assert.match(styles, /\.ov-clip \{[\s\S]*?background: var\(--surface-2\)/);
+  assert.match(styles, /\.ov-actions \.primary \{[\s\S]*?background: var\(--brand\)/);
+  assert.match(styles, /\.ov-clip\.has-media \{\s*border-color: var\(--line-solid\);[\s\S]*?background: var\(--surface-2\);/);
   assert.match(styles, /\.ov-clip\.has-media/);
 });
 
@@ -232,6 +239,7 @@ test('剪辑工作区主动解码首帧并提供可编辑的中文文字预设',
     'VideoEditorWorkspace.foundation.css',
     'VideoEditorWorkspace.layout.css',
     'VideoEditorWorkspace.theme.css',
+    'VideoEditorWorkspace.css',
   ].map((name) => readFile(new URL(`../renderer/src/app/editor/${name}`, import.meta.url), 'utf8')))).join('\n');
   assert.match(workspace, /preload="auto"/);
   assert.match(workspace, /const primeSourcePreview/);
@@ -273,7 +281,7 @@ test('剪辑工作区主动解码首帧并提供可编辑的中文文字预设',
     styles,
     /\.ov-inspector-section input,[\s\S]*?width:\s*100%;[\s\S]*?max-width:\s*100%/,
   );
-  assert.match(styles, /\.ov-edit-buttons button:nth-child\(2\) \{ font-size: 0; \}/);
+  assert.match(styles, /\.ov-edit-buttons button \{[^}]*font-size: var\(--text-body-12\)/);
   assert.match(workspace, /const deleteAsset = \(assetId: string\)/);
   assert.match(
     workspace,
@@ -286,7 +294,7 @@ test('剪辑工作区主动解码首帧并提供可编辑的中文文字预设',
   assert.match(workspace, /preload="auto"/);
   assert.match(styles, /\.ov-history \{[^}]*display:\s*flex/);
   assert.match(styles, /\.ov-asset-delete/);
-  assert.match(styles, /--ov-ui-font-size:\s*13px/);
+  assert.match(styles, /--ov-ui-font-size:\s*var\(--text-body-13\)/);
   assert.match(
     styles,
     /\.ov-inspector-section label,[\s\S]*?font-size:\s*var\(--ov-ui-font-size\)/,
@@ -294,17 +302,17 @@ test('剪辑工作区主动解码首帧并提供可编辑的中文文字预设',
   assert.match(styles, /\.ov-inspector-section input,[\s\S]*?min-height:\s*32px/);
   assert.match(
     styles,
-    /\.ov-inspector-section input,[\s\S]*?\.ov-inspector-section textarea \{\s*font-size:\s*12px/,
+    /\.ov-inspector-section input,[\s\S]*?\.ov-inspector-section textarea \{\s*font-size:\s*var\(--text-body-12\)/,
   );
-  assert.match(styles, /\.ov-ruler span \{[\s\S]*?font-size:\s*11px/);
+  assert.match(styles, /\.ov-ruler span \{[\s\S]*?font-size:\s*var\(--text-caption-11\)/);
   assert.match(workspace, /className="ov-inspector-section ov-transform-section"/);
   assert.match(
     styles,
-    /\.ov-transform-section input \{[^}]*min-height:\s*28px[^}]*font-size:\s*11px/,
+    /\.ov-transform-section input \{[^}]*min-height:\s*28px[^}]*font-size:\s*var\(--text-caption-11\)/,
   );
   assert.match(
     styles,
-    /\.ov-transform-presets button,[\s\S]*?\.ov-inspector-actions button \{[^}]*font-size:\s*12px/,
+    /\.ov-transform-presets button,[\s\S]*?\.ov-inspector-actions button \{[^}]*font-size:\s*var\(--text-body-12\)/,
   );
   assert.match(
     styles,

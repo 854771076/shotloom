@@ -40,8 +40,8 @@
   position: absolute;
   inset: 0;
   margin: auto;
-  width: 20px;
-  height: 20px;
+  width: var(--icon-lg);
+  height: var(--icon-lg);
 }
 
 .play {
@@ -57,8 +57,8 @@
 }
 
 .play > svg {
-  width: 26px;
-  height: 26px;
+  width: var(--icon-xl);
+  height: var(--icon-xl);
   padding: 6px;
   border-radius: 999px;
   background: rgb(0 0 0 / 45%);
@@ -77,10 +77,10 @@
   right: 4px;
   bottom: 4px;
   padding: 0 4px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   color: var(--slk-label-inverted);
   background: rgb(0 0 0 / 62%);
-  font-size: calc(10px + var(--slk-font-delta));
+  font-size: var(--text-caption-10);
   font-variant-numeric: tabular-nums;
   line-height: 15px;
 }

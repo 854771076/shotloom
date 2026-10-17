@@ -71,6 +71,6 @@ test('点击资产浏览器外部自动收起且网格卡片通过文件夹按�
 test('资产浏览器与展开侧栏并排且跟随侧栏宽度变化', () => {
   assert.match(styles, /sidebar-overlay-shell:is\(\.sidebar-is-pinned, \.sidebar-preview-open\)[\s\S]*?\.canvas-asset-popover-layer/);
   assert.match(styles, /left: calc\([\s\S]*?var\(--workspace-sidebar-width\) - var\(--workspace-sidebar-rail-width\)[\s\S]*?\)/);
-  assert.match(styles, /\.canvas-asset-popover-layer\s*\{[\s\S]*?transition: left 220ms/);
+  assert.match(styles, /\.canvas-asset-popover-layer\s*\{[\s\S]*?transition: left var\(--duration-enter\)/);
   assert.match(styles, /\.canvas-material-picker\s*\{[\s\S]*?border-radius: var\(--workbench-radius\) var\(--workbench-radius\) 0 0/);
 });

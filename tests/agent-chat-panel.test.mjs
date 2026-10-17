@@ -42,8 +42,29 @@ test('助手面板不再依赖 antd，样式只来自 CSS Modules 与 --slk-* �
 test('助手面板只有浅色，不提供暗色模式', () => {
   assert.ok(!existsSync(new URL(`${dir}useAgentTheme.ts`, import.meta.url)));
   assert.doesNotMatch(`${tokens}${modules}${panel}`, /data-slk-theme/);
-  assert.match(tokens, /--slk-bg-base: var\(--slk-static-n-00\)/);
+  assert.match(tokens, /--slk-bg-base: var\(--surface\)/);
   assert.doesNotMatch(panel, /theme/i);
+});
+
+// 面板曾经自带第五套灰阶（--slk-static-n-*），和画布、侧栏的墨阶在同一窗口里并存。
+test('助手面板的色值全部来自产品 token，没有第二套色阶', () => {
+  assert.doesNotMatch(tokens, /--slk-static|#(?:[0-9a-f]{3}|[0-9a-f]{6})\b/i);
+  assert.doesNotMatch(`${tokens}${modules}`, /--slk-static|--slk-border-l4\b/);
+  assert.match(tokens, /--slk-label-primary: var\(--text\)/);
+  assert.match(tokens, /--slk-label-secondary: var\(--muted\)/);
+  assert.match(tokens, /--slk-border-l1: var\(--line-soft\)/);
+});
+
+// 面板曾经自带 --slk-font-delta 伪流式刻度（delta 永远是 0），产出 10.5/12.5/17/19 这些阶梯外字号。
+test('助手面板字号只走 tokens.css 阶梯，字体栈只有一个入口', () => {
+  assert.doesNotMatch(
+    `${tokens}${modules}`,
+    /--slk-(font-delta|font-secondary|code-delta|content-font-size|code-font-size|font-family|font-code)/,
+  );
+  const literalSize = /font(?:-size)?:\s*(?:[1-9]00\s+)?(?:calc\(|\d+(?:\.\d+)?(?:px|em))/;
+  assert.doesNotMatch(modules, literalSize);
+  assert.match(modules, /var\(--font-ui\)/);
+  assert.match(modules, /var\(--font-mono\)/);
 });
 
 test('运行轨迹默认一行摘要，等待确认时才自动展开', () => {

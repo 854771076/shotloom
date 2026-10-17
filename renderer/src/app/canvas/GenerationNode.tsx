@@ -732,7 +732,6 @@ export const GenerationNode: WorkflowNodeRenderer = memo(({
           onClick={(event) => event.stopPropagation()}
         >
           <div className="work-composer-row">
-            <span className="work-type-chip">{metaLabel}</span>
             {node.type === "imageGeneration" && (
               <div className="preset-picker">
                 <button

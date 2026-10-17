@@ -24,8 +24,8 @@
 }
 
 .remove > svg {
-  width: 10px;
-  height: 10px;
+  width: var(--icon-xs);
+  height: var(--icon-xs);
 }
 
 @media (hover: hover) {

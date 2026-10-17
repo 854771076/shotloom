@@ -20,7 +20,7 @@
   color: var(--slk-label-tertiary);
   background: transparent;
   text-align: left;
-  font-size: calc(var(--slk-font-secondary));
+  font-size: var(--text-body-13);
   line-height: 22px;
   transition: color var(--slk-dur-fast) var(--slk-ease);
 }
@@ -33,8 +33,8 @@
 
 .headIcon,
 .headChevron {
-  width: 14px;
-  height: 14px;
+  width: var(--icon-sm);
+  height: var(--icon-sm);
 }
 
 .headLabel {
@@ -63,8 +63,8 @@
 
 .headCount {
   color: var(--slk-label-caption);
-  font-family: var(--slk-font-code);
-  font-size: 11px;
+  font-family: var(--font-mono);
+  font-size: var(--text-caption-11);
   font-variant-numeric: tabular-nums;
 }
 
@@ -90,7 +90,7 @@
   content: "";
   position: absolute;
   inset: 4.5px;
-  border-radius: 1.5px;
+  border-radius: var(--radius-sm);
   background: currentColor;
 }
 
@@ -136,20 +136,20 @@
   gap: 6px;
   min-height: 22px;
   color: var(--slk-label-tertiary);
-  font-size: calc(var(--slk-font-secondary) - 1px);
+  font-size: var(--text-body-12);
   line-height: 20px;
 }
 
 .stepIcon {
-  width: 13px;
-  height: 13px;
+  width: var(--icon-xs);
+  height: var(--icon-xs);
   /* 图标按行高居中，否则在 baseline 网格里会跟着文字下沉。 */
   align-self: center;
 }
 
 .stepState {
   color: var(--slk-label-secondary);
-  font-weight: 550;
+  font-weight: 500;
   white-space: nowrap;
 }
 
@@ -189,7 +189,7 @@
   gap: 4px;
   margin-left: 20px;
   color: var(--slk-label-tertiary);
-  font-size: calc(var(--slk-font-secondary) - 1px);
+  font-size: var(--text-body-12);
   line-height: 20px;
 }
 
@@ -238,19 +238,19 @@
   gap: 6px;
   min-height: 22px;
   color: var(--slk-label-tertiary);
-  font-size: calc(var(--slk-font-secondary) - 1px);
+  font-size: var(--text-body-12);
   line-height: 20px;
 }
 
 .branchIcon {
-  width: 13px;
-  height: 13px;
+  width: var(--icon-xs);
+  height: var(--icon-xs);
   align-self: center;
 }
 
 .branchState {
   color: var(--slk-label-secondary);
-  font-weight: 550;
+  font-weight: 500;
   white-space: nowrap;
 }
 
@@ -263,7 +263,7 @@
 .branchName {
   flex: 0 0 auto;
   color: var(--slk-label-secondary);
-  font-weight: 550;
+  font-weight: 500;
   white-space: nowrap;
 }
 
@@ -280,7 +280,7 @@
 .branchResult {
   margin-left: 20px;
   color: var(--slk-label-tertiary);
-  font-size: calc(var(--slk-font-secondary) - 1px);
+  font-size: var(--text-body-12);
   line-height: 20px;
 }
 
@@ -330,12 +330,12 @@
   border: 0;
   color: var(--slk-label-secondary);
   background: transparent;
-  font: 550 12px/18px var(--slk-font-family);
+  font: 550 var(--text-body-12)/18px var(--font-ui);
 }
 
 .argsToggle > svg {
-  width: 12px;
-  height: 12px;
+  width: var(--icon-xs);
+  height: var(--icon-xs);
 }
 
 .argsEditor {
@@ -345,8 +345,8 @@
   border-radius: var(--slk-radius-sm);
   color: var(--slk-label-primary);
   background: var(--slk-bg-base);
-  font-family: var(--slk-font-code);
-  font-size: calc(var(--slk-code-font-size) + var(--slk-code-delta));
+  font-family: var(--font-mono);
+  font-size: var(--text-caption-11);
   line-height: 18px;
   resize: vertical;
   outline: none;
@@ -358,7 +358,7 @@
 
 .argsError {
   color: var(--slk-state-error);
-  font-size: 11px;
+  font-size: var(--text-caption-11);
   line-height: 16px;
 }
 
@@ -368,7 +368,7 @@
   border: 0;
   color: var(--slk-label-accent);
   background: transparent;
-  font: 500 11px/16px var(--slk-font-family);
+  font: 500 var(--text-caption-11)/16px var(--font-ui);
 }
 
 .decisionActions {
@@ -384,7 +384,7 @@
   border-radius: 999px;
   color: var(--slk-label-secondary);
   background: var(--slk-hover-wash-strong);
-  font: 500 12px/1 var(--slk-font-family);
+  font: 500 var(--text-body-12)/1 var(--font-ui);
 }
 
 @media (hover: hover) {

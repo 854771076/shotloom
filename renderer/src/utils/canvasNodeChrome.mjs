@@ -1,4 +1,7 @@
-export const CANVAS_NODE_LABEL_HEIGHT = 20;
+export const CANVAS_NODE_LABEL_HEIGHT = 24;
+
+// Reference geometry: a 4px air gap separates the name band from the node top.
+export const CANVAS_NODE_LABEL_OFFSET = 28;
 
 const LEFT_PORT_SIZE = 12;
 const RIGHT_PORT_SIZE = 20;
@@ -28,7 +31,7 @@ export function canvasNodePortBounds(width, height) {
 export function canvasNodeToolbarOffset(semanticZoom, subtle = false) {
   const zoom = Number(semanticZoom);
   const safeZoom = Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
-  const baseOffset = subtle ? 18 : 30;
+  const baseOffset = subtle ? 26 : 38;
   const labelGap = subtle ? 6 : 10;
-  return Math.max(baseOffset, CANVAS_NODE_LABEL_HEIGHT * safeZoom + labelGap);
+  return Math.max(baseOffset, CANVAS_NODE_LABEL_OFFSET * safeZoom + labelGap);
 }

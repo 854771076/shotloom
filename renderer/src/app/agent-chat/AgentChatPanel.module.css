@@ -13,9 +13,9 @@
   border-left: 0.5px solid var(--slk-border-l2);
   background: var(--slk-bg-base);
   color: var(--slk-label-primary);
-  font-family: var(--slk-font-family);
-  font-size: var(--slk-content-font-size);
-  line-height: calc(24px + var(--slk-font-delta));
+  font-family: var(--font-ui);
+  font-size: var(--text-body-14);
+  line-height: 24px;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -34,8 +34,8 @@
   margin: 0;
   overflow: hidden;
   color: var(--slk-label-primary);
-  font-size: calc(13px + var(--slk-font-delta));
-  font-weight: 550;
+  font-size: var(--text-body-13);
+  font-weight: 500;
   line-height: 20px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -87,8 +87,8 @@
 }
 
 .glyph {
-  width: 16px;
-  height: 16px;
+  width: var(--icon-md);
+  height: var(--icon-md);
   flex: 0 0 auto;
 }
 
@@ -115,13 +115,13 @@
   color: var(--slk-label-secondary);
   background: var(--slk-bg-raised);
   box-shadow: var(--slk-elevation-panel);
-  font: 500 12px/1 var(--slk-font-family);
+  font: 500 var(--text-body-12)/1 var(--font-ui);
   transition: color var(--slk-dur-fast) var(--slk-ease);
 }
 
 .jump > svg {
-  width: 13px;
-  height: 13px;
+  width: var(--icon-sm);
+  height: var(--icon-sm);
 }
 
 @media (hover: hover) {

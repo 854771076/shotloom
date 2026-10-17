@@ -47,6 +47,7 @@ import {
 } from "../../utils/canvasNodeDrag.mjs";
 import {
   CANVAS_NODE_LABEL_HEIGHT,
+  CANVAS_NODE_LABEL_OFFSET,
   canvasNodePortBounds,
 } from "../../utils/canvasNodeChrome.mjs";
 import { CanvasNodeToolbar } from "./CanvasNodeToolbar";
@@ -206,6 +207,8 @@ export function CanvasNodeSemanticContent({
           zoom: USE_WEBKIT_NODE_SCALE_FALLBACK ? 1 : semanticZoom,
           scale: USE_WEBKIT_NODE_SCALE_FALLBACK ? semanticZoom : 1,
           transformOrigin: "top left",
+          // 节点内 1px 描边写的是逻辑像素，会被 zoom 一起放大；扣回倍率后任何倍率下都是屏幕 1px。
+          "--canvas-node-zoom": String(semanticZoom),
         } as CSSProperties}
       >
         {children}
@@ -213,8 +216,8 @@ export function CanvasNodeSemanticContent({
     </div>
   );
 }
-const MIN_CANVAS_ZOOM = 0.21;
-const MAX_CANVAS_ZOOM = 3;
+const MIN_CANVAS_ZOOM = 0.1;
+const MAX_CANVAS_ZOOM = 4;
 const MEDIA_PREVIEW_ZOOM_SETTLE_MS = 220;
 const MEDIA_NODE_TYPES = new Set([
   "imageGeneration",
@@ -452,7 +455,7 @@ function CanvasNode({ data, selected, dragging }: NodeProps<FlowNode>) {
         ref={setLabelRoot}
         className="canvas-node-label-anchor"
         style={{
-          top: -CANVAS_NODE_LABEL_HEIGHT * semanticZoom,
+          top: -CANVAS_NODE_LABEL_OFFSET * semanticZoom,
           width: dimensions.width * semanticZoom,
           height: CANVAS_NODE_LABEL_HEIGHT * semanticZoom,
           "--node-label-zoom": semanticZoom,
@@ -600,7 +603,6 @@ export function WorkflowCanvas({
     });
   }, [canonicalNodes]);
   const renderedNodes = flowNodes;
-  const renderedSemanticZoom = semanticZoom;
   const ids = useMemo(() => new Set(visible.map((node) => node.id)), [visible]);
   const visibleById = useMemo(() => new Map(visible.map((node) => [node.id, node])), [visible]);
   const flowEdges = useMemo<Array<Edge<WorkflowEdgeData>>>(
@@ -619,7 +621,6 @@ export function WorkflowCanvas({
             edge,
             sourceHandle,
             targetHandle,
-            semanticZoom,
           ]);
           const cached = flowEdgeCache.current.get(edge.id);
           if (cached?.signature === signature) return cached.output;
@@ -632,12 +633,6 @@ export function WorkflowCanvas({
               type: MarkerType.ArrowClosed,
               width: 10,
               height: 10,
-              color: "#aab1ad",
-            },
-            style: {
-              stroke: "#aab1ad",
-              strokeWidth: Math.min(1.35, Math.max(0.5, semanticZoom)),
-              opacity: semanticZoom < 0.55 ? 0.48 : 0.72,
             },
           };
           flowEdgeCache.current.set(edge.id, { signature, output });
@@ -649,7 +644,7 @@ export function WorkflowCanvas({
       }
       return result;
     },
-    [edges, ids, semanticZoom, visibleById],
+    [edges, ids, visibleById],
   );
 
   const onNodesChange = useCallback(
@@ -923,7 +918,7 @@ export function WorkflowCanvas({
           ref={bindCanvasRoot}
           onDragOver={onArtifactDragOver}
           onDrop={onArtifactDrop}
-          className={`react-workflow-canvas${renderedSemanticZoom < 0.8 ? " canvas-zoom-compact" : ""}${renderedSemanticZoom < 0.35 ? " canvas-zoom-distant" : ""}${Math.round(renderedSemanticZoom * 100) <= 20 ? " canvas-zoom-overview" : ""}`}
+          className="react-workflow-canvas"
           tabIndex={0}
           onPointerDownCapture={(event) => {
             const target = event.target as Element;
@@ -1040,6 +1035,8 @@ export function WorkflowCanvas({
             edges={edgesVisible ? flowEdges : []}
             nodeTypes={nodeTypes}
             proOptions={{ hideAttribution: true }}
+            // 空字符串让箭头不写行内 stroke/fill，颜色由 canvas.css 的 --canvas-edge 统一决定。
+            defaultMarkerColor=""
             onlyRenderVisibleElements={false}
             defaultViewport={{ x: viewport.x, y: viewport.y, zoom: 1 }}
             minZoom={1}
@@ -1076,8 +1073,6 @@ export function WorkflowCanvas({
                 className="canvas-minimap"
                 pannable
                 zoomable={false}
-                nodeColor="#7f8d85"
-                maskColor="rgba(250,250,248,.72)"
               />
             )}
           </ReactFlow>

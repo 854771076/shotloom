@@ -69,8 +69,8 @@ test('布局和画布渲染共用唯一的节点尺寸契约', () => {
 });
 
 test('图片节点按原图比例显示，并限制极端长宽比', () => {
-  assert.deepEqual(mediaCanvasNodeDimensions(1080, 1920), { width: 197, height: 350 });
-  assert.deepEqual(mediaCanvasNodeDimensions(1200, 1600), { width: 263, height: 350 });
+  assert.deepEqual(mediaCanvasNodeDimensions(1080, 1920), { width: 248, height: 440 });
+  assert.deepEqual(mediaCanvasNodeDimensions(1200, 1600), { width: 330, height: 440 });
   assert.deepEqual(mediaCanvasNodeDimensions(1920, 1080), { width: 350, height: 197 });
   assert.deepEqual(mediaCanvasNodeDimensions(4000, 500), { width: 350, height: 100 });
   assert.deepEqual(mediaCanvasNodeDimensions(0, 0), { width: 350, height: 350 });
@@ -106,7 +106,7 @@ test('空媒体节点按模型配置比例自适应', () => {
   );
   assert.deepEqual(
     canvasNodeDimensions(node('image-portrait', 'imageGeneration', { config: { size: '1024x1536' } })),
-    { width: 233, height: 350 },
+    { width: 293, height: 440 },
   );
   assert.deepEqual(
     canvasNodeDimensions(node('video-adaptive', 'videoGeneration', { config: { ratio: 'adaptive' } })),

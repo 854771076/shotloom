@@ -37,8 +37,9 @@ test('项目侧栏提供返回上一层入口并恢复当前画布的父文件�
 });
 
 test('悬停抽屉只改变宽度和文字，不改变工具图标几何尺寸', () => {
-  assert.match(styles, /width 220ms cubic-bezier\(\.22, 1, \.36, 1\)/);
-  assert.match(styles, /\.side-item svg \{[\s\S]*?flex:\s*0 0 17px/);
+  assert.match(styles, /width var\(--duration-enter\) var\(--ease-sheet\)/);
+  assert.match(styles, /\.side-item svg \{[\s\S]*?flex:\s*0 0 var\(--icon-md\)/);
+  assert.doesNotMatch(styles, /\.sidebar-shell\.collapsed \.side-item svg/);
   assert.doesNotMatch(sidebar, /className="side-title"/);
   assert.match(styles, /\.sidebar-shell\.collapsed \.sidebar \{[\s\S]*?padding:\s*46px 7px 8px/);
   assert.match(styles, /\.sidebar-shell\.collapsed \.sidebar-footer button \{ width: 40px; height: 36px/);
@@ -119,8 +120,8 @@ test('侧栏 Logo 的瞳孔跟随鼠标并尊重减少动态效果设置', () =>
 });
 
 test('侧栏底部入口与上方导航使用一致的字号和图标尺寸', () => {
-  assert.match(styles, /\.sidebar-footer button \{[^}]*height:\s*36px[^}]*font-size:\s*13px[^}]*font-weight:\s*500/);
-  assert.match(styles, /\.sidebar-footer svg \{ width:\s*17px; height:\s*17px; flex:\s*0 0 17px/);
+  assert.match(styles, /\.sidebar-footer button \{[^}]*height:\s*36px[^}]*font-size:\s*var\(--text-body-13\)[^}]*font-weight:\s*500/);
+  assert.match(styles, /\.sidebar-footer svg \{ width:\s*var\(--icon-md\); height:\s*var\(--icon-md\); flex:\s*0 0 var\(--icon-md\)/);
   assert.doesNotMatch(styles, /sidebar-settings-icon/);
 });
 
@@ -269,7 +270,7 @@ test('厂商卡片用配置状态说明模型可见性而不是承诺连通性',
   assert.match(settingsPanel, /item\.configured \? "已配置" : "未配置"/);
   assert.match(settingsPanel, /填写 API Key 后该厂商的模型才会进入目录/);
   assert.match(settingsPanel, /实际连通性在调用模型时验证/);
-  assert.match(settingsStyles, /\.provider-incomplete i \{ background: #c9c4be/);
+  assert.match(settingsStyles, /\.provider-incomplete i \{ background: var\(--line-strong\)/);
 });
 
 test('厂商卡片按生成类型展示该厂商的全部内置模型', () => {

@@ -6,7 +6,7 @@ export interface CanvasSizedNode {
 }
 
 export const CANVAS_NODE_SIZE_SCALE = 1;
-export const CANVAS_NODE_SIZING_VERSION = 4;
+export const CANVAS_NODE_SIZING_VERSION = 5;
 
 const scaled = (value: number) => Math.round(value * CANVAS_NODE_SIZE_SCALE);
 
@@ -22,17 +22,22 @@ export function defaultCanvasNodeDimensions(type: string) {
 
 const MEDIA_NODE_MIN_SIZE = scaled(100);
 const MEDIA_NODE_MAX_SIZE = scaled(350);
+const MEDIA_NODE_PORTRAIT_MAX_HEIGHT = scaled(440);
 
 /**
- * Match the reference canvas contract: scale the longest media edge to 350px
- * and clamp only the short edge to 100px. The node and its media therefore use
- * the same aspect-driven layout instead of a generic landscape rectangle.
+ * Match the reference canvas contract: landscape and square media scale the
+ * longest edge to 350px; portrait media scale height to 440px (reference
+ * default portrait node is 360x440) so tall shots do not collapse into thin
+ * strips. The short edge only clamps at 100px.
  */
 export function mediaCanvasNodeDimensions(naturalWidth: number, naturalHeight: number) {
   if (!(naturalWidth > 0) || !(naturalHeight > 0)) {
     return defaultCanvasNodeDimensions("imageGeneration");
   }
-  const scale = Math.min(MEDIA_NODE_MAX_SIZE / naturalWidth, MEDIA_NODE_MAX_SIZE / naturalHeight);
+  const longEdge = naturalHeight > naturalWidth
+    ? Math.max(MEDIA_NODE_MAX_SIZE, MEDIA_NODE_PORTRAIT_MAX_HEIGHT)
+    : MEDIA_NODE_MAX_SIZE;
+  const scale = Math.min(longEdge / naturalWidth, longEdge / naturalHeight);
   return {
     width: Math.max(MEDIA_NODE_MIN_SIZE, Math.round(naturalWidth * scale)),
     height: Math.max(MEDIA_NODE_MIN_SIZE, Math.round(naturalHeight * scale)),

@@ -289,7 +289,7 @@ test('松手后等待坐标提交完成再恢复浮层', () => {
   assert.match(node, /const hidden = dragging \|\| dragReleaseSettling/);
   assert.doesNotMatch(canvas, /pendingPositionCommits|committedIds/);
   assert.match(styles, /\.canvas-node-asset-scope-menu--hidden \{[\s\S]*?opacity:\s*0;[\s\S]*?translate:\s*0 -7px;[\s\S]*?transition:\s*none;[\s\S]*?pointer-events:\s*none;/);
-  assert.match(styles, /\.work-composer-anchor \{[\s\S]*?opacity 150ms ease-out,[\s\S]*?translate 220ms cubic-bezier\(\.22, 1, \.36, 1\)/);
+  assert.match(styles, /\.work-composer-anchor \{[\s\S]*?opacity var\(--duration-fast\) var\(--ease-out\),[\s\S]*?translate var\(--duration-enter\) var\(--ease-sheet\)/);
 });
 test('本地媒体流地址加载失败时回退到带正确 MIME 的缓冲地址', () => {
   assert.match(mediaCacheHook, /bufferedPath === path/);
@@ -317,10 +317,10 @@ test('视频节点持续显示时长并提供声音开关', () => {
   assert.match(node, /className="work-video-controls nodrag nopan"[\s\S]*?videoPlaying[\s\S]*?requestFullscreen/);
   assert.doesNotMatch(node, /10 \* Math\.min\(1, semanticZoom\)/);
   assert.match(node, /className="work-video-control-button"[\s\S]*?nextMuted = !videoMuted[\s\S]*?volume-x[\s\S]*?volume/);
-  assert.match(migrationStyles, /\.work-video-status \{[\s\S]*?border-radius: 4px[\s\S]*?background: rgba\(78, 83, 90, \.86\)[\s\S]*?opacity: 1/);
+  assert.match(migrationStyles, /\.work-video-status \{[\s\S]*?border-radius: var\(--radius-sm\)[\s\S]*?background: rgba\(78, 83, 90, \.86\)[\s\S]*?opacity: 1/);
   assert.match(migrationStyles, /\.work-preview:hover \.work-video-status \{[\s\S]*?opacity: 0[\s\S]*?visibility: hidden/);
   assert.match(migrationStyles, /\.work-video-controls \{[\s\S]*?background: linear-gradient\(180deg, transparent, rgba\(10, 12, 15, \.8\)\)/);
-  assert.match(migrationStyles, /\.audio-play-glyph \{[\s\S]*?border-left: 6px solid #fff/);
+  assert.match(migrationStyles, /\.audio-play-glyph \{[\s\S]*?border-left: 6px solid var\(--overlay-ink\)/);
   assert.match(migrationStyles, /\.work-preview \.audio-waveform-download svg \{ width: var\(--canvas-node-icon-size\); height: var\(--canvas-node-icon-size\); \}/);
 });
 test('工作台只计算当前路由数据且素材选择器按需加载', () => {
@@ -365,6 +365,9 @@ test('画布缩放使用最终布局尺寸并保持 React Flow 视口为 1x', ()
   assert.match(canvas, /scale: USE_WEBKIT_NODE_SCALE_FALLBACK \? semanticZoom : 1/);
   assert.match(canvas, /className="canvas-node-semantic-frame"[\s\S]*?width: width \* semanticZoom[\s\S]*?height: height \* semanticZoom/);
   assert.doesNotMatch(canvas, /className="canvas-node-semantic-content"[\s\S]{0,220}?transform: `scale/);
+  assert.match(canvas, /"--canvas-node-zoom": String\(semanticZoom\)/);
+  assert.match(styles, /\.canvas-node-semantic-content \{\s*--canvas-hairline: calc\(1px \/ var\(--canvas-node-zoom, 1\)\)/);
+  assert.match(styles, /\.work-node \{[\s\S]*?border: var\(--canvas-hairline\) solid var\(--canvas-node-border\)/);
   assert.match(styles, /\.canvas-node-semantic-frame \{[^}]*min-width:\s*0;[^}]*min-height:\s*0/);
   assert.match(styles, /\.canvas-node-semantic-content \{[^}]*display:\s*block;[^}]*contain:\s*layout style;[^}]*-webkit-text-size-adjust:\s*none;[^}]*text-size-adjust:\s*none/);
   assert.match(canvas, /defaultViewport=\{\{ x: viewport\.x, y: viewport\.y, zoom: 1 \}\}/);
@@ -373,10 +376,11 @@ test('画布缩放使用最终布局尺寸并保持 React Flow 视口为 1x', ()
   assert.match(canvas, /onWheelCapture=\{\(event\) => \{[\s\S]*?if \(event\.ctrlKey\)[\s\S]*?event\.preventDefault\(\);[\s\S]*?return;/);
 });
 test('节点文字、图标和错误态共享语义尺寸并沿同一缩放轨道', () => {
-  assert.match(styles, /--canvas-node-title-size: 12px/);
-  assert.match(styles, /--canvas-node-body-size: 12px/);
-  assert.match(styles, /--canvas-node-error-size: 12px/);
-  assert.match(styles, /--canvas-node-icon-size: 12px/);
+  // 画布只按角色命名尺寸，值和字体阶梯/图标刻度仍归 tokens.css 所有。
+  assert.match(styles, /--canvas-node-title-size: var\(--text-body-14\)/);
+  assert.match(styles, /--canvas-node-body-size: var\(--text-body-12\)/);
+  assert.match(styles, /--canvas-node-error-size: var\(--text-body-12\)/);
+  assert.match(styles, /--canvas-node-icon-size: var\(--icon-xs\)/);
   assert.match(styles, /--canvas-node-head-height: 24px/);
   assert.match(styles, /\.work-error \{[\s\S]*?font-size: var\(--canvas-node-error-size\)[\s\S]*?word-break: break-word/);
   assert.match(styles, /\.audio-waveform-download \{[\s\S]*?width: var\(--canvas-node-action-size\)[\s\S]*?height: var\(--canvas-node-action-size\)/);
@@ -415,30 +419,28 @@ test('语义缩放时端口与节点边缘使用同一屏幕坐标', () => {
   assert.match(styles, /\.canvas-flow-port-out \{ right: 0;/);
   assert.match(styles, /\.canvas-flow-port-out::before \{ left: 100%;/);
 });
-test('低倍率画布降低连线与节点操作的信息密度', () => {
+test('画布倍率变化不隐藏内容也不给连线单独降透明度', () => {
   assert.doesNotMatch(canvas, /label:.*roleLabel/);
   assert.doesNotMatch(canvas, /const roleLabel/);
-  assert.match(canvas, /strokeWidth: Math\.min\(1\.35, Math\.max\(0\.5, semanticZoom\)\)/);
-  assert.match(canvas, /opacity: semanticZoom < 0\.55 \? 0\.48 : 0\.72/);
-  assert.match(canvas, /canvas-zoom-compact[\s\S]*?canvas-zoom-distant[\s\S]*?canvas-zoom-overview/);
-  assert.match(canvas, /const renderedSemanticZoom = semanticZoom/);
-  assert.match(canvas, /className="canvas-node-label-anchor"[\s\S]*?top: -CANVAS_NODE_LABEL_HEIGHT \* semanticZoom,[\s\S]*?width: dimensions\.width \* semanticZoom/);
+  assert.doesNotMatch(canvas, /opacity: semanticZoom|strokeWidth:/);
+  assert.doesNotMatch(canvas, /canvas-zoom-(compact|distant|overview)/);
+  assert.match(canvas, /className="canvas-node-label-anchor"[\s\S]*?top: -CANVAS_NODE_LABEL_OFFSET \* semanticZoom,[\s\S]*?width: dimensions\.width \* semanticZoom/);
   assert.match(canvas, /CanvasNodeLabelRootContext\.Provider value=\{labelRoot\}/);
-  assert.match(canvas, /Math\.round\(renderedSemanticZoom \* 100\) <= 20 \? " canvas-zoom-overview"/);
+  assert.match(canvas, /className="react-workflow-canvas"/);
   assert.doesNotMatch(canvas, /--canvas-label-scale/);
   assert.doesNotMatch(migrationStyles, /--canvas-label-scale/);
-  assert.match(migrationStyles, /canvas-zoom-overview \.work-node-kicker \{[\s\S]*?display: none/);
-  assert.match(migrationStyles, /canvas-zoom-compact \.work-node-kicker \{[\s\S]*?opacity: \.68;[\s\S]*?pointer-events: none/);
+  assert.doesNotMatch(migrationStyles, /canvas-zoom-overview/);
+  assert.match(migrationStyles, /max\(1, var\(--node-label-zoom, 1\)\)/);
   assert.doesNotMatch(migrationStyles, /canvas-zoom-compact \.work-node-kicker \{[^}]*?inset:/);
   assert.doesNotMatch(migrationStyles, /canvas-zoom-compact \.work-node-kicker > span/);
-  assert.match(migrationStyles, /canvas-zoom-distant \.work-node-kicker \{ opacity: \.42; \}/);
+  assert.match(migrationStyles, /inset: -28px 0 auto;/);
   // 低倍率不靠隐藏，也不给节点内某块内容套第二层缩放：入口与节点名称、卡片共用
   // CanvasNodeSemanticContent 上唯一的一层 zoom，所以按卡片尺寸等比缩小，不会折行也不会溢出卡片。
   assert.doesNotMatch(canvas, /nodeActionCounterScale|--node-action-scale|--node-logical-width/);
   assert.doesNotMatch(migrationStyles, /(^|\n)\s*zoom:/);
   assert.doesNotMatch(migrationStyles, /canvas-zoom-compact[^{]*\.text-result-starters/);
-  assert.match(migrationStyles, /canvas-zoom-overview :is\([\s\S]*?\.director-node-head,[\s\S]*?\.resource-meta,[\s\S]*?display: none !important/);
-  assert.match(migrationStyles, /canvas-zoom-overview \.canvas-flow-port[\s\S]*?pointer-events: none/);
+  assert.doesNotMatch(migrationStyles, /canvas-zoom-overview :is/);
+  assert.doesNotMatch(migrationStyles, /canvas-zoom-overview \.canvas-flow-port/);
 });
 test('节点使用完整设计尺寸且旧画布只换算一次', () => {
   assert.match(project, /import \{[\s\S]*?CANVAS_NODE_SIZE_SCALE,[\s\S]*?\} from '@\/domain\/graph\/CanvasNodeDimensions'/);
@@ -560,4 +562,16 @@ test('图片预览在缩放稳定后升级清晰度且视频不订阅预览尺�
   assert.match(fileCommands, /JpegEncoder::new_with_quality\(&mut encoded, 92\)/);
   assert.match(api, /activeImagePreviewReads < 4/);
   assert.match(node, /className="work-node-wrapper"[\s\S]*?actions\.select\(node\.id\)/);
+});
+test('连线与箭头只在 CSS 主题变量里取色，缩放不再重建连线对象', () => {
+  assert.match(styles, /--xy-edge-stroke: var\(--canvas-edge\);/);
+  assert.match(styles, /--xy-edge-stroke-width: var\(--canvas-edge-width\);/);
+  assert.match(styles, /--xy-edge-stroke-selected: var\(--canvas-edge-selected\);/);
+  assert.match(styles, /--xy-connectionline-stroke: var\(--canvas-edge-flow\);/);
+  assert.match(styles, /\.react-flow__arrowhead polyline \{ stroke: var\(--canvas-edge\); \}/);
+  assert.match(styles, /\.react-flow__arrowhead polyline\.arrowclosed \{ fill: var\(--canvas-edge\); \}/);
+  // React Flow 把 marker color 写进行内 style；空 defaultMarkerColor 才能把取色权交给 CSS。
+  assert.match(canvas, /defaultMarkerColor=""/);
+  assert.doesNotMatch(canvas, /stroke: "#|strokeWidth: 1\.5|color: "#c4c4c4"/);
+  assert.match(canvas, /\[edges, ids, visibleById\]/);
 });
