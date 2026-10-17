@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 
 interface InteractiveLogoProps {
   src: string;
-  className?: string;
+  className?: string | undefined;
 }
 
 export function InteractiveLogo({ src, className = "" }: InteractiveLogoProps) {

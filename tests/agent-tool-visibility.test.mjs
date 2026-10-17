@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import {
@@ -9,7 +8,9 @@ import {
   registerAgentTool,
 } from '../renderer/src/agent/core/toolRegistry.ts';
 import { AGENT_DEFINITIONS, agentDefinition } from '../renderer/src/agent/agents/definitions.ts';
+import { createAgentRunFacts } from '../renderer/src/agent/core/runFacts.ts';
 import { selectAgentSkills } from '../renderer/src/agent/core/visibility.ts';
+import { readSource } from './helpers/sourceContract.mjs';
 
 function contextFor(agentId, overrides = {}) {
   return {
@@ -17,7 +18,7 @@ function contextFor(agentId, overrides = {}) {
     agentId,
     signal: new AbortController().signal,
     loadedSkillIds: new Set(), attachments: [],
-    capabilities: { nodeExecution: true }, state: new Map(), emit: () => {},
+    capabilities: { nodeExecution: true }, run: createAgentRunFacts(), state: new Map(), emit: () => {},
     ...overrides,
   };
 }
@@ -139,10 +140,7 @@ test('只有主 Agent 声明的 dispatch 才会建立子 Agent profile', () => {
 test('契约的 appliesTo 只能引用已声明的 Agent', () => {
   const knownIds = new Set(AGENT_DEFINITIONS.map((agent) => agent.id));
   for (const file of ['safety-rules', 'anti-loop', 'production-governance']) {
-    const source = readFileSync(
-      new URL(`../renderer/src/agent/content/contracts/${file}.md`, import.meta.url),
-      'utf8',
-    );
+    const source = readSource(`../renderer/src/agent/content/contracts/${file}.md`);
     const appliesTo = /appliesTo: \[([^\]]*)\]/.exec(source)?.[1];
     assert.ok(appliesTo, `${file} 缺少 appliesTo`);
     for (const raw of appliesTo.split(',')) {
@@ -200,13 +198,11 @@ test('所有默认工具都至少被一个 Agent 白名单授予', () => {
   const files = ['canvasTools', 'catalogTools', 'lifecycleTools', 'productionPlanTools', 'textTools', 'videoEditorTools'];
   const registered = [];
   for (const file of files) {
-    const source = readFileSync(new URL(`../renderer/src/agent/tools/${file}.ts`, import.meta.url), 'utf8');
+    const source = readSource(`../renderer/src/agent/tools/${file}.ts`);
     registered.push(...[...source.matchAll(/\bid: '([a-z_0-9]+)'/g)].map(([, id]) => id));
   }
   // Skill 命名空间工具由 registerSkillTool 加前缀，实际 id 与源码里的基础名不同。
-  const scriptSource = readFileSync(
-    new URL('../renderer/src/agent/tools/scriptTools.ts', import.meta.url), 'utf8',
-  );
+  const scriptSource = readSource('renderer/src/agent/tools/scriptTools.ts');
   const skillNamespace = /registerSkillTool<[^>]*>\('([^']+)'/.exec(scriptSource)?.[1] || '';
   registered.push(
     ...[...scriptSource.matchAll(/\bid: '([a-z_0-9]+)'/g)]

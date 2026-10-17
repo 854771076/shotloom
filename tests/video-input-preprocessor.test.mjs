@@ -1,11 +1,9 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import test from 'node:test';
 
-const taskService = readFileSync(
-  new URL('../renderer/src/services/modelTaskService.js', import.meta.url),
-  'utf8',
-);
+import test from 'node:test';
+import { readSource } from './helpers/sourceContract.mjs';
+
+const taskService = readSource('renderer/src/services/modelTaskService.ts');
 
 test('视频任务直接提交用户连接或上传的原始图片输入', () => {
   assert.doesNotMatch(taskService, /preprocessVideoModelInputs|videoInputPreprocessing/);

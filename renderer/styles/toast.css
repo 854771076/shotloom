@@ -1,0 +1,42 @@
+/* 全局提示条。 */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  top: 60px;
+  transform: translateX(-50%);
+  z-index: var(--layer-toast);
+  min-width: 220px;
+  max-width: min(520px, calc(100vw - 32px));
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  color: var(--text);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  font-size: var(--text-body-13);
+  font-weight: 600;
+}
+
+.toast.toast-success {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border-color: var(--good-wash);
+  color: var(--good);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-lg);
+}
+
+.toast-success-mark {
+  display: grid;
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--good-foreground);
+  background: var(--good);
+  font-size: var(--text-body-13);
+  font-weight: 600;
+}

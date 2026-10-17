@@ -1,21 +1,21 @@
 import { loadModelCatalog } from './helpers/modelCatalog.mjs';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { modelResponseError } from '../renderer/src/utils/modelResponseParsing.mjs';
-import { renderProtocolContentTemplate, renderProtocolTemplate } from '../renderer/src/utils/modelProtocol.mjs';
-import { optionLabel } from '../renderer/src/utils/modelPresentation.js';
+import { modelResponseError } from '../renderer/src/utils/modelResponseParsing.ts';
+import { renderProtocolContentTemplate, renderProtocolTemplate } from '../renderer/src/utils/modelProtocol.ts';
+import { optionLabel } from '../renderer/src/utils/modelPresentation.ts';
+import { readSource } from './helpers/sourceContract.mjs';
 
 const catalog = loadModelCatalog();
-const agentContract = JSON.parse(readFileSync(new URL('../renderer/src/config/agent-action-contract.json', import.meta.url), 'utf8'));
+const agentContract = JSON.parse(readSource('renderer/src/config/agent-action-contract.json'));
 
 test('模型能力按厂商文件登记，索引不复制模型定义', () => {
-  const manifest = JSON.parse(readFileSync(new URL('../renderer/src/config/model-catalog-v2.json', import.meta.url), 'utf8'));
+  const manifest = JSON.parse(readSource('renderer/src/config/model-catalog-v2.json'));
   assert.equal(Object.hasOwn(manifest, 'models'), false);
   assert.equal(new Set(manifest.providers).size, manifest.providers.length);
   assert.equal(new Set(manifest.modelOrder).size, catalog.models.length);
   for (const provider of manifest.providers) {
-    const file = JSON.parse(readFileSync(new URL(`../renderer/src/config/model-catalog-v2/${provider}.json`, import.meta.url), 'utf8'));
+    const file = JSON.parse(readSource(`../renderer/src/config/model-catalog-v2/${provider}.json`));
     assert.equal(file.provider, provider);
     assert.ok(file.models.length > 0);
     assert.ok(file.models.every((model) => model.provider === provider));

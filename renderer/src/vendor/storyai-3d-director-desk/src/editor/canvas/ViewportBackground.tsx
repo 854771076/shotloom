@@ -95,7 +95,7 @@ export function ViewportBackground({
   panoramaYaw,
 }: {
   backgroundColor: string;
-  panoramaAsset?: DirectorAssetRef | null;
+  panoramaAsset?: DirectorAssetRef | null | undefined;
   panoramaRadius: number;
   panoramaYaw: number;
 }) {

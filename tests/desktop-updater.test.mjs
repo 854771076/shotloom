@@ -1,14 +1,15 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import test from 'node:test';
 
-const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
+import test from 'node:test';
+import { readSource } from './helpers/sourceContract.mjs';
+
+const read = (path) => readSource(path);
 
 test('desktop updater keeps the checked update for download and installation', () => {
-  const api = read('renderer/src/services/tauriApi.js');
-  const store = read('renderer/src/store/updateStore.js');
+  const api = read('renderer/src/services/tauriApi.ts');
+  const store = read('renderer/src/store/updateStore.ts');
   const dialog = read('renderer/src/app/components/UpdateDialog.tsx');
-  const styles = read('renderer/styles.css');
+  const styles = read('renderer/styles/dialogs.css');
   const checkFlow = store.slice(
     store.indexOf('export async function checkForUpdate'),
     store.indexOf('export async function downloadUpdate'),
@@ -21,8 +22,8 @@ test('desktop updater keeps the checked update for download and installation', (
   assert.match(api, /await pendingUpdate\.install\(\)/);
   assert.match(api, /await relaunch\(\)/);
   assert.doesNotMatch(api, /尚未配置 Tauri updater/);
-  assert.match(store, /desktopApi\.update\.download\(\(progress\) =>/);
-  assert.match(store, /function transition\(event\)/);
+  assert.match(store, /desktopApi\.update\.download\(\(progress: UpdateProgress\) =>/);
+  assert.match(store, /function transition\(event: AnyRecord\)/);
   assert.match(store, /case 'UP_TO_DATE':[\s\S]*error: '', notice: event\.message/);
   assert.match(store, /scheduleRetry\(downloadUpdate/);
   assert.match(store, /applyAvailable\(result\.info \|\| updateStore\.info, 'ready'\)/);

@@ -1,5 +1,5 @@
 import { type MouseEvent, useMemo, useState } from "react";
-import { assetCategories } from "../constants/navigation";
+import { assetCategories, defaultAssetCategory } from "../../domain/asset/assetCategories";
 import { EmptyState } from "../components/EmptyState";
 import { IconSymbol } from "../components/IconSymbol";
 import { MaterialGrid, type MaterialItem } from "../components/MaterialGrid";
@@ -34,9 +34,7 @@ export function MaterialsView(
   const [keyword, setKeyword] = useState("");
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const [libraryItem, setLibraryItem] = useState<MaterialItem | null>(null);
-  const [category, setCategory] = useState(
-    assetCategories[0]?.id || "characters",
-  );
+  const [category, setCategory] = useState(defaultAssetCategory.id);
   const [renameItem, setRenameItem] = useState<MaterialItem | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
   const currentCategory = useAppStore((state) => state.assetCategory);
@@ -92,7 +90,7 @@ export function MaterialsView(
     if (action === "show-file") void controller.showFile(item);
     if (action === "add-to-library") {
       setLibraryItem(item);
-      setCategory(currentCategory || assetCategories[0]?.id || "characters");
+      setCategory(currentCategory || defaultAssetCategory.id);
     }
     if (action === "rename-item") {
       setRenameItem(item);

@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import {
@@ -10,6 +9,8 @@ import {
   prepareAgentToolCall,
   registerAgentTool,
 } from '../renderer/src/agent/core/toolRegistry.ts';
+import { createAgentRunFacts } from '../renderer/src/agent/core/runFacts.ts';
+import { readSource } from './helpers/sourceContract.mjs';
 
 test('唯一 Agent 可在关键信息缺失时询问', () => {
   assert.equal(canRequestAgentClarification(), true);
@@ -30,7 +31,7 @@ test('Skill 命名空间工具在对应 Skill 加载前不进入模型请求', (
     agentId: 'canvas-primary',
     signal: new AbortController().signal,
     loadedSkillIds: new Set(['video-production']), attachments: [],
-    capabilities: { nodeExecution: false }, state: new Map(), emit: () => {},
+    capabilities: { nodeExecution: false }, run: createAgentRunFacts(), state: new Map(), emit: () => {},
   };
   // 只加载了别的 Skill：该工具既不会被序列化给模型，也不允许执行。
   assert.deepEqual(listAgentTools(context).map((tool) => tool.id), []);
@@ -46,19 +47,13 @@ test('Skill 命名空间工具在对应 Skill 加载前不进入模型请求', (
 });
 
 test('默认 Agent 工具以真实注册表为准并允许 Runtime 重复激活', () => {
-  const source = readFileSync(
-    new URL('../renderer/src/agent/tools/registerDefaultTools.ts', import.meta.url),
-    'utf8',
-  );
+  const source = readSource('renderer/src/agent/tools/registerDefaultTools.ts');
   assert.match(source, /hasAgentTool\('canvas_list_nodes'\)/);
   assert.doesNotMatch(source, /let registered = false/);
 });
 
 test('画布能力通过细粒度工具暴露且不保留批量模型入口', () => {
-  const source = readFileSync(
-    new URL('../renderer/src/agent/tools/canvasTools.ts', import.meta.url),
-    'utf8',
-  );
+  const source = readSource('renderer/src/agent/tools/canvasTools.ts');
   for (const tool of [
     'canvas_list_nodes', 'canvas_get_node', 'canvas_focus_nodes',
     'canvas_create_node', 'canvas_update_node', 'canvas_connect_nodes',
@@ -74,15 +69,12 @@ test('画布能力通过细粒度工具暴露且不保留批量模型入口', ()
   assert.match(source, /flattenAgentActionSchema\(buildAgentActionSchema/);
   assert.doesNotMatch(source, /return \{ type: 'object' as const, oneOf:/);
   assert.doesNotMatch(source, /note_node/);
-  const actionHandler = readFileSync(
-    new URL('../renderer/src/services/agentCanvasActionHandler.ts', import.meta.url),
-    'utf8',
-  );
+  const actionHandler = readSource('renderer/src/services/agent/agentActionHandlers.ts');
   assert.doesNotMatch(actionHandler, /note_node|'note'/);
 });
 
 test('普通画布 Agent 暴露真实视频抽帧工具并返回视觉附件', () => {
-  const source = readFileSync(new URL('../renderer/src/agent/tools/canvasTools.ts', import.meta.url), 'utf8');
+  const source = readSource('renderer/src/agent/tools/canvasTools.ts');
   assert.match(source, /id: 'canvas_media_frame'/);
   assert.match(source, /captureVideoFrameToProject/);
   assert.match(source, /__toolAttachments/);
@@ -112,10 +104,7 @@ test('工具图标由注册表声明，缺省时按 effect 取类别图标', () 
 
 // 写错图标名不会报错，IconSymbol 会静默换成 box，所以必须按真实清单校验。
 test('每个 Agent 工具都声明图标且图标名真实存在', () => {
-  const iconsSource = readFileSync(
-    new URL('../renderer/src/app/components/IconSymbol.tsx', import.meta.url),
-    'utf8',
-  ).match(/const paths = \{([\s\S]*?)\n\} as const/)[1];
+  const iconsSource = readSource('renderer/src/app/components/IconSymbol.tsx').match(/const paths = \{([\s\S]*?)\n\} as const/)[1];
   const iconNames = new Set([...iconsSource.matchAll(/^\s{2}"?([a-z-]+)"?:/gm)].map(([, name]) => name));
   assert.ok(iconNames.size > 40, '未解析到图标清单');
 
@@ -126,7 +115,7 @@ test('每个 Agent 工具都声明图标且图标名真实存在', () => {
   const declared = [];
   const missingIcon = [];
   for (const file of files) {
-    const source = readFileSync(new URL(`../renderer/src/agent/tools/${file}.ts`, import.meta.url), 'utf8');
+    const source = readSource(`../renderer/src/agent/tools/${file}.ts`);
     // 定义可以是一行或多行，按下一个 id 切块后再在块内找 icon，避免依赖换行。
     const starts = [...source.matchAll(/\bid: '([a-z_]+)'/g)];
     starts.forEach((start, index) => {

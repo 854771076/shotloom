@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { markdownToRichHtml } from '../renderer/src/utils/richTextMarkdown.mjs';
+import { markdownToRichHtml } from '../renderer/src/utils/richTextMarkdown.ts';
 
 test('Markdown 转换成真实富文本标题、强调、列表和表格', () => {
   const html = markdownToRichHtml('# 标题\n\n正文 **粗体** 和 _斜体_\n\n- 一\n- 二\n\n| 名称 | 内容 |\n| --- | --- |\n| A | B |');

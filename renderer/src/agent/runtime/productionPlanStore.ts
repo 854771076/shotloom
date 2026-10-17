@@ -10,7 +10,8 @@ export interface ProductionPlanWorkItem extends JsonObject {
   id: string;
   title: string;
   outputType: ProductionOutputType;
-  prompt?: string;
+  // 规范化会把缺失提示词显式写成 undefined（"这项还没有提示词"），所以这里必须允许显式 undefined。
+  prompt?: string | undefined;
   dependsOn: string[];
   referenceNodeIds: string[];
 }
@@ -134,7 +135,7 @@ function normalizePlanStructure(stages: ProductionPlanStage[]): string[] {
   return warnings;
 }
 
-function validateRuntimeRefs(plan: ProductionPlan, stage: ProductionPlanStage, requireOutputs: boolean): void {
+function validateRuntimeRefs(stage: ProductionPlanStage, requireOutputs: boolean): void {
   const nodes = (store.project.nodes || []) as JsonObject[];
   const tasks = (store.project.tasks || []) as JsonObject[];
   const nodeById = new Map<string, JsonObject>(nodes.map((node) => [String(node.id), node]));
@@ -198,8 +199,8 @@ export function writeProductionPlan(input: {
   title: string;
   goal: string;
   executionMode: ProductionExecutionMode;
-  sources?: string[];
-  stages: Array<Pick<ProductionPlanStage, 'title' | 'description' | 'workItems' | 'completionCriteria'> & { id?: string }>;
+  sources?: string[] | undefined;
+  stages: Array<Pick<ProductionPlanStage, 'title' | 'description' | 'workItems' | 'completionCriteria'> & { id?: string | undefined }>;
 }): ProductionPlan {
   const now = new Date().toISOString();
   const normalizedStages: ProductionPlanStage[] = input.stages.map((stage, index) => {
@@ -278,16 +279,16 @@ export function updateProductionPlanStage(input: {
   stageId: string;
   expectedRevision: number;
   status: ProductionPlanStageStatus;
-  runtimeRefs?: ProductionPlanRuntimeRef[];
-  summary?: string;
-  blockedReason?: string;
+  runtimeRefs?: ProductionPlanRuntimeRef[] | undefined;
+  summary?: string | undefined;
+  blockedReason?: string | undefined;
 }): ProductionPlan {
   const plan = plans().find((item) => item.schemaVersion === 2 && item.id === input.planId);
   if (!plan) throw new Error('制作计划不存在');
   assertExpectedRevision(plan, input.expectedRevision);
   const index = plan.stages.findIndex((item) => item.id === input.stageId);
-  if (index < 0) throw new Error('制作阶段不存在');
   const stage = plan.stages[index];
+  if (!stage) throw new Error('制作阶段不存在');
 
   const refs = new Map(stage.runtimeRefs.map((ref) => [ref.workItemId, ref]));
   for (const ref of input.runtimeRefs || []) refs.set(ref.workItemId, clone(ref));
@@ -295,7 +296,7 @@ export function updateProductionPlanStage(input: {
 
   if (input.status === 'done') {
     const requireOutputs = plan.executionMode === 'execute';
-    validateRuntimeRefs(plan, stage, requireOutputs);
+    validateRuntimeRefs(stage, requireOutputs);
   }
 
   stage.status = input.status;

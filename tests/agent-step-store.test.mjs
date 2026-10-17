@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { canvasMutationFingerprint } from '../renderer/src/utils/canvasMutationFingerprint.mjs';
+import { canvasMutationFingerprint } from '../renderer/src/utils/canvasMutationFingerprint.ts';
 
 test('画布内容变化会改变待确认写入使用的指纹', () => {
   const project = { nodes: [{ id: 'node-1', title: '初稿' }], edges: [], agentSteps: [] };

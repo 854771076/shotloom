@@ -4,7 +4,7 @@ import {
   createChatCompletionStreamAccumulator,
   mergeChatCompletionStreamFragment,
   parseChatCompletionSseLine,
-} from '../renderer/src/utils/chatCompletionStream.mjs';
+} from '../renderer/src/utils/chatCompletionStream.ts';
 
 test('聊天流逐段显示文字并重建完整工具调用', () => {
   const deltas = [];

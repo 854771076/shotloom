@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { readSource, sourceExists } from './helpers/sourceContract.mjs';
 
-const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
+const read = (path) => readSource(path);
 const dir = '../renderer/src/app/agent-chat/';
 
 const panel = read(`${dir}AgentChatPanel.tsx`);
@@ -15,8 +15,8 @@ const artifacts = read(`${dir}ArtifactList.tsx`);
 const referenceCard = read(`${dir}ReferenceCard.tsx`);
 const mediaThumb = read(`${dir}MediaThumb.tsx`);
 const presentation = read(`${dir}messagePresentation.ts`);
-const adapter = read('../renderer/src/app/adapters/copilotAdapter.ts');
-const presenter = read('../renderer/src/app/copilot/CopilotRuntimePresenter.ts');
+const session = read('../renderer/src/app/adapters/agentSession.ts');
+const presenter = read('../renderer/src/app/agent-session/runtimePresenter.ts');
 const canvasTools = read('../renderer/src/agent/tools/canvasTools.ts');
 const toolRegistry = read('../renderer/src/agent/core/toolRegistry.ts');
 const traceStyles = read(`${dir}ToolTrace.module.css`);
@@ -33,14 +33,14 @@ test('助手面板不再依赖 antd，样式只来自 CSS Modules 与 --slk-* �
     assert.match(source, /from "\.\/\w+\.module\.css"/);
   }
   assert.doesNotMatch(`${panel}${composer}`, /ConfigProvider/);
-  assert.ok(!existsSync(new URL('../renderer/src/app/copilot/CopilotPanel.tsx', import.meta.url)));
+  assert.ok(!sourceExists('renderer/src/app/agent-session/AgentPanel.tsx'));
   assert.doesNotMatch(modules, /#[0-9a-f]{3}\b/i);
   assert.match(modules, /var\(--slk-/);
 });
 
 // 暗色模式整条链路都不存在：令牌只有浅色一套值，面板没有主题属性和切换入口。
 test('助手面板只有浅色，不提供暗色模式', () => {
-  assert.ok(!existsSync(new URL(`${dir}useAgentTheme.ts`, import.meta.url)));
+  assert.ok(!sourceExists(`${dir}useAgentTheme.ts`));
   assert.doesNotMatch(`${tokens}${modules}${panel}`, /data-slk-theme/);
   assert.match(tokens, /--slk-bg-base: var\(--surface\)/);
   assert.doesNotMatch(panel, /theme/i);
@@ -89,7 +89,11 @@ test('工具步骤显示注册表标题与真实产出', () => {
   assert.match(canvasTools, /summarizeResult: snapshotDisplay/);
   assert.match(canvasTools, /nodeSummaryLabel\(input\.nodeId\)\} @ /);
   assert.doesNotMatch(canvasTools, /node\(s\)/);
-  assert.match(trace, /\{\(tool\.output \|\| previews\.length\) && \(/);
+  assert.match(trace, /\{expanded && \(/);
+  // 参数与结果只在展开时挂载全文；收起行只留摘要与耗时。
+  assert.match(trace, /\{\(!!tool\.output \|\| !!previews\.length\) && \(/);
+  assert.match(trace, /JSON\.stringify\(args, null, 2\)/);
+  assert.match(trace, /formatDuration\(tool\.startedAt, tool\.endedAt\)/);
   // 缩略图必须复用项目的图片预览缓存，直接引用 asset 协议在画布里从来不是图片路径。
   assert.match(trace, /useMediaPreviewCache\(\{ path, kind: "image", maxSize: 320 \}\)/);
   assert.doesNotMatch(trace, /convertFileSrc/);
@@ -112,13 +116,15 @@ test('待确认调用允许在批准前修改参数，非法 JSON 不得提交',
   assert.match(trace, /恢复原参数/);
 });
 
-test('发送中把发送按钮切换为停止，输入只读且不存在排队入口', () => {
-  assert.match(composer, /data-stop=\{busy \|\| undefined\}/);
-  assert.match(composer, /busy \? controller\.cancel\(\) : submit\(\)/);
-  assert.match(composer, /readOnly=\{busy\}/);
-  assert.match(composer, /name=\{busy \? "stop" : "arrow-up"\}/);
+test('运行中composer不锁死输入，停止是独立控件，排队消息只显示等待态', () => {
+  assert.match(composer, /className=\{styles\.stop\}/);
+  assert.match(composer, /onClick=\{controller\.cancel\}/);
+  assert.match(composer, /onClick=\{submit\}/);
+  assert.doesNotMatch(composer, /readOnly=\{busy\}|busy \? controller\.cancel\(\) : submit\(\)/);
+  assert.doesNotMatch(modules, /\[data-stop\]/);
   assert.match(trace, /aria-label="停止 Agent"/);
   assert.match(transcript, /busy &&[\s\S]*?!messages\.some/);
+  assert.match(transcript, /busy && message\.deliveryStage === "sent"/);
   assert.doesNotMatch(composer, /加入队列|queue|排队/);
 });
 
@@ -133,9 +139,9 @@ test('相同 Runtime 失败合并成紧凑诊断卡，重试只在非运行态�
 });
 
 test('完成态沿用流式正文而不是用最终响应整段覆盖', () => {
-  assert.match(adapter, /flush\(\);\s*finalizeMessage/);
-  assert.match(adapter, /content:\s*presentation\.streamed \|\| result\?\.reply/);
-  assert.doesNotMatch(adapter, /content:\s*result\?\.reply \|\| presentation\.streamed/);
+  assert.match(session, /flush\(\);\s*finalizeMessage/);
+  assert.match(session, /content:\s*presentation\.streamed \|\| result\?\.reply/);
+  assert.doesNotMatch(session, /content:\s*result\?\.reply \|\| presentation\.streamed/);
 });
 
 test('制作计划只在 plan 变化时重置展开，并按阶段定位真实节点', () => {
@@ -156,7 +162,7 @@ test('@ 引用的节点卡片只发送契约字段，媒体预览与附件不进
   assert.match(composer, /nodeMentions: mentions\.map\(\(\{ imageAttachment: _drop, node: _node, \.\.\.item \}\) => \(\{ \.\.\.item \}\)\)/);
   // 引用卡描述只随消息持久化供界面回看，不得进模型请求。
   assert.match(composer, /references: references\.map\(\(item\) => item\.reference\)/);
-  assert.doesNotMatch(adapter, /references: payload\.references/);
+  assert.doesNotMatch(session, /references: payload\.references/);
 });
 
 test('引用与发送落在面板当前显示的会话上，不二次解析项目级 active 指针', () => {

@@ -37,6 +37,26 @@
   --line-strong: rgba(0, 0, 0, .12);
   --line-solid: #e6e6e6;
 
+  /* Neutral washes — 界面灰底只允许这三档，按角色命名：
+   * hover 是鼠标落点，pressed 是按下/当前项，inset 是轨道、占位块这类凹下去的底。
+   * 组件里再写 rgba(0,0,0,.0x) 就是在私造第四、第五档。 */
+  --wash-hover: rgba(0, 0, 0, .045);
+  --wash-pressed: rgba(0, 0, 0, .055);
+  --wash-inset: rgba(0, 0, 0, .08);
+  /* Scrims 压在界面内容之上（不是素材之上），遮罩只分两档：轻遮罩留给可就地取消的弹层，
+   * modal 给真正打断操作的对话框。grip 是可拖拽细条的静止/强调两档，与滚动条拇指同族。 */
+  --scrim-soft: rgba(0, 0, 0, .16);
+  --scrim-modal: rgba(0, 0, 0, .38);
+  --grip: rgba(0, 0, 0, .15);
+  --grip-active: rgba(0, 0, 0, .24);
+
+  /* Floating surfaces — 半透明白底浮在内容之上，只允许这四档（越靠下越不透明）。
+   * 深色主题镜像成不透明深底：rgba(255,255,255,.94) 压在暗画布上不是"浮起"，而是一块脏白。 */
+  --float-surface-wash: rgba(255, 255, 255, .72);
+  --float-surface-soft: rgba(255, 255, 255, .86);
+  --float-surface: rgba(255, 255, 255, .94);
+  --float-surface-solid: rgba(255, 255, 255, .98);
+
   /* Brand: black for primary actions, one accent for clickable/active */
   --brand: #000000;
   --brand-hover: rgba(0, 0, 0, .82);
@@ -44,6 +64,9 @@
   --brand-accent: #6d6cff;
   --brand-accent-foreground: #ffffff;
   --brand-accent-wash: rgba(109, 108, 255, .08);
+  /* wash 是当前项底，tint 是给占位图这类大面积弱着色，border 是选中态描边。 */
+  --brand-accent-tint: rgba(109, 108, 255, .12);
+  --brand-accent-border: rgba(109, 108, 255, .22);
   --accent: #202020;
 
   /* Status: the only hues allowed outside the accent, and only for real
@@ -193,6 +216,25 @@
   --overlay-hairline: rgba(0, 0, 0, .35);
   /* 灯箱里浮在图片/视频上的控制条与按钮只用这一档落影（原先是 .2/.22/.2 三种手写变体）。 */
   --overlay-cast: 0 8px 24px rgba(0, 0, 0, .25);
+  /* 浮层压在素材上时的着色分三族：
+   * shade 是暗化素材本身的重遮罩（裁剪、缩略图上的可读性渐变），
+   * control 是素材上的圆形钮与角标这类静止控件底，hover 加深一档；
+   * fill 是控件条自身的白底三档（静止、高亮、强调），line-strong 给按键下沿。
+   * 它们都不做深色镜像：颜色属于素材层，切换主题时素材还是那张图。 */
+  --overlay-shade: rgba(0, 0, 0, .58);
+  --overlay-shade-mid: rgba(0, 0, 0, .44);
+  --overlay-shade-faint: rgba(0, 0, 0, .14);
+  --overlay-control: rgba(0, 0, 0, .55);
+  --overlay-control-hover: rgba(0, 0, 0, .7);
+  --overlay-chip: rgba(78, 83, 90, .86);
+  --overlay-fade: rgba(10, 12, 15, .8);
+  --overlay-cast-text: 0 2px 8px rgba(0, 0, 0, .42);
+  --overlay-fill: rgba(255, 255, 255, .06);
+  --overlay-fill-hover: rgba(255, 255, 255, .14);
+  --overlay-fill-strong: rgba(255, 255, 255, .28);
+  --overlay-progress: rgba(255, 255, 255, .38);
+  --overlay-hairline-soft: rgba(255, 255, 255, .035);
+  --overlay-line-strong: rgba(255, 255, 255, .25);
   --ring: rgba(0, 0, 0, .3);
   --popup-item-hover: rgba(0, 0, 0, .03);
   --popup-item-active: rgba(0, 0, 0, .06);
@@ -258,12 +300,28 @@
   --line-strong: rgba(255, 255, 255, .14);
   --line-solid: #454545;
 
+  --wash-hover: rgba(255, 255, 255, .06);
+  --wash-pressed: rgba(255, 255, 255, .09);
+  --wash-inset: rgba(255, 255, 255, .12);
+  --scrim-soft: rgba(0, 0, 0, .5);
+  --scrim-modal: rgba(0, 0, 0, .6);
+  --grip: rgba(255, 255, 255, .24);
+  --grip-active: rgba(255, 255, 255, .4);
+
+  /* 深色浮层用不透明深底 + 高 α，保留"浮在内容上"的边界；纯白 α 在暗底上会变灰。 */
+  --float-surface-wash: rgba(31, 31, 31, .86);
+  --float-surface-soft: rgba(31, 31, 31, .94);
+  --float-surface: rgba(31, 31, 31, .97);
+  --float-surface-solid: rgba(31, 31, 31, .99);
+
   --brand: #fafafa;
   --brand-hover: #e2e2e2;
   --brand-soft: #1a1a1a;
   --brand-accent: #8b8aff;
   --brand-accent-foreground: #161616;
   --brand-accent-wash: rgba(139, 138, 255, .14);
+  --brand-accent-tint: rgba(139, 138, 255, .2);
+  --brand-accent-border: rgba(139, 138, 255, .3);
   --accent: #d0d0d0;
 
   --good: #57bd94;

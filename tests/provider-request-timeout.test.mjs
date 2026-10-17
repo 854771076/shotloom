@@ -5,7 +5,7 @@ import {
   DEFAULT_PROVIDER_REQUEST_TIMEOUT_MS,
   IMAGE_PROVIDER_REQUEST_TIMEOUT_MS,
   providerRequestTimeoutMs,
-} from '../renderer/src/utils/providerRequestTimeout.mjs';
+} from '../renderer/src/utils/providerRequestTimeout.ts';
 
 test('图片同步请求使用完整的十五分钟生成额度', () => {
   assert.equal(providerRequestTimeoutMs('imageGeneration', 900_000), 900_000);

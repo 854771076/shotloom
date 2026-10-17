@@ -10,12 +10,11 @@ import {
 import {
   createOpenVideoRuntime,
   getOpenVideoRuntimeSupport,
-} from "../../services/openVideoRuntime.js";
-import { videoEditorDuration } from "../../utils/videoEditorProject.mjs";
+} from "../../services/openVideoRuntime.ts";
+import { videoEditorDuration } from "../../utils/videoEditorProject.ts";
 import type { VideoEditorRuntimeRef } from "./videoEditorRuntimeTypes";
 import type {
   VideoEditorProject,
-  VideoEditorTransform,
 } from "./videoEditorTypes";
 
 type SourceState = "empty" | "loading" | "ready" | "error";
@@ -36,7 +35,6 @@ export function useVideoEditorRuntime({
   createStudioProject,
   setTime,
   setPlaying,
-  setSelectedId,
 }: {
   canvasRef: RefObject<HTMLCanvasElement | null>;
   project: VideoEditorProject;
@@ -53,7 +51,6 @@ export function useVideoEditorRuntime({
   createStudioProject: (project: VideoEditorProject) => unknown;
   setTime: Dispatch<SetStateAction<number>>;
   setPlaying: Dispatch<SetStateAction<boolean>>;
-  setSelectedId: Dispatch<SetStateAction<string>>;
 }) {
   const [engineReady, setEngineReady] = useState(false);
   const [engineError, setEngineError] = useState("");

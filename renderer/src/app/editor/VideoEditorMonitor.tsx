@@ -2,7 +2,7 @@ import type {
   PointerEvent as ReactPointerEvent,
   RefObject,
 } from "react";
-import { editorClipDuration } from "../../utils/videoEditorProject.mjs";
+import { editorClipDuration } from "../../utils/videoEditorProject.ts";
 import { IconSymbol } from "../components/IconSymbol";
 import { constrainTransformToCanvas, type TransformCorner } from "./videoEditorModel";
 import { formatEditorTimecode } from "./videoEditorFormat";
@@ -65,9 +65,9 @@ export function VideoEditorMonitor({
   sourceState: SourceState;
   preferFallbackPreview: boolean;
   usesNativeSequencePreview: boolean;
-  nativePreviewClip?: VideoEditorClip | null;
-  nativePreviewAsset?: VideoEditorAsset;
-  primaryVideoAssetId?: string;
+  nativePreviewClip?: VideoEditorClip | null | undefined;
+  nativePreviewAsset?: VideoEditorAsset | undefined;
+  primaryVideoAssetId?: string | undefined;
   nativePreviewUrl: string;
   playbackUrl: string;
   previewAudio: { muted: boolean; volume: number };
@@ -460,7 +460,7 @@ function TransformHandles({
         title="拖动旋转"
         onPointerDown={(event) => onBeginTransform(event, clip, "rotate")}
       />
-      {TRANSFORM_CORNERS.map(({ corner, className, title }) => (
+      {TRANSFORM_CORNERS.map(({ corner, className }) => (
         <span
           key={corner}
           className={`ov-transform-resize-handle ${className}`}

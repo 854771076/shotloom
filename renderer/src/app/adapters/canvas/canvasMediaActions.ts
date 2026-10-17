@@ -1,18 +1,18 @@
 import { canvasNodeDimensions } from "../../../services/agentLayoutService";
-import { desktopApi } from "../../../services/desktopApi.js";
+import { desktopApi } from "../../../services/desktopApi.ts";
 import {
   addMaterialToAssetLibrary,
   ensureMaterialStoredInProjectAssets,
   registerImportedMaterial,
-} from "../../../store/assetStore.js";
-import { addCanvasEdge } from "../../../store/canvasGraphStore.js";
-import { recordCanvasHistory } from "../../../store/canvasHistoryStore.js";
-import { promoteMaterialToLocalLibrary } from "../../../store/localAssetLibraryStore.js";
-import { addNode, setSelectedNodeIds } from "../../../store/nodeStore.js";
-import { store as rawStore, touchProject } from "../../../store/projectStore.js";
-import { showSuccessToast, showToast } from "../../store/overlayStore";
+} from "../../../store/assetStore.ts";
+import { addCanvasEdge } from "../../../store/canvasGraphStore.ts";
+import { recordCanvasHistory } from "../../../store/canvasHistoryStore.ts";
+import { promoteMaterialToLocalLibrary } from "../../../store/localAssetLibraryStore.ts";
+import { addNode, setSelectedNodeIds } from "../../../store/nodeStore.ts";
+import { store as rawStore, touchProject } from "../../../store/projectStore.ts";
+import { showSuccessToast, showToast } from "../../../store/notificationStore";
 import type { ImageCropRect } from "../../components/ImageCropEditor";
-import { imageGridCellRect } from "../../../utils/imageGridCrop.mjs";
+import { imageGridCellRect } from "../../../utils/imageGridCrop.ts";
 import { selectedNodeLocalMedia } from "./canvasMediaSelection";
 
 const store: any = rawStore;

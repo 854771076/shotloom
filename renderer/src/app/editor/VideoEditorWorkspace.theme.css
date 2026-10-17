@@ -295,10 +295,10 @@
   right: 4px;
   display: grid;
   place-items: center;
-  border: 1px solid rgba(0, 0, 0, .1);
+  border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
   color: var(--type-primary);
-  background: rgba(255, 255, 255, .92);
+  background: var(--float-surface);
   box-shadow: var(--drop-shadow-sm);
   opacity: 0;
   transition: opacity var(--duration-fast) var(--ease-std);

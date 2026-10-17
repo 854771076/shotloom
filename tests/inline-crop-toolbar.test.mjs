@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { inlineCropToolbarPosition } from '../renderer/src/utils/inlineCropToolbar.mjs';
+import { inlineCropToolbarPosition } from '../renderer/src/utils/inlineCropToolbar.ts';
 
 const canvas = { width: 1000, height: 700 };
 const node = { x: 300, y: 200, width: 400, height: 250 };

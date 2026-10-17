@@ -5,8 +5,8 @@ import {
   rewriteVideoEditorMediaOps,
   videoEditorAgentDiagnostics,
   videoEditorAgentSnapshot,
-} from '../renderer/src/utils/videoEditorAgent.mjs';
-import { createVideoEditorProject } from '../renderer/src/utils/videoEditorProject.mjs';
+} from '../renderer/src/utils/videoEditorAgent.ts';
+import { createVideoEditorProject } from '../renderer/src/utils/videoEditorProject.ts';
 
 function project() {
   return createVideoEditorProject({ sourceFile: '/tmp/sample.mp4', sourceName: 'sample.mp4', duration: 12 });

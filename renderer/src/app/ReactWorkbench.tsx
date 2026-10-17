@@ -1,9 +1,9 @@
 import { useEffect, useReducer, useState, useSyncExternalStore } from "react";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { useWindowClose } from "../composables/useWindowClose";
-import { desktopApi } from "../services/desktopApi.js";
-import { copyFileIntoProjectAssets, inferFileResourceType } from "../store/assetStore.js";
+import { registerWindowCloseGuard } from "./windowCloseGuard";
+import { desktopApi } from "../services/desktopApi.ts";
+import { copyFileIntoProjectAssets, inferFileResourceType } from "../store/assetStore.ts";
 import {
   hasOpenProject,
   initProjectCloneProgressListener,
@@ -12,18 +12,18 @@ import {
   navigateToRoute,
   store,
   touchProject,
-} from "../store/projectStore.js";
-import { loadAppSettings, settingsStore } from "../store/settingsStore.js";
-import { loadGlobalRecipes } from "../store/recipesStore.js";
-import { loadGlobalSkills } from "../store/skillsStore.js";
-import { resumeRemoteTasks } from "../store/taskStore.js";
-import { getDomainRevision, subscribeDomain } from "../store/domainReactivity.js";
-import { canvasActionShortcutLabel } from "../utils/canvasActionShortcuts.js";
+} from "../store/projectStore.ts";
+import { loadAppSettings, settingsStore } from "../store/settingsStore.ts";
+import { loadGlobalRecipes } from "../store/recipesStore.ts";
+import { loadGlobalSkills } from "../store/skillsStore.ts";
+import { resumeRemoteTasks } from "../store/taskStore.ts";
+import { getDomainRevision, subscribeDomain } from "../store/domainReactivity.ts";
+import { canvasActionShortcutLabel } from "../utils/canvasActionShortcuts.ts";
 import {
   inferEditorMediaType,
   probeEditorMedia,
-} from "../utils/editorMediaImport.mjs";
-import { createVideoSegmentProject, normalizeVideoEditorProject } from "../utils/videoEditorProject.mjs";
+} from "../utils/editorMediaImport.ts";
+import { createVideoSegmentProject } from "../utils/videoEditorProject.ts";
 import { AppShell } from "./AppShell";
 import {
   canvasCommands,
@@ -34,12 +34,11 @@ import {
 import { createVideoExportNode, registerVideoEditorOpener } from "./adapters/canvas/videoEditorActions";
 import { registerSimpleClipEditorOpener } from "./adapters/canvas/simpleClipEditorActions";
 import {
-  copilotController,
-  copilotData,
-  getCopilotRevision,
-  maintainCopilotSessionMemory,
-  subscribeCopilot,
-} from "./adapters/copilotAdapter";
+  agentPanelController,
+  agentPanelData,
+  maintainAgentSessionMemory,
+} from "./adapters/agentChatAdapter";
+import { agentSession } from "./adapters/agentSession";
 import { projectLibraryController, projectLibraryData } from "./adapters/projectLibraryAdapter";
 import {
   assetsController,
@@ -59,7 +58,7 @@ import { MaterialsView } from "./views/MaterialsView";
 import { ProjectsView } from "./views/ProjectsView";
 import { SettingsFeature } from "./views/SettingsFeature";
 import { TasksView } from "./views/TasksView";
-import { showToast } from "./store/overlayStore";
+import { showToast } from "../store/notificationStore";
 import { recoverInterruptedAgentRuns, relieveAgentHistoryMemoryPressure } from "../agent/runtime/runStore";
 import { type AppRoute, useAppStore } from "./store/appStore";
 import { installMediaPreviewCacheMemoryPressureListener } from "../services/mediaPreviewCache";
@@ -123,11 +122,11 @@ export function ReactWorkbench() {
       }
       resumeRemoteTasks();
       taskTimer = window.setInterval(() => resumeRemoteTasks(), 5000);
-      maintainCopilotSessionMemory();
-      sessionMemoryTimer = window.setInterval(() => maintainCopilotSessionMemory(), 60_000);
+      maintainAgentSessionMemory();
+      sessionMemoryTimer = window.setInterval(() => maintainAgentSessionMemory(), 60_000);
       disposeMediaCachePressure = installMediaPreviewCacheMemoryPressureListener();
       initProjectCloneProgressListener?.();
-      disposeClose = useWindowClose();
+      disposeClose = registerWindowCloseGuard();
       if (desktopApi.platform !== 'browser') {
         disposeMemoryPressure = await listen<any>('system-memory-pressure', ({ payload }) => {
           const level = payload?.level === 'critical' ? 'critical' : 'low';
@@ -239,9 +238,9 @@ export function ReactWorkbench() {
     : [];
   const isVideoOutput = (item: any) => {
     const type = String(item?.resourceType || item?.mimeType || item?.type || "").toLowerCase();
-    const path = String(item?.filePath || item?.path || item?.url || "")
-      .split(/[?#]/)[0]
-      .toLowerCase();
+    const path = (
+      String(item?.filePath || item?.path || item?.url || "").split(/[?#]/)[0] ?? ""
+    ).toLowerCase();
     return type.includes("video") || /\.(mp4|mov|webm|m4v)$/.test(path);
   };
   const selectedEditorOutput =
@@ -408,14 +407,14 @@ export function ReactWorkbench() {
         controller={{
           canvas: canvasController,
           nodes: nodeActions,
-          copilot: {
-            ...copilotController,
-            subscribe: subscribeCopilot,
-            getRevision: getCopilotRevision,
-            // 作用域参数必须透传给 copilotData：剪辑面板按 editorNodeId 读自己的会话，
+          agentPanel: {
+            ...agentPanelController,
+            subscribe: agentSession.subscribe,
+            getRevision: agentSession.revision,
+            // 作用域参数必须透传给 agentPanelData：剪辑面板按 editorNodeId 读自己的会话，
             // 丢弃参数会让两个面板读到同一个作用域。
             read: (scope: "canvas" | "editor" = "canvas", editorNodeId = "") =>
-              copilotData(scope, editorNodeId),
+              agentPanelData(scope, editorNodeId),
           },
           async applyMaterial(item) {
             await canvasCommands.applyMaterial(item);

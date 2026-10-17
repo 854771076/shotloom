@@ -1,13 +1,16 @@
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync } from 'node:fs';
+import { readdirSync } from 'node:fs';
 import test from 'node:test';
+import { readSource } from './helpers/sourceContract.mjs';
 import {
   changedBuiltInFields,
   withBuiltInEntries,
   withoutBuiltInEntries,
-} from '../renderer/src/services/builtInCatalogStorage.js';
+} from '../renderer/src/services/builtInCatalogStorage.ts';
 
-const skillsRoot = new URL('../renderer/src/agent/content/skills/', import.meta.url);
+const skillsDir = 'renderer/src/agent/content/skills/';
+const skillsRoot = new URL(`../${skillsDir}`, import.meta.url);
+const skillFile = (relative) => readSource(`${skillsDir}${relative}`);
 const expectedIds = [
   'character-board',
   'ecommerce-product',
@@ -40,8 +43,8 @@ const expectedNames = {
 };
 
 function parseSkill(id) {
-  const content = readFileSync(new URL(`${id}/SKILL.md`, skillsRoot), 'utf8');
-  const manifest = JSON.parse(readFileSync(new URL(`${id}/skill.json`, skillsRoot), 'utf8'));
+  const content = skillFile(`${id}/SKILL.md`);
+  const manifest = JSON.parse(skillFile(`${id}/skill.json`));
   const match = content.match(/^---\s*\n([\s\S]*?)\n---\s*\n?/);
   assert.ok(match, `${id} 缺少 frontmatter`);
   const metadata = {};
@@ -72,7 +75,7 @@ test('内置 Skill 使用唯一 Nody 风格领域集合', () => {
   const ids = readdirSync(skillsRoot, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .filter((entry) => {
-      try { return readFileSync(new URL(`${entry.name}/SKILL.md`, skillsRoot), 'utf8').length > 0; } catch { return false; }
+      try { return skillFile(`${entry.name}/SKILL.md`).length > 0; } catch { return false; }
     })
     .map((entry) => entry.name)
     .sort();

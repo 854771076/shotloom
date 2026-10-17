@@ -1,14 +1,14 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
-import { desktopApi } from "../../../services/desktopApi.js";
-import { recordCanvasHistory } from "../../../store/canvasHistoryStore.js";
-import { addNode, setSelectedNodeIds } from "../../../store/nodeStore.js";
-import { registerImportedMaterial } from "../../../store/assetStore.js";
-import { addCanvasEdge } from "../../../store/canvasGraphStore.js";
+import { desktopApi } from "../../../services/desktopApi.ts";
+import { recordCanvasHistory } from "../../../store/canvasHistoryStore.ts";
+import { addNode, setSelectedNodeIds } from "../../../store/nodeStore.ts";
+import { registerImportedMaterial } from "../../../store/assetStore.ts";
+import { addCanvasEdge } from "../../../store/canvasGraphStore.ts";
 import { canvasNodeDimensions } from "../../../services/agentLayoutService";
-import { store, touchProject } from "../../../store/projectStore.js";
-import { appendEditorMediaAsset, normalizeVideoEditorProject } from "../../../utils/videoEditorProject.mjs";
-import { inferEditorMediaType, probeEditorMedia } from "../../../utils/editorMediaImport.mjs";
-import { showSuccessToast, showToast } from "../../store/overlayStore";
+import { store, touchProject } from "../../../store/projectStore.ts";
+import { appendEditorMediaAsset, normalizeVideoEditorProject } from "../../../utils/videoEditorProject.ts";
+import { inferEditorMediaType, probeEditorMedia } from "../../../utils/editorMediaImport.ts";
+import { showSuccessToast, showToast } from "../../../store/notificationStore";
 
 let videoEditorOpener: ((id: string) => void) | null = null;
 

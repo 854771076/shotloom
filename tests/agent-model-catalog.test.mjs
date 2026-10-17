@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { compactAgentModelCatalog } from '../renderer/src/utils/agentModelCatalog.mjs';
+import { compactAgentModelCatalog } from '../renderer/src/utils/agentModelCatalog.ts';
 
 test('Agent 模型目录保留选型契约但不重复发送执行层协议', () => {
   const result = compactAgentModelCatalog([{

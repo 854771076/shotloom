@@ -15,12 +15,6 @@
     "core:window:allow-set-title",
     "dialog:default",
     "process:default",
-    {
-      "identifier": "shell:allow-open",
-      "allow": [
-        { "open": "^((mailto:)|(tel:)|(https?://)|(file://)|/|[A-Za-z]:[\\\\/]).+" }
-      ]
-    },
     "updater:default"
   ]
 }

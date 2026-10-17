@@ -10,8 +10,8 @@ import {
   readProtocolPath,
   renderProtocolContentTemplate,
   renderProtocolTemplate,
-} from '../renderer/src/utils/modelProtocol.mjs';
-import { modelJsonRequestBody, multipartArrayFieldName } from '../renderer/src/utils/modelRequestBody.mjs';
+} from '../renderer/src/utils/modelProtocol.ts';
+import { modelJsonRequestBody, multipartArrayFieldName } from '../renderer/src/utils/modelRequestBody.ts';
 
 const openaiContentTemplate = {
   text: { type: 'text', text: '{{text}}' },

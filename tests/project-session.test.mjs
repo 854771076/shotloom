@@ -3,7 +3,7 @@ import test from 'node:test';
 import {
   buildProjectSession,
   hasFullProjectSessionSnapshot,
-} from '../renderer/src/utils/projectSession.mjs';
+} from '../renderer/src/utils/projectSession.ts';
 
 test('已落盘项目的会话只保存轻量身份，不重复保存大型画布数据', () => {
   const project = {

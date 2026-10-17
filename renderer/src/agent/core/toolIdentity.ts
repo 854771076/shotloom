@@ -11,8 +11,8 @@
 export const TOOL_ID_RE = /^[a-z][a-z0-9_]*(?:__[a-z][a-z0-9_]*)?$/;
 
 export function toolNamespacePrefix(toolId: string): string | null {
-  const match = toolId.match(/^([a-z][a-z0-9_]*)__/);
-  return match ? match[1] : null;
+  const [, namespace] = toolId.match(/^([a-z][a-z0-9_]*)__/) || [];
+  return namespace || null;
 }
 
 export function toolBaseName(toolId: string): string {

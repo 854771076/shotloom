@@ -1,138 +1,42 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import test from 'node:test';
-const canvas = readFileSync(
-  new URL('../renderer/src/app/canvas/CanvasNodeToolbar.tsx', import.meta.url),
-  'utf8',
-) + readFileSync(
-  new URL('../renderer/src/app/canvas/WorkflowCanvas.tsx', import.meta.url),
-  'utf8',
-);
-const node = readFileSync(
-  new URL('../renderer/src/app/canvas/GenerationNode.tsx', import.meta.url),
-  'utf8',
-) + readFileSync(new URL('../renderer/src/app/canvas/generationNodeMedia.ts', import.meta.url), 'utf8');
-const audioPreview = readFileSync(
-  new URL('../renderer/src/app/canvas/GenerationAudioPreview.tsx', import.meta.url),
-  'utf8',
-);
-const canvasGeometry = readFileSync(
-  new URL('../renderer/src/app/canvas/canvasScreenGeometry.ts', import.meta.url),
-  'utf8',
-);
-const styles = readFileSync(
-  new URL('../renderer/styles/canvas.css', import.meta.url),
-  'utf8',
-);
-const task = readFileSync(new URL('../renderer/src/store/taskStore.js', import.meta.url), 'utf8');
-const project = readFileSync(
-  new URL('../renderer/src/store/projectStore.js', import.meta.url),
-  'utf8',
-) + readFileSync(new URL('../renderer/src/store/projectNormalization.js', import.meta.url), 'utf8');
-const api = readFileSync(new URL('../renderer/src/services/tauriApi.js', import.meta.url), 'utf8');
-const previewQueue = readFileSync(
-  new URL('../renderer/src/app/canvas/previewLoadQueue.ts', import.meta.url),
-  'utf8',
-);
-const mediaCacheHook = readFileSync(
-  new URL('../renderer/src/app/canvas/useMediaPreviewCache.ts', import.meta.url),
-  'utf8',
-);
-const mediaCache = readFileSync(
-  new URL('../renderer/src/services/mediaPreviewCache.ts', import.meta.url),
-  'utf8',
-);
-const fileCommands = readFileSync(
-  new URL('../src-tauri/src/commands/file.rs', import.meta.url),
-  'utf8',
-) + readFileSync(new URL('../src-tauri/src/commands/image.rs', import.meta.url), 'utf8');
-const director = readFileSync(
-  new URL('../renderer/src/app/canvas/ThreeDDirectorNode.tsx', import.meta.url),
-  'utf8',
-);
-const directorStyles = readFileSync(
-  new URL('../renderer/src/app/canvas/ThreeDDirectorNode.css', import.meta.url),
-  'utf8',
-);
-const directorApp = readFileSync(
-  new URL('../renderer/src/vendor/storyai-3d-director-desk/src/App.tsx', import.meta.url),
-  'utf8',
-);
-const directorBridge = readFileSync(
-  new URL(
-    '../renderer/src/vendor/storyai-3d-director-desk/src/editor/io/hostBridge.ts',
-    import.meta.url,
-  ),
-  'utf8',
-);
-const directorCanvas = readFileSync(
-  new URL(
-    '../renderer/src/vendor/storyai-3d-director-desk/src/editor/canvas/DirectorCanvas.tsx',
-    import.meta.url,
-  ),
-  'utf8',
-);
-const directorScene = readFileSync(
-  new URL(
-    '../renderer/src/vendor/storyai-3d-director-desk/src/editor/canvas/SceneRoot.tsx',
-    import.meta.url,
-  ),
-  'utf8',
-);
-const directorStore = readFileSync(
-  new URL(
-    '../renderer/src/vendor/storyai-3d-director-desk/src/editor/store/directorStore.ts',
-    import.meta.url,
-  ),
-  'utf8',
-);
-const workbench = readFileSync(
-  new URL('../renderer/src/app/ReactWorkbench.tsx', import.meta.url),
-  'utf8',
-);
-const creationView = readFileSync(
-  new URL('../renderer/src/app/views/CreationView.tsx', import.meta.url),
-  'utf8',
-);
-const shell = readFileSync(new URL('../renderer/src/app/AppShell.tsx', import.meta.url), 'utf8');
-const adapter = readFileSync(
-  new URL('../renderer/src/app/adapters/canvasAdapter.ts', import.meta.url),
-  'utf8',
-) + readFileSync(
-  new URL('../renderer/src/app/adapters/canvas/canvasViewData.ts', import.meta.url),
-  'utf8',
-);
-const canvasHistory = readFileSync(
-  new URL('../renderer/src/store/canvasHistoryStore.js', import.meta.url),
-  'utf8',
-);
-const canvasDrag = await import('../renderer/src/utils/canvasNodeDrag.mjs');
-const canvasDragSource = readFileSync(
-  new URL('../renderer/src/utils/canvasNodeDrag.mjs', import.meta.url),
-  'utf8',
-);
-const nodeChrome = await import('../renderer/src/utils/canvasNodeChrome.mjs');
-const copilotAdapter = readFileSync(
-  new URL('../renderer/src/app/adapters/copilotAdapter.ts', import.meta.url),
-  'utf8',
-);
+import { readGenerationNodeSource } from './helpers/generationNodeSource.mjs';
+import { readSource } from './helpers/sourceContract.mjs';
+const canvas = readSource('renderer/src/app/canvas/CanvasNodeToolbar.tsx') + readSource('renderer/src/app/canvas/WorkflowCanvas.tsx');
+const node = readGenerationNodeSource();
+const audioPreview = readSource('renderer/src/app/canvas/GenerationAudioPreview.tsx');
+const canvasGeometry = readSource('renderer/src/app/canvas/canvasScreenGeometry.ts');
+const styles = readSource('renderer/styles/canvas.css');
+const task = readSource('renderer/src/store/taskStore.ts');
+const project = readSource('renderer/src/store/projectStore.ts') + readSource('renderer/src/store/projectNormalization.ts');
+const api = readSource('renderer/src/services/tauriApi.ts');
+const previewQueue = readSource('renderer/src/app/canvas/previewLoadQueue.ts');
+const mediaCacheHook = readSource('renderer/src/app/canvas/useMediaPreviewCache.ts');
+const mediaCache = readSource('renderer/src/services/mediaPreviewCache.ts');
+const fileCommands = readSource('src-tauri/src/commands/file.rs') + readSource('src-tauri/src/commands/image.rs');
+const director = readSource('renderer/src/app/canvas/ThreeDDirectorNode.tsx');
+const directorStyles = readSource('renderer/src/app/canvas/ThreeDDirectorNode.css');
+const directorHost = readSource('renderer/src/app/adapters/directorDeskBridge.ts');
+const directorApp = readSource('renderer/src/vendor/storyai-3d-director-desk/src/App.tsx');
+const directorBridge = readSource('renderer/src/vendor/storyai-3d-director-desk/src/editor/io/hostBridge.ts');
+const directorCanvas = readSource('renderer/src/vendor/storyai-3d-director-desk/src/editor/canvas/DirectorCanvas.tsx');
+const directorScene = readSource('renderer/src/vendor/storyai-3d-director-desk/src/editor/canvas/SceneRoot.tsx');
+const directorStore = readSource('renderer/src/vendor/storyai-3d-director-desk/src/editor/store/directorStore.ts');
+const workbench = readSource('renderer/src/app/ReactWorkbench.tsx');
+const creationView = readSource('renderer/src/app/views/CreationView.tsx');
+const shell = readSource('renderer/src/app/AppShell.tsx');
+const adapter = readSource('renderer/src/app/adapters/canvasAdapter.ts') + readSource('renderer/src/app/adapters/canvas/canvasViewData.ts');
+const canvasHistory = readSource('renderer/src/store/canvasHistoryStore.ts');
+const canvasDrag = await import('../renderer/src/utils/canvasNodeDrag.ts');
+const canvasDragSource = readSource('renderer/src/utils/canvasNodeDrag.ts');
+const nodeChrome = await import('../renderer/src/utils/canvasNodeChrome.ts');
+const agentChatAdapter = readSource('renderer/src/app/adapters/agentChatAdapter.ts');
+const agentSession = readSource('renderer/src/app/adapters/agentSession.ts');
 const agentChat = '../renderer/src/app/agent-chat/';
-const transcript = readFileSync(
-  new URL(`${agentChat}Transcript.tsx`, import.meta.url),
-  'utf8',
-);
-const transcriptStyles = readFileSync(
-  new URL(`${agentChat}Transcript.module.css`, import.meta.url),
-  'utf8',
-);
-const messagePresentation = readFileSync(
-  new URL(`${agentChat}messagePresentation.ts`, import.meta.url),
-  'utf8',
-);
-const migrationStyles = readFileSync(
-  new URL('../renderer/styles/canvas.css', import.meta.url),
-  'utf8',
-);
+const transcript = readSource(`${agentChat}Transcript.tsx`);
+const transcriptStyles = readSource(`${agentChat}Transcript.module.css`);
+const messagePresentation = readSource(`${agentChat}messagePresentation.ts`);
+const migrationStyles = readSource('renderer/styles/canvas.css');
 test('React Flow 保持节点挂载并在拖动结束后合并持久化', () => {
   assert.match(canvas, /proOptions=\{\{ hideAttribution: true \}\}/);
   assert.match(canvas, /onlyRenderVisibleElements=\{false\}/);
@@ -317,9 +221,9 @@ test('视频节点持续显示时长并提供声音开关', () => {
   assert.match(node, /className="work-video-controls nodrag nopan"[\s\S]*?videoPlaying[\s\S]*?requestFullscreen/);
   assert.doesNotMatch(node, /10 \* Math\.min\(1, semanticZoom\)/);
   assert.match(node, /className="work-video-control-button"[\s\S]*?nextMuted = !videoMuted[\s\S]*?volume-x[\s\S]*?volume/);
-  assert.match(migrationStyles, /\.work-video-status \{[\s\S]*?border-radius: var\(--radius-sm\)[\s\S]*?background: rgba\(78, 83, 90, \.86\)[\s\S]*?opacity: 1/);
+  assert.match(migrationStyles, /\.work-video-status \{[\s\S]*?border-radius: var\(--radius-sm\)[\s\S]*?background: var\(--overlay-chip\)[\s\S]*?opacity: 1/);
   assert.match(migrationStyles, /\.work-preview:hover \.work-video-status \{[\s\S]*?opacity: 0[\s\S]*?visibility: hidden/);
-  assert.match(migrationStyles, /\.work-video-controls \{[\s\S]*?background: linear-gradient\(180deg, transparent, rgba\(10, 12, 15, \.8\)\)/);
+  assert.match(migrationStyles, /\.work-video-controls \{[\s\S]*?background: linear-gradient\(180deg, transparent, var\(--overlay-fade\)\)/);
   assert.match(migrationStyles, /\.audio-play-glyph \{[\s\S]*?border-left: 6px solid var\(--overlay-ink\)/);
   assert.match(migrationStyles, /\.work-preview \.audio-waveform-download svg \{ width: var\(--canvas-node-icon-size\); height: var\(--canvas-node-icon-size\); \}/);
 });
@@ -329,13 +233,13 @@ test('工作台只计算当前路由数据且素材选择器按需加载', () =>
   assert.match(workbench, /loadMaterials: resourceLibraryData/);
   assert.match(creationView, /controller\.loadMaterials\(\)/);
   assert.match(shell, /<section className="content">\s*\{view\}/);
-  assert.doesNotMatch(workbench, /subscribeCopilot\(refresh\)/);
+  assert.doesNotMatch(workbench, /agentSession\.subscribe\(refresh\)/);
   assert.match(
     creationView,
-    /function LiveCopilotPanel[\s\S]*?useSyncExternalStore\([\s\S]*?controller\.subscribe/,
+    /function LiveAgentPanel[\s\S]*?useSyncExternalStore\([\s\S]*?controller\.subscribe/,
   );
-  assert.match(copilotAdapter, /toRaw\(active\(\)\)[\s\S]*?conversation\.messages/);
-  assert.match(copilotAdapter, /source === textModelConfigSource/);
+  assert.match(agentSession, /toRaw\(activeConversation\(\)\)[\s\S]*?conversation\.messages/);
+  assert.match(agentChatAdapter, /source === textModelConfigSource/);
   assert.match(messagePresentation, /markdownByMessage = new WeakMap/);
   assert.match(transcript, /__html: messageMarkdown\(message\)/);
   assert.match(transcriptStyles, /\.userRow,[\s\S]*?\.assistantRow \{[\s\S]*?content-visibility:\s*auto;[\s\S]*?contain-intrinsic-size: auto 88px/);
@@ -494,7 +398,7 @@ test('3D 导演台的删除键优先删除内部对象，否则交给画布删�
   assert.match(directorApp, /event\.key === "Delete" \|\| event\.key === "Backspace"/);
   assert.match(directorApp, /hasObjectSelection[\s\S]*?state\.deleteSelectedObject\(\)/);
   assert.match(directorApp, /storyai:director-desk-delete-node/);
-  assert.match(director, /storyai:director-desk-delete-node[\s\S]*?actions\.delete\(node\.id\)/);
+  assert.match(director, /onDeleteNode:[\s\S]*?actions\.delete\(node\.id\)/);
 });
 test('3D 导演台默认整块可移动，双击后进入场景交互', () => {
   assert.doesNotMatch(canvas, /dragHandle: node\.type === "threeDDirector"/);
@@ -506,7 +410,7 @@ test('3D 导演台默认整块可移动，双击后进入场景交互', () => {
     directorApp,
     /event\.key === "Escape"[\s\S]*?storyai:director-desk-exit-interaction/,
   );
-  assert.match(director, /storyai:director-desk-exit-interaction[\s\S]*?setInteracting\(false\)/);
+  assert.match(director, /onExitInteraction:[\s\S]*?setInteracting\(false\)/);
   assert.match(director, /className="director-node-open-button nodrag"[\s\S]*?打开导演台/);
   assert.match(directorStyles, /\.director-node-drag-handle[\s\S]*?cursor: grab/);
 });
@@ -518,12 +422,29 @@ test('3D 导演台从真实上游连线同步当前图片输出', () => {
   assert.match(adapter, /edgeId: String\(edge\.id/);
   assert.match(director, /incomingImages\.at\(-1\)/);
   assert.match(director, /edgeId: image\.edgeId/);
-  assert.match(director, /storyai:director-desk-panorama-clear/);
+  assert.match(directorHost, /panoramaClear: "storyai:director-desk-panorama-clear"/);
   assert.match(
     director,
-    /storyai:director-desk-panorama-removed[\s\S]*?removeDirectorIncomingEdge/,
+    /onPanoramaRemoved:[\s\S]*?removeDirectorIncomingEdge/,
   );
   assert.match(directorBridge, /storyai:director-desk-panorama-clear[\s\S]*?clearHostPanorama/);
+});
+
+test('vendored 导演台只通过宿主适配层通信', () => {
+  // 上游私有协议在产品侧只有一个拥有者：消息名与 iframe 入口都写在宿主适配层里。
+  assert.match(directorHost, /session: "storyai:director-desk-session"/);
+  assert.match(directorHost, /capturesSent: "storyai:director-desk-captures-sent"/);
+  assert.match(directorHost, /director-desk\.html\?instanceId=\$\{encodeURIComponent\(instanceId\)\}&theme=\$\{theme\}/);
+  // 来源校验属于协议：别的窗口发来的同名消息不能被当成导演台回执。
+  assert.match(
+    directorHost,
+    /event\.origin !== window\.location\.origin \|\| event\.source !== getFrame\(\)\?\.contentWindow/,
+  );
+  // 画布组件只消费类型化回调，不再自己比较协议字符串。
+  assert.doesNotMatch(director, /storyai:director-desk/);
+  assert.doesNotMatch(director, /director-desk\.html/);
+  assert.match(director, /subscribeDirectorDesk\(getFrame, \{/);
+  assert.match(director, /src=\{directorDeskFrameSrc\(node\.id, "light"\)\}/);
 });
 test('3D 导演台空闲时停止连续渲染且连续变换只持久化一次', () => {
   assert.equal(directorCanvas.match(/frameloop="demand"/g)?.length, 2);
@@ -543,7 +464,7 @@ test('3D 导演台空闲时停止连续渲染且连续变换只持久化一次',
 });
 test('并发任务轮询只在状态变化时触发合并持久化', () => {
   const update =
-    task.match(/function applyRemoteTaskUpdate\(node, task, remote\) \{([\s\S]*?)\n\}/)?.[1] || '';
+    task.match(/function applyRemoteTaskUpdate\(node: AnyRecord, task: AnyRecord, remote: AnyRecord\) \{([\s\S]*?)\n\}/)?.[1] || '';
   assert.match(update, /const changed =/);
   assert.match(update, /touchProject\(\{ sessionDelay: 500, coalesceSession: true \}\)/);
   assert.match(project, /if \(sessionPersistTimer && coalesce\) return/);

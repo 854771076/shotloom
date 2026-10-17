@@ -10,9 +10,9 @@ import { normalizeRemoteStatus } from '@/utils/remoteTaskFormatting';
 import {
   firstProtocolValue, normalizeProtocolResponse, protocolInlineImage, protocolMessageVariables,
   protocolResultEndpointFile, renderProtocolContentTemplate, renderProtocolTemplate,
-} from '@/utils/modelProtocol.mjs';
-import { multipartArrayFieldName } from '@/utils/modelRequestBody.mjs';
-import { providerRequestTimeoutMs } from '@/utils/providerRequestTimeout.mjs';
+} from '@/utils/modelProtocol.ts';
+import { multipartArrayFieldName } from '@/utils/modelRequestBody.ts';
+import { providerRequestTimeoutMs } from '@/utils/providerRequestTimeout.ts';
 import type {
   CompiledProviderRequest, CompileContext, ProviderAdapter,
   ProviderTask, ProviderTaskState, ResourceRef,
@@ -71,7 +71,7 @@ export class DeclarativeAdapter implements ProviderAdapter {
   readonly description: string;
   readonly iconId: string;
   readonly baseUrl: string;
-  readonly baseUrlRequired?: boolean;
+  readonly baseUrlRequired?: boolean | undefined;
 
   constructor(meta: DeclarativeAdapterMeta) {
     this.id = meta.id;
@@ -157,21 +157,18 @@ export class DeclarativeAdapter implements ProviderAdapter {
     };
     const content = renderProtocolContentTemplate(request.contract?.contentTemplate, {
       text: request.protocolVariables?.prompt,
-      images: imageEntries.map(({ ref, value }) => ({
-        url: value,
-        role: imageRoleForSlot(ref.inputSlot),
-        slot: ref.inputSlot || '',
-      })),
-      videos: videoEntries.map(({ ref, value }) => ({
-        url: value,
-        role: request.contract?.requestFields?.videoContentRole,
-        slot: ref.inputSlot || '',
-      })),
-      audios: audioEntries.map(({ ref, value }) => ({
-        url: value,
-        role: request.contract?.requestFields?.audioContentRole,
-        slot: ref.inputSlot || '',
-      })),
+      images: imageEntries.map(({ ref, value }) => {
+        const role = imageRoleForSlot(ref.inputSlot);
+        return { url: value, ...(role ? { role } : {}), slot: ref.inputSlot || '' };
+      }),
+      videos: videoEntries.map(({ ref, value }) => {
+        const role = request.contract?.requestFields?.videoContentRole;
+        return { url: value, ...(role ? { role } : {}), slot: ref.inputSlot || '' };
+      }),
+      audios: audioEntries.map(({ ref, value }) => {
+        const role = request.contract?.requestFields?.audioContentRole;
+        return { url: value, ...(role ? { role } : {}), slot: ref.inputSlot || '' };
+      }),
     });
     const messageVariables = protocolMessageVariables(
       Array.isArray(request.protocolVariables?.messages) ? request.protocolVariables.messages : [],

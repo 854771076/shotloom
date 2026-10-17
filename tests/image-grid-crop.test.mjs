@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { imageGridCellRect } from '../renderer/src/utils/imageGridCrop.mjs';
+import { imageGridCellRect } from '../renderer/src/utils/imageGridCrop.ts';
 
 test('宫格按可移动裁剪区域切分，邻格共享边界', () => {
   const selection = { x: .1, y: .2, width: .6, height: .5 };

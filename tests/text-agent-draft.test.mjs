@@ -4,46 +4,31 @@
  */
 import assert from 'node:assert/strict';
 import test, { after, before } from 'node:test';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { createServer } from 'vite';
+import { createRendererEnv } from './helpers/rendererSsr.mjs';
 
-let server;
+let env;
 let projectStore;
 let normalization;
 let conversations;
 let bridge;
 let registry;
+let createAgentRunFacts;
 
 before(async () => {
-  globalThis.localStorage = {
-    getItem: () => null, setItem: () => {}, removeItem: () => {}, clear: () => {},
-  };
-  globalThis.window = {
-    setTimeout: () => 0, clearTimeout: () => {}, setInterval: () => 0, clearInterval: () => {},
-  };
-  const rendererRoot = fileURLToPath(new URL('../renderer', import.meta.url));
-  server = await createServer({
-    configFile: false,
-    root: rendererRoot,
-    resolve: { alias: { '@': path.join(rendererRoot, 'src') } },
-    server: { middlewareMode: true, hmr: false },
-    appType: 'custom',
-  });
-  projectStore = await server.ssrLoadModule('/src/store/projectStore.js');
-  normalization = await server.ssrLoadModule('/src/store/projectNormalization.js');
-  conversations = await server.ssrLoadModule('/src/services/copilotConversations.mjs');
-  bridge = await server.ssrLoadModule('/src/agent/runtime/textDraftBridge.ts');
-  registry = await server.ssrLoadModule('/src/agent/core/toolRegistry.ts');
-  const { registerTextDraftTools } = await server.ssrLoadModule('/src/agent/tools/textTools.ts');
+  env = await createRendererEnv({ storage: new Map(), withWindow: true });
+  projectStore = await env.load('store/projectStore');
+  normalization = await env.load('store/projectNormalization');
+  conversations = await env.load('services/agentConversations');
+  bridge = await env.load('agent/runtime/textDraftBridge');
+  registry = await env.load('agent/core/toolRegistry');
+  ({ createAgentRunFacts } = await env.load('agent/core/runFacts'));
+  const { registerTextDraftTools } = await env.load('agent/tools/textTools');
   registerTextDraftTools();
   projectStore.store.project = normalization.createProject('文本 Agent 测试项目');
 });
 
 after(async () => {
-  await server?.close();
-  delete globalThis.localStorage;
-  delete globalThis.window;
+  await env?.dispose();
 });
 
 function contextFor(conversationId) {
@@ -52,7 +37,7 @@ function contextFor(conversationId) {
     agentId: 'text-primary',
     signal: new AbortController().signal,
     loadedSkillIds: new Set(), attachments: [],
-    capabilities: { nodeExecution: true }, state: new Map(), emit: () => {},
+    capabilities: { nodeExecution: true }, run: createAgentRunFacts(), state: new Map(), emit: () => {},
   };
 }
 
@@ -63,7 +48,7 @@ async function runTool(name, input, context) {
 
 test('文本 Agent 只看见草稿读写工具，会话未绑定节点或编辑器关闭时不可用', () => {
   const project = projectStore.store.project;
-  const text = conversations.createCopilotConversation(project, {
+  const text = conversations.createAgentConversation(project, {
     title: '文本 Agent', agentId: 'text-primary', textNodeId: 'text-a',
   });
   const unregister = bridge.registerTextDraftTarget({
@@ -81,7 +66,7 @@ test('文本 Agent 只看见草稿读写工具，会话未绑定节点或编辑�
     '编辑器关闭后草稿工具不得进入模型请求',
   );
 
-  const canvas = conversations.getActiveCopilotConversation(project);
+  const canvas = conversations.getActiveAgentConversation(project);
   assert.deepEqual(
     registry.listAgentTools(contextFor(canvas.id)).map((tool) => tool.id).filter((id) => id.startsWith('text_draft_')),
     [],
@@ -91,10 +76,10 @@ test('文本 Agent 只看见草稿读写工具，会话未绑定节点或编辑�
 
 test('读取与写入落在会话绑定的草稿上，追加会合并用户已输入的内容', async () => {
   const project = projectStore.store.project;
-  const textA = conversations.createCopilotConversation(project, {
+  const textA = conversations.createAgentConversation(project, {
     title: '文本 Agent', agentId: 'text-primary', textNodeId: 'text-a',
   });
-  const textB = conversations.createCopilotConversation(project, {
+  const textB = conversations.createAgentConversation(project, {
     title: '文本 Agent', agentId: 'text-primary', textNodeId: 'text-b',
   });
   let draftA = '用户已写的开头';
@@ -146,7 +131,7 @@ test('读取与写入落在会话绑定的草稿上，追加会合并用户已�
 });
 
 test('文本 Agent 使用独立提示词，不带画布制作与生成指令', async () => {
-  const { buildAgentSystemPrompt } = await server.ssrLoadModule('/src/agent/content/instructions.ts');
+  const { buildAgentSystemPrompt } = await env.load('agent/content/instructions');
   const prompt = buildAgentSystemPrompt({ agentId: 'text-primary' }, 'RUNTIME_MODEL_CONTRACT');
   assert.match(prompt, /RUNTIME_MODEL_CONTRACT/);
   assert.match(prompt, /草稿/);

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { editorMediaMimeType } from "../../utils/editorMediaImport.mjs";
-import { desktopApi } from "../../services/desktopApi.js";
+import { editorMediaMimeType } from "../../utils/editorMediaImport.ts";
+import { desktopApi } from "../../services/desktopApi.ts";
 import type { VideoEditorAsset } from "./videoEditorTypes";
 
 interface RuntimeMediaUrl {

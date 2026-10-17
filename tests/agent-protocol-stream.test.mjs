@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createAgentProtocolAccumulator, normalizeAgentProtocolResponse } from '../renderer/src/utils/agentProtocolStream.mjs';
-import { modelJsonRequestBody } from '../renderer/src/utils/modelRequestBody.mjs';
+import { createAgentProtocolAccumulator, normalizeAgentProtocolResponse } from '../renderer/src/utils/agentProtocolStream.ts';
+import { modelJsonRequestBody } from '../renderer/src/utils/modelRequestBody.ts';
 
 test('Responses 流保留文本、call_id、完整工具参数和用量', () => {
   const deltas = [];

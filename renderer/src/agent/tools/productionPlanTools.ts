@@ -38,7 +38,7 @@ const runtimeRefSchema = {
 };
 
 function publish(context: AgentToolContext, plan: JsonObject) {
-  context.state.set('activeProductionPlanId', plan.id);
+  context.run.activeProductionPlanId = String(plan.id);
   context.emit({ type: 'production_plan_updated', plan, createdAt: new Date().toISOString() });
 }
 

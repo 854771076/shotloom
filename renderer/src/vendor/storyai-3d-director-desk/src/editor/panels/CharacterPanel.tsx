@@ -38,14 +38,15 @@ export function CharacterPanel() {
     if (selectedCrowdId) {
       const crowdMembers = objects.filter((item) => item.kind === "character" && item.crowdId === selectedCrowdId);
       const crowdAnchor = getCrowdAnchorTransform(objects, selectedCrowdId);
+      const primaryRole = crowdMembers[crowdMembers.length - 1] ?? crowdMembers[0];
 
-      if (crowdMembers.length && crowdAnchor) {
+      if (primaryRole && crowdAnchor) {
         return {
           mode: "crowd" as const,
           crowdId: selectedCrowdId,
           crowdMembers,
           crowdAnchor,
-          role: crowdMembers[crowdMembers.length - 1] ?? crowdMembers[0],
+          role: primaryRole,
           name: crowdMembers[0]?.crowdLabel ?? "群众",
           color: crowdMembers[0]?.color ?? "#4F8EF7",
         };

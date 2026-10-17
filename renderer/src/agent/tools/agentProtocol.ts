@@ -1,4 +1,6 @@
-import type { AgentAction, JsonObject } from '../../services/agentTypes';
+import type {
+  AgentAction, AgentInputLink, AgentInputRole, AgentInputSlot, JsonObject,
+} from '../../services/agentTypes';
 import type { JsonSchema } from '../core/types';
 
 interface ActionSpec {
@@ -24,12 +26,12 @@ function resolveCommonPropertyRefs(value: unknown, commonProperties: Record<stri
   }
   if (!value || typeof value !== 'object') return value;
   const record = value as Record<string, unknown>;
-  const match = typeof record.$ref === 'string'
-    ? record.$ref.match(/^#\/commonProperties\/([^/]+)$/)
-    : null;
-  if (match) {
-    const referenced = commonProperties[match[1]];
-    if (!referenced) throw new Error(`Agent action schema references unknown common property: ${match[1]}`);
+  const refName = typeof record.$ref === 'string'
+    ? record.$ref.match(/^#\/commonProperties\/([^/]+)$/)?.[1]
+    : undefined;
+  if (refName) {
+    const referenced = commonProperties[refName];
+    if (!referenced) throw new Error(`Agent action schema references unknown common property: ${refName}`);
     const overrides = Object.fromEntries(Object.entries(record).filter(([key]) => key !== '$ref'));
     return resolveCommonPropertyRefs({ ...cloneJson(referenced), ...overrides }, commonProperties);
   }
@@ -59,7 +61,9 @@ export function buildAgentActionSchema(
       if (property) properties[field] = resolveCommonPropertyRefs(property, commonProperties) as JsonSchema;
     }
     branches.push({
-      type: 'object', description: spec.description, properties,
+      type: 'object',
+      ...(spec.description === undefined ? {} : { description: spec.description }),
+      properties,
       // Existing generation actions intentionally allow runtime defaults even
       // when the storage contract lists fields as required. Connections have
       // no safe default, so expose their endpoints as schema-required.
@@ -127,22 +131,21 @@ function inferActionType(action: AgentAction): string {
   return '';
 }
 
-function normalizeInputLinks(value: unknown): AgentAction['inputLinks'] {
+function normalizeInputLinks(value: unknown): AgentInputLink[] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((item) => {
     if (typeof item === 'string' && item.trim()) return [{ nodeId: item.trim() }];
     if (!item || typeof item !== 'object' || Array.isArray(item)) return [];
-    const link = item as JsonObject;
-    const nodeId = String(link.nodeId || link.id || '').trim();
+    const source = item as JsonObject;
+    const nodeId = String(source.nodeId || source.id || '').trim();
     if (!nodeId) return [];
-    const role = String(link.role || '').trim();
-    const slot = String(link.slot || '').trim();
-    return [{
-      nodeId,
-      ...(role ? { role: role as AgentAction['role'] } : {}),
-      ...(slot ? { slot: slot as AgentAction['slot'] } : {}),
-      ...(link.required === false ? { required: false } : {}),
-    }];
+    const link: AgentInputLink = { nodeId };
+    const role = String(source.role || '').trim();
+    const slot = String(source.slot || '').trim();
+    if (role) link.role = role as AgentInputRole;
+    if (slot) link.slot = slot as AgentInputSlot;
+    if (source.required === false) link.required = false;
+    return [link];
   });
 }
 

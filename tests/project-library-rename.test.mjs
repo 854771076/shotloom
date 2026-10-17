@@ -1,19 +1,11 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import test from 'node:test';
 
-const projectsView = readFileSync(
-  new URL('../renderer/src/app/views/ProjectsView.tsx', import.meta.url),
-  'utf8',
-);
-const projectAdapter = readFileSync(
-  new URL('../renderer/src/app/adapters/projectLibraryAdapter.ts', import.meta.url),
-  'utf8',
-);
-const projectCommand = readFileSync(
-  new URL('../src-tauri/src/commands/project.rs', import.meta.url),
-  'utf8',
-);
+import test from 'node:test';
+import { readSource } from './helpers/sourceContract.mjs';
+
+const projectsView = readSource('renderer/src/app/views/ProjectsView.tsx');
+const projectAdapter = readSource('renderer/src/app/adapters/projectLibraryAdapter.ts');
+const projectCommand = readSource('src-tauri/src/commands/project.rs');
 
 test('项目重命名只在进入编辑态时全选，不会在每次输入后重复全选', () => {
   assert.match(projectsView, /const renameEntryKey = rename \? entryKey\(rename\.entry\) : ""/);

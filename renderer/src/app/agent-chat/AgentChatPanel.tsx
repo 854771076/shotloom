@@ -2,17 +2,16 @@ import {
   forwardRef,
   useCallback,
   useEffect,
-  useImperativeHandle,
   useMemo,
   useRef,
   useState,
   useSyncExternalStore,
 } from "react";
 import type { WorkflowNodeData } from "../canvas/WorkflowCanvas";
-import { agentNodeAliasMaps } from "../../services/agentCanvasSnapshot.js";
-import { resolveNodeChatImageAttachment } from "../../services/nodeChatAttachment.mjs";
+import { agentNodeAliasMaps } from "../../services/agentCanvasSnapshot.ts";
+import { resolveNodeChatImageAttachment } from "../../services/nodeChatAttachment.ts";
 import { IconSymbol } from "../components/IconSymbol";
-import { getDomainRevision, subscribeDomain } from "../../store/domainReactivity.js";
+import { getDomainRevision, subscribeDomain } from "../../store/domainReactivity.ts";
 import { compactRepeatedFailures } from "./messagePresentation";
 import { Transcript } from "./Transcript";
 import { Composer } from "./Composer";

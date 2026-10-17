@@ -1,4 +1,4 @@
-import { renderMarkdown } from "../../utils/copilotMarkdown.js";
+import { renderMarkdown } from "../../utils/markdown.ts";
 import type { AgentMessage } from "./contracts";
 
 export type PresentedAgentMessage = AgentMessage & { repeatedFailureCount?: number };

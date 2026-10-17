@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { isPathInsideAssetRoot, joinAssetPath, projectAssetRoot } from '../renderer/src/utils/assetPaths.mjs';
+import { isPathInsideAssetRoot, joinAssetPath, projectAssetRoot } from '../renderer/src/utils/assetPaths.ts';
 
 test('shared project asset root overrides the canvas-local assets directory', () => {
   assert.equal(projectAssetRoot({ library: { assetRootDir: '/work/assets' } }, '/work/shot-1'), '/work/assets');

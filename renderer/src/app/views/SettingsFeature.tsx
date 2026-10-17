@@ -3,7 +3,7 @@ import { getModelInfo } from "../../domain/catalog/ModelCatalog";
 import { findProviderAdapter, getProviderAdapters } from "../../domain/provider/adapters";
 import { getProviderModelRows } from "../../domain/provider/ModelAvailability";
 import type { ProviderConfig } from "../../domain/provider/ProviderConfig";
-import { resolveProviderIconId } from "../../domain/provider/ProviderBrandIcons.js";
+import { resolveProviderIconId } from "../../domain/provider/ProviderBrandIcons.ts";
 import { builtInRecipeChanges } from "../../services/builtInRecipes";
 import { builtInSkillChanges } from "../../services/builtInSkills";
 import { desktopApi } from "../../services/desktopApi";
@@ -49,7 +49,7 @@ import {
   DEFAULT_CANVAS_ACTION_SHORTCUTS,
   normalizeCanvasActionShortcuts,
 } from "../../utils/canvasActionShortcuts";
-import { showToast } from "../store/overlayStore";
+import { showToast } from "../../store/notificationStore";
 import {
   type RecipeDraft,
   RecipeEditorDialog,

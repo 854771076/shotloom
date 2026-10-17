@@ -12,7 +12,7 @@ import {
   User,
   Users,
 } from "lucide-react";
-import type { DirectorObject, DirectorObjectKind } from "../schema/directorProject";
+import type { DirectorObject } from "../schema/directorProject";
 import { useDirectorStore } from "../store/directorStore";
 
 type SceneTreePreviewItem = {

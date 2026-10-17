@@ -38,7 +38,6 @@ export function ScenePanel() {
   const [panoramaRadiusDraft, setPanoramaRadiusDraft] = useState(String(scene.panoramaRadius));
   const [groundHeightDraft, setGroundHeightDraft] = useState(String(scene.groundHeight));
   const panoramaAsset = assets.find((item) => item.id === panoramaAssetId);
-  const clampedPanoramaRadius = clampNumber(scene.panoramaRadius, PANORAMA_RADIUS_MIN, PANORAMA_RADIUS_MAX);
 
   useEffect(() => {
     setSceneScaleDraft(String(scene.scale));

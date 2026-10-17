@@ -312,6 +312,7 @@ export function getModelLibraryItems() {
   return Object.entries(modelLibraryModules)
     .map(([path, url]) => {
       const [, directoryName, fileName] = path.match(/模型库\/([^/]+)\/([^/]+)$/) ?? [];
+      if (!directoryName) return null;
       const category = categoriesByDirectory.get(directoryName);
 
       if (!category || !fileName) return null;

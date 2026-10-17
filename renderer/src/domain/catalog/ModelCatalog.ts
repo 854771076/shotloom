@@ -36,12 +36,12 @@ export interface CatalogParam {
   key: string;
   label: string;
   type: string;
-  required?: boolean;
+  required?: boolean | undefined;
   default?: unknown;
-  numeric?: boolean;
-  options?: unknown[];
-  conflictsWith?: string[];
-  visibleWhen?: Record<string, unknown>;
+  numeric?: boolean | undefined;
+  options?: unknown[] | undefined;
+  conflictsWith?: string[] | undefined;
+  visibleWhen?: Record<string, unknown> | undefined;
   presentation?: string | {
     control: 'segmented' | 'select' | 'ratio' | 'resolution' | 'slider' | 'number' | 'toggle' | 'text' | 'hidden';
     group?: string;
@@ -50,8 +50,8 @@ export interface CatalogParam {
     min?: number;
     max?: number;
     step?: number;
-  };
-  optionLabels?: Record<string, string>;
+  } | undefined;
+  optionLabels?: Record<string, string> | undefined;
 }
 
 export interface CatalogInputConstraints {
@@ -346,7 +346,7 @@ export interface ModelRuntimeContract {
   requestFields: Record<string, string>;
   inputConstraints: CatalogInputConstraints;
   outputConstraints: CatalogOutputConstraints;
-  agent?: CatalogAgentProtocol;
+  agent?: CatalogAgentProtocol | undefined;
   // Capability flags
   supportsInputImages: boolean;
   minInputImages: number;
@@ -370,25 +370,25 @@ export interface ModelRuntimeContract {
   allowedDurations: number[];
   defaultDuration: number | null;
   supportedTextSubtasks: string[];
-  pollStatusMap?: Record<string, string>;
-  auth?: CatalogMode['auth'];
-  headers?: Record<string, string>;
+  pollStatusMap?: Record<string, string> | undefined;
+  auth?: CatalogMode['auth'] | undefined;
+  headers?: Record<string, string> | undefined;
   requestTemplate?: unknown;
   contentTemplate?: unknown;
-  taskIdPath?: string;
+  taskIdPath?: string | undefined;
   taskRequestTemplate?: unknown;
-  statusPath?: string;
-  progressPath?: string;
-  errorPath?: string;
-  resultTextPath?: string;
-  resultUrlPath?: string;
-  resultBase64Path?: string;
-  resultHexPath?: string;
-  resultMimeType?: string;
-  resultFileExtension?: string;
-  resultBody?: CatalogResultBody;
-  resultEndpoint?: CatalogResultEndpoint;
-  resultDownloadAuth?: boolean;
+  statusPath?: string | undefined;
+  progressPath?: string | undefined;
+  errorPath?: string | undefined;
+  resultTextPath?: string | undefined;
+  resultUrlPath?: string | undefined;
+  resultBase64Path?: string | undefined;
+  resultHexPath?: string | undefined;
+  resultMimeType?: string | undefined;
+  resultFileExtension?: string | undefined;
+  resultBody?: CatalogResultBody | undefined;
+  resultEndpoint?: CatalogResultEndpoint | undefined;
+  resultDownloadAuth?: boolean | undefined;
 }
 
 export interface ModelSchema {
@@ -415,7 +415,59 @@ export interface TypeMeta {
 
 // ── Singleton Catalog ────────────────────────────────────────────────────────
 
-const defaultCap = {
+const defaultTextTypeMeta: TypeMeta = { value: 'textGeneration', label: '文本生成', defaultModel: 'gpt-5.4', icon: 'chat' };
+
+// capabilityFromMode / defaultCap 的推断形状是运行时契约的组成部分（contractFor 直接展开它），
+// 因此把它固化成显式契约；字段缺失时消费方会退回 defaultCap 的取值。
+export interface ModelInputCapability {
+  inputConstraints: CatalogInputConstraints;
+  supportsInputImages: boolean;
+  minInputImages: number;
+  maxInputImages: number;
+  inputImageRoles: string[];
+  imageRole: string;
+  supportsReferenceImages: boolean;
+  referenceImageFormat: string;
+  imageValueFormat: string;
+  supportsMaskEditing: boolean;
+  supportsImageStreaming: boolean;
+  maskFormat: string;
+  supportsInputVideo: boolean;
+  minInputVideos: number;
+  maxInputVideos: number;
+  inputVideoRoles: string[];
+  supportsInputAudio: boolean;
+  minInputAudios: number;
+  maxInputAudios: number;
+  inputAudioRoles: string[];
+  endpointPath: string;
+  endpointScope: string;
+  taskEndpointPath: string;
+  taskEndpointScope: string;
+  allowedDurations: number[];
+  defaultDuration: number | null;
+  supportedTextSubtasks: string[];
+  pollStatusMap?: Record<string, string> | undefined;
+  auth?: CatalogMode['auth'] | undefined;
+  headers?: Record<string, string> | undefined;
+  requestTemplate?: unknown;
+  taskIdPath?: string | undefined;
+  taskRequestTemplate?: unknown;
+  statusPath?: string | undefined;
+  progressPath?: string | undefined;
+  errorPath?: string | undefined;
+  resultTextPath?: string | undefined;
+  resultUrlPath?: string | undefined;
+  resultBase64Path?: string | undefined;
+  resultHexPath?: string | undefined;
+  resultMimeType?: string | undefined;
+  resultFileExtension?: string | undefined;
+  resultBody?: CatalogResultBody | undefined;
+  resultEndpoint?: CatalogResultEndpoint | undefined;
+  resultDownloadAuth?: boolean | undefined;
+}
+
+const defaultCap: ModelInputCapability = {
   inputConstraints: {} as CatalogInputConstraints,
   supportsInputImages: false, minInputImages: 0, maxInputImages: 0, inputImageRoles: [], imageRole: 'none',
   supportsReferenceImages: false,
@@ -625,7 +677,9 @@ class ModelCatalog {
       upstreamModel: model.upstreamModel || model.id,
       modeId: mode.id,
       inputMode: this.semanticInputMode(mode, model.type),
-      inputSlots: [...(mode.inputSlots || (this.semanticInputMode(mode, model.type) ? slotsForInputMode(this.semanticInputMode(mode, model.type)!) : []))],
+      inputSlots: mode.inputSlots
+        ? [...mode.inputSlots]
+        : (this.semanticInputMode(mode, model.type) ? slotsForInputMode(this.semanticInputMode(mode, model.type)!) : []),
       provider: model.provider,
       endpoint: { ...mode.endpoint },
       taskEndpoint: mode.taskEndpoint ? { ...mode.taskEndpoint } : null,
@@ -639,7 +693,7 @@ class ModelCatalog {
     };
   }
 
-  private capabilityFromMode(mode: CatalogMode | null) {
+  private capabilityFromMode(mode: CatalogMode | null): ModelInputCapability {
     if (!mode) return { ...defaultCap };
     const input = mode.inputConstraints || {};
     const output = mode.outputConstraints || {};
@@ -691,11 +745,11 @@ class ModelCatalog {
     };
   }
 
-  getModelInputCapability(modelId: string, modeId?: string) {
+  getModelInputCapability(modelId: string, modeId?: string): ModelInputCapability {
     return this.capabilityFromMode(this.getModeConfig(modelId, modeId));
   }
 
-  getInputCapabilityForRoles(type: string, modelId: string, inputRoles: string[] = [], requestedMode?: string) {
+  getInputCapabilityForRoles(modelId: string, inputRoles: string[] = [], requestedMode?: string) {
     const mode = this.resolveModeConfig(modelId, inputRoles, requestedMode);
     return {
       supported: Boolean(mode),
@@ -765,11 +819,11 @@ class ModelCatalog {
     { value: 'imageGeneration', label: '图片生成', defaultModel: 'gpt-image-2', icon: 'image' },
     { value: 'videoGeneration', label: '视频生成', defaultModel: 'grok-imagine-video', icon: 'play' },
     { value: 'audioGeneration', label: '音频生成', defaultModel: '', icon: 'waveform' },
-    { value: 'textGeneration', label: '文本生成', defaultModel: 'gpt-5.4', icon: 'chat' },
+    defaultTextTypeMeta,
   ];
 
   getTypeMeta(type: string): TypeMeta {
-    return ModelCatalog.GENERATION_TYPES.find((t) => t.value === type) || ModelCatalog.GENERATION_TYPES[3];
+    return ModelCatalog.GENERATION_TYPES.find((t) => t.value === type) || defaultTextTypeMeta;
   }
 
   static coerceParamValue(param: CatalogParam, value: unknown): unknown {
@@ -803,20 +857,18 @@ export const resolveModeIdForInputMode = (modelId: string, inputMode?: string) =
   modelCatalog.resolveModeIdForInputMode(modelId, inputMode);
 export const getModelIdsByType = (nodeType: string) => modelCatalog.getModelIdsByType(nodeType);
 export const getModelInfo = (modelId: string) => modelCatalog.getModelInfo(modelId);
-export const isModelForType = (nodeType: string, modelId: string) => modelCatalog.isModelForType(nodeType, modelId);
+export const isModelForType = (nodeType: string | undefined, modelId: string) => modelCatalog.isModelForType(String(nodeType || ''), modelId);
 export const getAllModelNames = () => modelCatalog.getAllModelNames();
 export const resolveModelModeConfig = (modelId: string, inputRoles?: string[], requestedMode?: string) =>
   modelCatalog.resolveModeConfig(modelId, inputRoles, requestedMode);
-export const resolveModelRuntimeContract = (type: string, modelId: string, inputRoles?: string[], requestedMode?: string) =>
-  modelCatalog.resolveRuntimeContract(type, modelId, inputRoles, requestedMode);
+export const resolveModelRuntimeContract = (type: string | undefined, modelId: string, inputRoles?: string[], requestedMode?: string) =>
+  modelCatalog.resolveRuntimeContract(String(type || ''), modelId, inputRoles, requestedMode);
 export const buildRuntimeContractForModel = (model: CatalogModel, modeId?: string) =>
   modelCatalog.buildRuntimeContract(model, modeId);
-export const getModelInputCapability = (type: string, modelId: string, modeId?: string) =>
-  modelCatalog.getModelInputCapability(modelId, modeId);
-export const getModelInputCapabilityForRoles = (type: string, modelId: string, inputRoles?: string[], requestedMode?: string) =>
-  modelCatalog.getInputCapabilityForRoles(type, modelId, inputRoles, requestedMode);
-export const getModelSchema = (type: string, modelId?: string, modeId?: string) =>
-  modelCatalog.getModelSchema(type, modelId, modeId);
+export const getModelInputCapabilityForRoles = (_type: string | undefined, modelId: string, inputRoles?: string[], requestedMode?: string) =>
+  modelCatalog.getInputCapabilityForRoles(modelId, inputRoles, requestedMode);
+export const getModelSchema = (type: string | undefined, modelId?: string, modeId?: string) =>
+  modelCatalog.getModelSchema(String(type || ''), modelId, modeId);
 export const defaultConfigForType = (type: string, modelId?: string) =>
   modelCatalog.defaultConfigForType(type, modelId);
 export const getAgentModelCatalog = () => modelCatalog.getAgentCatalog();

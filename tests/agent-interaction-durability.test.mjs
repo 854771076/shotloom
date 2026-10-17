@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import test from 'node:test';
 
-const runStore = readFileSync(new URL('../renderer/src/agent/runtime/runStore.ts', import.meta.url), 'utf8');
-const projectStore = readFileSync(new URL('../renderer/src/store/projectStore.js', import.meta.url), 'utf8')
-  + readFileSync(new URL('../renderer/src/store/projectNormalization.js', import.meta.url), 'utf8');
-const closeGuard = readFileSync(new URL('../renderer/src/composables/useWindowClose.js', import.meta.url), 'utf8');
-const lifecycle = readFileSync(new URL('../renderer/src/agent/tools/lifecycleTools.ts', import.meta.url), 'utf8');
+import test from 'node:test';
+import { readSource } from './helpers/sourceContract.mjs';
+
+const runStore = readSource('renderer/src/agent/runtime/runStore.ts');
+const projectStore = readSource('renderer/src/store/projectStore.ts')
+  + readSource('renderer/src/store/projectNormalization.ts');
+const closeGuard = readSource('renderer/src/app/windowCloseGuard.ts');
+const lifecycle = readSource('renderer/src/agent/tools/lifecycleTools.ts');
 
 test('Agent 问题和工具确认使用统一的项目级持久化交互', () => {
   assert.match(projectStore, /agentInteractions: \[\]/);

@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { readFileSync } from 'node:fs';
 
 import {
   canvasNodeDimensions,
@@ -11,6 +10,7 @@ import {
   mediaCanvasNodeDimensions,
   reconcileMediaNodeDimensions,
 } from '../renderer/src/domain/graph/CanvasNodeDimensions.ts';
+import { readSource } from './helpers/sourceContract.mjs';
 
 function node(id, type, extra = {}) {
   return { id, type, title: id, x: -999, y: -999, ...extra };
@@ -20,10 +20,7 @@ function project(nodes, edges = []) {
   return { nodes, edges, tasks: [] };
 }
 
-const layoutSource = readFileSync(
-  new URL('../renderer/src/services/agentLayoutService.ts', import.meta.url),
-  'utf8',
-);
+const layoutSource = readSource('renderer/src/services/agentLayoutService.ts');
 
 test('工作流布局不从标题、角色关键词或节点类型猜测制作语义', () => {
   assert.doesNotMatch(layoutSource, /TERMINAL_ROLE_PATTERN|sequenceNumber|semanticBaseDepth|nodeRole/);

@@ -120,9 +120,9 @@ const groups: Array<
       description: "内置厂商的 API Key 与接口地址",
     }, {
       id: "agent",
-      label: "Copilot",
+      label: "Agent",
       icon: "spark",
-      description: "Copilot 默认模型与执行策略",
+      description: "Agent 默认模型与执行策略",
     }],
   },
   {
@@ -189,8 +189,13 @@ const toggleRows = [
   [
     "agentAutoLayout",
     "创建后自动整理",
-    "Copilot 创建节点后立即应用全局分层布局",
+    "Agent 创建节点后立即应用全局分层布局",
   ],
+] as const;
+
+const canvasShortcutRows = [
+  ["fitView", "适应视窗", "让全部节点回到可见区域"],
+  ["autoLayout", "自动整理", "优先整理当前选区，否则整理全部节点"],
 ] as const;
 
 function ModelSelect(
@@ -702,11 +707,7 @@ export function SettingsPanel(
                 <span className="settings-status-pill">全局分层</span>
               </div>
               <div className="canvas-shortcut-settings">
-                {[["fitView", "适应视窗", "让全部节点回到可见区域"], [
-                  "autoLayout",
-                  "自动整理",
-                  "优先整理当前选区，否则整理全部节点",
-                ]].map(([key, label, description]) => (
+                {canvasShortcutRows.map(([key, label, description]) => (
                   <div key={key} className="canvas-shortcut-setting">
                     <div>
                       <strong>{label}</strong>

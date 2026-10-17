@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { restoreMissingGeneratedFiles } from '../renderer/src/services/generatedFileRestoration.mjs';
+import { restoreMissingGeneratedFiles } from '../renderer/src/services/generatedFileRestoration.ts';
 
 test('重新打开项目时恢复缺失的生成文件并更新素材事实', async () => {
   const project = {

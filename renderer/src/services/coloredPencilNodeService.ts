@@ -1,6 +1,6 @@
 import { desktopApi } from '@/services/desktopApi';
-import { addCanvasEdge } from '@/store/canvasGraphStore';
-import { semanticOutputFileName } from '@/utils/generatedOutputNaming.mjs';
+import { addCanvasEdge, type CanvasProjectLike } from '@/store/canvasGraphStore';
+import { semanticOutputFileName } from '@/utils/generatedOutputNaming.ts';
 import { uid } from '@/utils/format';
 
 export const COLORED_PENCIL_STYLE_ID = 'colored-pencil';
@@ -88,7 +88,7 @@ export async function createColoredPencilImageNode(
     createdAt: new Date().toISOString(),
   };
   project.nodes.push(derived);
-  addCanvasEdge(project, sourceNode.id, derived.id, {
+  addCanvasEdge(project as CanvasProjectLike, sourceNode.id, derived.id, {
     touch: false,
     kind: 'typed-input',
     edge: { data: { inputRole: 'referenceImage', required: true } },

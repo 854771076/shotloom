@@ -68,6 +68,11 @@ export interface AgentToolCall {
   summary?: string;
   /** 工具真实产出的文字描述；没有产出时为空，界面不得用入参冒充结果。 */
   output?: string;
+  /** tool_start 携带的完整调用参数；展开步骤时如实展示，缺失时不显示参数区。 */
+  args?: Record<string, unknown>;
+  /** 真实派发与结算的时间戳，用于在摘要行尾部给出耗时。 */
+  startedAt?: string;
+  endedAt?: string;
   /** 工具产出的本地位图（如抽帧结果），用于让用户核对 Agent 的依据。 */
   previews?: Array<{ path: string; label: string }>;
   pending?: boolean;

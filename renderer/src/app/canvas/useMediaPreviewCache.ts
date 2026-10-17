@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
-import { desktopApi } from "../../services/desktopApi.js";
+import { desktopApi } from "../../services/desktopApi.ts";
 import {
   acquireMediaPreview,
   type CachedMediaKind,
@@ -13,11 +13,11 @@ const supportedKinds = new Set(["image", "video", "audio"]);
 export function useMediaPreviewCache(input: {
   path: string;
   kind: string;
-  mimeType?: string;
-  maxSize?: number;
-  revision?: string;
-  fallbackUrl?: string;
-  enabled?: boolean;
+  mimeType?: string | undefined;
+  maxSize?: number | undefined;
+  revision?: string | undefined;
+  fallbackUrl?: string | undefined;
+  enabled?: boolean | undefined;
 }) {
   const [cachedUrl, setCachedUrl] = useState("");
   const [bufferedPath, setBufferedPath] = useState("");
@@ -47,10 +47,10 @@ export function useMediaPreviewCache(input: {
           const acquired = await acquireMediaPreview({
             path,
             kind,
-            mimeType: input.mimeType,
-            maxSize: input.maxSize,
-            revision: input.revision,
             buffered,
+            ...(input.mimeType === undefined ? {} : { mimeType: input.mimeType }),
+            ...(input.maxSize === undefined ? {} : { maxSize: input.maxSize }),
+            ...(input.revision === undefined ? {} : { revision: input.revision }),
           });
           if (cancelled) {
             acquired.release();

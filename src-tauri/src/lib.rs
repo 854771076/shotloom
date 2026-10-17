@@ -84,9 +84,9 @@ pub fn run() {
 
     let builder = tauri::Builder::default()
         .manage(commands::GenerationGatewayState::new())
+        .manage(commands::MediaTaskState::default())
         .manage(commands::RecoveryState::new())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init());
     #[cfg(target_os = "macos")]
@@ -115,6 +115,7 @@ pub fn run() {
             commands::generation_stream,
             commands::generation_download,
             commands::generation_cancel,
+            commands::media_task_cancel,
             commands::platform,
             commands::settings_get,
             commands::settings_set,
@@ -149,6 +150,7 @@ pub fn run() {
             commands::file_global_asset_root,
             commands::file_trash,
             commands::file_show_item_in_folder,
+            commands::file_open_path,
             commands::file_export_resource_package,
             commands::file_import_resource_package,
             commands::file_write,

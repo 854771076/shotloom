@@ -1,25 +1,13 @@
 import { loadModelCatalog } from './helpers/modelCatalog.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { readFileSync } from 'node:fs';
-import { optionLabel } from '../renderer/src/utils/modelPresentation.js';
+import { optionLabel } from '../renderer/src/utils/modelPresentation.ts';
+import { readSource } from './helpers/sourceContract.mjs';
 
-const adaptersIndexSource = readFileSync(
-  new URL('../renderer/src/domain/provider/adapters/index.ts', import.meta.url),
-  'utf8',
-);
-const adapterSource = (name) => readFileSync(
-  new URL(`../renderer/src/domain/provider/adapters/${name}.ts`, import.meta.url),
-  'utf8',
-);
-const catalogSource = readFileSync(
-  new URL('../renderer/src/domain/catalog/ModelCatalog.ts', import.meta.url),
-  'utf8',
-);
-const loopRequestSource = readFileSync(
-  new URL('../renderer/src/agent/loop/modelRequest.ts', import.meta.url),
-  'utf8',
-);
+const adaptersIndexSource = readSource('renderer/src/domain/provider/adapters/index.ts');
+const adapterSource = (name) => readSource(`../renderer/src/domain/provider/adapters/${name}.ts`);
+const catalogSource = readSource('renderer/src/domain/catalog/ModelCatalog.ts');
+const loopRequestSource = readSource('renderer/src/agent/loop/modelRequest.ts');
 const catalogJson = loadModelCatalog();
 const starrouterAdapter = adapterSource('starrouter');
 

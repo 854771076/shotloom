@@ -8,13 +8,13 @@ import {
   rewriteVideoEditorMediaOps,
   videoEditorAgentDiagnostics,
   videoEditorAgentSnapshot,
-} from '@/utils/videoEditorAgent.mjs';
-import { inferEditorMediaType, probeEditorMedia } from '@/utils/editorMediaImport.mjs';
-import { videoEditorEffectKeys, videoEditorTransitionKeys } from '@/utils/videoEditorEffects.mjs';
+} from '@/utils/videoEditorAgent.ts';
+import { inferEditorMediaType, probeEditorMedia } from '@/utils/editorMediaImport.ts';
+import { videoEditorEffectKeys, videoEditorTransitionKeys } from '@/utils/videoEditorEffects.ts';
 import type { VideoEditorAssetType, VideoEditorProject } from '@/app/editor/videoEditorTypes';
 import { store } from '@/store/projectStore';
 import { desktopApi } from '@/services/desktopApi';
-import { editorClipDuration, findEditorClip } from '@/utils/videoEditorProject.mjs';
+import { editorClipDuration, findEditorClip } from '@/utils/videoEditorProject.ts';
 
 interface EditorSession {
   projectKey: string;
@@ -34,7 +34,7 @@ interface EditorSession {
 let activeEditor: EditorSession | null = null;
 
 function editorAvailable(context: AgentToolContext) {
-  const conversation = (store.project.copilotConversations || []).find(
+  const conversation = (store.project.agentConversations || []).find(
     (item: { id?: string }) => String(item.id || '') === context.conversationId,
   ) as { editorNodeId?: string } | undefined;
   return Boolean(activeEditor && activeEditor.projectKey === context.projectKey
@@ -412,6 +412,8 @@ export function registerVideoEditorTools() {
     effect: 'project_write',
     isAvailable: editorAvailable,
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    // 导出会先等用户选保存路径，再等真实渲染完成，两者都不该被工具超时打断。
+    timeoutMs: 0,
     execute: async (_input, context) => {
       const editor = editorFor(context);
       try {

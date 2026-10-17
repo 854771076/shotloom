@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   agentNodeAliasMaps,
   agentNodeStableAlias,
-} from '../renderer/src/services/agentNodeAlias.mjs';
+} from '../renderer/src/services/agentNodeAlias.ts';
 
 test('画布节点使用稳定的短别名而不是完整 UUID', () => {
   assert.equal(

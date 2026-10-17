@@ -6,49 +6,26 @@
  */
 import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { createServer } from 'vite';
+import { createRendererEnv } from './helpers/rendererSsr.mjs';
 
 const storage = new Map();
-let server;
+let env;
 let projectStore;
 let normalization;
 let runStore;
 let projectIdentity;
 
 before(async () => {
-  globalThis.localStorage = {
-    getItem: (key) => storage.get(key) ?? null,
-    setItem: (key, value) => storage.set(key, String(value)),
-    removeItem: (key) => storage.delete(key),
-    clear: () => storage.clear(),
-  };
-  globalThis.window = {
-    setTimeout: () => 0,
-    clearTimeout: () => {},
-    setInterval: () => 0,
-    clearInterval: () => {},
-  };
-  const rendererRoot = fileURLToPath(new URL('../renderer', import.meta.url));
-  server = await createServer({
-    configFile: false,
-    root: rendererRoot,
-    resolve: { alias: { '@': path.join(rendererRoot, 'src') } },
-    server: { middlewareMode: true, hmr: false },
-    appType: 'custom',
-  });
-  projectStore = await server.ssrLoadModule('/src/store/projectStore.js');
-  normalization = await server.ssrLoadModule('/src/store/projectNormalization.js');
-  projectIdentity = await server.ssrLoadModule('/src/services/agentProjectIdentity.ts');
-  runStore = await server.ssrLoadModule('/src/agent/runtime/runStore.ts');
+  env = await createRendererEnv({ storage, withWindow: true });
+  projectStore = await env.load('store/projectStore');
+  normalization = await env.load('store/projectNormalization');
+  projectIdentity = await env.load('services/agentProjectIdentity');
+  runStore = await env.load('agent/runtime/runStore');
   projectStore.store.project = normalization.createProject('身份投影测试项目');
 });
 
 after(async () => {
-  await server?.close();
-  delete globalThis.localStorage;
-  delete globalThis.window;
+  await env?.dispose();
 });
 
 const now = new Date().toISOString();

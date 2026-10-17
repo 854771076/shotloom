@@ -1,31 +1,34 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { readSource, sourceExists } from './helpers/sourceContract.mjs';
 
-const sidebar = readFileSync(new URL('../renderer/src/app/layout/SideBar.tsx', import.meta.url), 'utf8');
-const interactiveLogo = readFileSync(new URL('../renderer/src/app/components/InteractiveLogo.tsx', import.meta.url), 'utf8');
-const appShell = readFileSync(new URL('../renderer/src/app/AppShell.tsx', import.meta.url), 'utf8');
-const topbar = readFileSync(new URL('../renderer/src/app/layout/TopBar.tsx', import.meta.url), 'utf8');
-const projectLibrary = readFileSync(new URL('../renderer/src/app/adapters/projectLibraryAdapter.ts', import.meta.url), 'utf8');
-const taskStore = readFileSync(new URL('../renderer/src/store/taskStore.js', import.meta.url), 'utf8');
-const settingsPanel = readFileSync(new URL('../renderer/src/app/views/SettingsPanel.tsx', import.meta.url), 'utf8');
-const settingsFeature = readFileSync(new URL('../renderer/src/app/views/SettingsFeature.tsx', import.meta.url), 'utf8');
+const sidebar = readSource('renderer/src/app/layout/SideBar.tsx');
+const interactiveLogo = readSource('renderer/src/app/components/InteractiveLogo.tsx');
+const appShell = readSource('renderer/src/app/AppShell.tsx');
+const topbar = readSource('renderer/src/app/layout/TopBar.tsx');
+const projectLibrary = readSource('renderer/src/app/adapters/projectLibraryAdapter.ts');
+const taskStore = readSource('renderer/src/store/taskStore.ts');
+const settingsPanel = readSource('renderer/src/app/views/SettingsPanel.tsx');
+const settingsFeature = readSource('renderer/src/app/views/SettingsFeature.tsx');
 const agentChat = '../renderer/src/app/agent-chat/';
-const transcript = readFileSync(new URL(`${agentChat}Transcript.tsx`, import.meta.url), 'utf8');
-const agentPresentation = readFileSync(new URL(`${agentChat}agentPresentation.ts`, import.meta.url), 'utf8');
-const composer = readFileSync(new URL(`${agentChat}Composer.tsx`, import.meta.url), 'utf8');
-const transcriptStyles = readFileSync(new URL(`${agentChat}Transcript.module.css`, import.meta.url), 'utf8');
-const composerStyles = readFileSync(new URL(`${agentChat}Composer.module.css`, import.meta.url), 'utf8');
-const copilotAdapter = readFileSync(new URL('../renderer/src/app/adapters/copilotAdapter.ts', import.meta.url), 'utf8');
-const referenceCard = readFileSync(new URL(`${agentChat}ReferenceCard.tsx`, import.meta.url), 'utf8');
-const referenceModel = readFileSync(new URL(`${agentChat}mediaReference.ts`, import.meta.url), 'utf8');
-const referenceStyles = readFileSync(new URL(`${agentChat}ReferenceCard.module.css`, import.meta.url), 'utf8');
-const mediaThumb = readFileSync(new URL(`${agentChat}MediaThumb.tsx`, import.meta.url), 'utf8');
-const mediaThumbStyles = readFileSync(new URL(`${agentChat}MediaThumb.module.css`, import.meta.url), 'utf8');
-const styles = readFileSync(new URL('../renderer/styles.css', import.meta.url), 'utf8');
-const settingsStyles = readFileSync(new URL('../renderer/styles/settings.css', import.meta.url), 'utf8');
+const transcript = readSource(`${agentChat}Transcript.tsx`);
+const agentPresentation = readSource(`${agentChat}agentPresentation.ts`);
+const composer = readSource(`${agentChat}Composer.tsx`);
+const transcriptStyles = readSource(`${agentChat}Transcript.module.css`);
+const composerStyles = readSource(`${agentChat}Composer.module.css`);
+const agentChatAdapter = readSource('renderer/src/app/adapters/agentChatAdapter.ts');
+const agentSession = readSource('renderer/src/app/adapters/agentSession.ts');
+const referenceCard = readSource(`${agentChat}ReferenceCard.tsx`);
+const referenceModel = readSource(`${agentChat}mediaReference.ts`);
+const referenceStyles = readSource(`${agentChat}ReferenceCard.module.css`);
+const mediaThumb = readSource(`${agentChat}MediaThumb.tsx`);
+const mediaThumbStyles = readSource(`${agentChat}MediaThumb.module.css`);
+// 全局样式按界面区域分文件，导入顺序就是层叠顺序；这里按规则归属读取对应区域。
+const styles = readSource('renderer/styles/app-shell.css');
+const workbenchStyles = readSource('renderer/styles/workbench.css');
+const settingsStyles = readSource('renderer/styles/settings.css');
 const reactMigrationStyles = ['canvas.css', 'project-materials.css', 'media-overlays.css', 'creation-view.css']
-  .map((name) => readFileSync(new URL(`../renderer/styles/${name}`, import.meta.url), 'utf8'))
+  .map((name) => readSource(`../renderer/styles/${name}`))
   .join('\n');
 
 test('项目侧栏提供返回上一层入口并恢复当前画布的父文件夹', () => {
@@ -106,7 +109,7 @@ test('侧栏使用 Shotloom 自有 Logo 和正确产品名', () => {
   assert.match(styles, /\.sidebar-brand img \{[^}]*width:\s*32px[^}]*height:\s*32px[^}]*flex:\s*0 0 32px/);
   assert.doesNotMatch(styles, /\.sidebar-shell\.collapsed \.sidebar-brand img/);
   assert.match(styles, /\.sidebar-shell\.collapsed \.sidebar-brand-copy \{ display: none; \}/);
-  assert.equal(existsSync(new URL('../renderer/public/shotloom-logo.png', import.meta.url)), true);
+  assert.equal(sourceExists('renderer/public/shotloom-logo.png'), true);
   assert.doesNotMatch(sidebar, /Hoshi/);
 });
 
@@ -148,10 +151,10 @@ test('创作画布保留窄窗口操作边界且不恢复厚标题栏', () => {
 });
 
 test('助手折叠按钮为画布右上角工具组预留空间', () => {
-  assert.match(styles, /--agent-reopen-width:\s*104px/);
-  assert.match(styles, /\.forge-agent-reopen \{[^}]*width:\s*var\(--agent-reopen-width\)[^}]*height:\s*40px/);
+  assert.match(workbenchStyles, /--agent-reopen-width:\s*104px/);
+  assert.match(workbenchStyles, /\.forge-agent-reopen \{[^}]*width:\s*var\(--agent-reopen-width\)[^}]*height:\s*40px/);
   assert.match(reactMigrationStyles, /\.forge-lite-main\.agent-collapsed \.canvas-corner-controls \{[^}]*right:\s*calc\(22px \+ var\(--agent-reopen-width\)\)/);
-  assert.doesNotMatch(`${styles}${reactMigrationStyles}${settingsStyles}`, /copilot/i);
+  assert.doesNotMatch(`${styles}${workbenchStyles}${reactMigrationStyles}${settingsStyles}`, /copilot/i);
 });
 
 test('助手空状态使用创作欢迎区并把模型与 Skill 收进大输入器底栏', () => {
@@ -199,8 +202,9 @@ test('附件引用显示为媒体卡，输入框焦点不出现双重描边', ()
   assert.match(composer, /<ReferenceCard/);
   // 旧的文本胶囊不能留着，否则同一份引用会有两种呈现。
   assert.doesNotMatch(composer, /function MentionChip|styles\.fileChip|styles\.mentionAt/);
-  assert.doesNotMatch(copilotAdapter, /未命名节点|未命名文件/);
-  assert.match(copilotAdapter, /references: \[\.\.\.\(payload\.references \|\| \[\]\)\]/);
+  assert.doesNotMatch(agentChatAdapter, /未命名节点|未命名文件/);
+  assert.doesNotMatch(agentSession, /未命名节点|未命名文件/);
+  assert.match(agentSession, /references: \[\.\.\.\(payload\.references \|\| \[\]\)\]/);
   // 节点引用取用户此刻在画布上看到的那份产物，不能盲目取最后一个输出。
   assert.match(referenceModel, /String\(record\.selectedOutputNodeId \|\| ""\)\.replace/);
   // 素材名只在 title 悬浮提示和无障碍标签里，卡片本身不放文字。
@@ -252,7 +256,7 @@ test('API 厂商页先展示内置厂商列表，点击后进入详情', () => {
   assert.match(settingsPanel, /<ProviderCard item=\{selectedProvider\}/);
   assert.doesNotMatch(settingsPanel, /controller\.(add|edit|delete)Provider/);
   assert.doesNotMatch(settingsFeature, /addProvider|editProvider|deleteProvider|ProviderConnectionDialog|getConfiguredProviders|getProviderDefinition/);
-  assert.equal(existsSync(new URL('../renderer/src/app/views/ProviderConnectionDialog.tsx', import.meta.url)), false);
+  assert.equal(sourceExists('renderer/src/app/views/ProviderConnectionDialog.tsx'), false);
 });
 
 test('厂商卡片只提交 API Key 与接口地址，其余配置属于代码声明', () => {

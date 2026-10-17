@@ -1,12 +1,11 @@
 import { useSyncExternalStore } from "react";
 import { TEXT_AGENT_ID } from "../../agent/agents/definitions";
 import {
-  copilotController,
-  copilotData,
-  getCopilotRevision,
+  agentPanelController,
+  agentPanelData,
   newTextConversation,
-  subscribeCopilot,
-} from "../adapters/copilotAdapter";
+} from "../adapters/agentChatAdapter";
+import { agentSession } from "../adapters/agentSession";
 import { AgentChatPanel } from "./AgentChatPanel";
 
 /**
@@ -14,9 +13,9 @@ import { AgentChatPanel } from "./AgentChatPanel";
  * `text-primary` 和当前文本节点，画布与剪辑面板看不到这些会话。
  */
 export function TextAgentPanel({ nodeId, onClose }: { nodeId: string; onClose: () => void }) {
-  useSyncExternalStore(subscribeCopilot, getCopilotRevision, getCopilotRevision);
+  useSyncExternalStore(agentSession.subscribe, agentSession.revision, agentSession.revision);
   // 首次读取即建立该节点的会话，面板的读取与发送因此落在同一个 conversationId 上。
-  const data = copilotData("text", nodeId);
+  const data = agentPanelData("text", nodeId);
   return (
     <aside className="text-agent-panel">
       <AgentChatPanel
@@ -30,11 +29,11 @@ export function TextAgentPanel({ nodeId, onClose }: { nodeId: string; onClose: (
         textModel={data.textModel}
         textModels={data.textModels}
         controller={{
-          ...copilotController,
+          ...agentPanelController,
           close: onClose,
           // 文本面板的会话管理只服务当前文本节点，不能跟随项目级 active 指针。
           newConversation: () => newTextConversation(nodeId),
-          clear: () => copilotController.clear?.(data.activeConversationId),
+          clear: () => agentPanelController.clear?.(data.activeConversationId),
         }}
       />
     </aside>

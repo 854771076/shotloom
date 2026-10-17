@@ -31,7 +31,7 @@ import { AgentChatPanel } from "../agent-chat/AgentChatPanel";
 import { CANVAS_AGENT_ID } from "../../agent/agents/definitions";
 import type { VideoEditorAsset, VideoEditorController } from "../editor/VideoEditorWorkspace";
 import type { AgentLayoutMode } from "../../services/agentLayoutService";
-import { assetCategories } from "../constants/navigation";
+import { assetCategories } from "../../domain/asset/assetCategories";
 
 const VideoEditorWorkspace = lazy(() =>
   import("../editor/VideoEditorWorkspace").then((module) => ({
@@ -42,10 +42,10 @@ const VideoEditorWorkspace = lazy(() =>
 export interface CreationViewController {
   canvas: WorkflowCanvasController;
   nodes: WorkflowNodeActions;
-  copilot: AgentController & {
+  agentPanel: AgentController & {
     subscribe: (listener: () => void) => () => void;
     getRevision: () => number;
-    read: (scope?: "canvas" | "editor", editorNodeId?: string) => CreationCopilotData;
+    read: (scope?: "canvas" | "editor", editorNodeId?: string) => AgentPanelData;
     openVideoEditorConversation?: (nodeId: string) => void;
   };
   applyMaterial: (item: MaterialItem, scope: "library" | "local" | "files") => void | Promise<void>;
@@ -91,7 +91,7 @@ export interface CreationViewData {
   };
 }
 
-type CreationCopilotData = {
+type AgentPanelData = {
   messages: AgentMessage[];
   conversations: ConversationItem[];
   activeConversationId: string;
@@ -100,22 +100,22 @@ type CreationCopilotData = {
   textModels: Array<{ id: string; label: string; iconId: string }>;
 };
 
-function LiveCopilotPanel({
+function LiveAgentPanel({
   nodes,
   artifactNodes,
   controller,
-  copilotRef,
+  agentPanelRef,
 }: {
   nodes: WorkflowNodeData[];
   artifactNodes: WorkflowNodeData[];
-  controller: CreationViewController["copilot"];
-  copilotRef: React.Ref<AgentPanelHandle>;
+  controller: CreationViewController["agentPanel"];
+  agentPanelRef: React.Ref<AgentPanelHandle>;
 }) {
   useSyncExternalStore(controller.subscribe, controller.getRevision, controller.getRevision);
   const data = controller.read();
   return (
     <AgentChatPanel
-      ref={copilotRef}
+      ref={agentPanelRef}
       agentId={CANVAS_AGENT_ID}
       messages={data.messages}
       nodes={nodes}
@@ -137,10 +137,10 @@ export function CreationView({
   data: CreationViewData;
   controller: CreationViewController;
 }) {
-  const [copilotVisible, setCopilotVisible] = useState(true);
-  const copilotRef = useRef<AgentPanelHandle>(null);
-  const [copilotWidth, setCopilotWidth] = useState(() => {
-    const saved = Number(window.localStorage.getItem("shotloom:copilot-width-v4"));
+  const [agentPanelVisible, setAgentPanelVisible] = useState(true);
+  const agentPanelRef = useRef<AgentPanelHandle>(null);
+  const [agentPanelWidth, setAgentPanelWidth] = useState(() => {
+    const saved = Number(window.localStorage.getItem("shotloom:agent-panel-width-v4"));
     const preferred = Math.round(window.innerWidth * 0.4);
     const available = Math.max(360, Math.min(680, window.innerWidth - 420));
     return Number.isFinite(saved) && saved > 0
@@ -239,24 +239,24 @@ export function CreationView({
     await controller.importMaterials();
     refreshMaterials("files");
   }
-  const copilotController: CreationViewController["copilot"] = {
-    ...controller.copilot,
-    close: () => setCopilotVisible(false),
+  const agentPanelController: CreationViewController["agentPanel"] = {
+    ...controller.agentPanel,
+    close: () => setAgentPanelVisible(false),
   };
-  function resizeCopilot(nextWidth: number) {
+  function resizeAgentPanel(nextWidth: number) {
     const maxWidth = Math.max(360, Math.min(680, window.innerWidth - 420));
     const width = Math.round(Math.min(maxWidth, Math.max(360, nextWidth)));
-    setCopilotWidth(width);
-    window.localStorage.setItem("shotloom:copilot-width-v4", String(width));
+    setAgentPanelWidth(width);
+    window.localStorage.setItem("shotloom:agent-panel-width-v4", String(width));
   }
-  function startCopilotResize(event: PointerEvent<HTMLDivElement>) {
+  function startAgentPanelResize(event: PointerEvent<HTMLDivElement>) {
     event.preventDefault();
     const startX = event.clientX;
-    const startWidth = copilotWidth;
+    const startWidth = agentPanelWidth;
     const target = event.currentTarget;
     target.setPointerCapture(event.pointerId);
     const move = (moveEvent: globalThis.PointerEvent) => {
-      resizeCopilot(startWidth + startX - moveEvent.clientX);
+      resizeAgentPanel(startWidth + startX - moveEvent.clientX);
     };
     const finish = () => {
       target.removeEventListener("pointermove", move);
@@ -267,10 +267,10 @@ export function CreationView({
     target.addEventListener("pointerup", finish);
     target.addEventListener("pointercancel", finish);
   }
-  function resizeCopilotWithKeyboard(event: KeyboardEvent<HTMLDivElement>) {
+  function resizeAgentPanelWithKeyboard(event: KeyboardEvent<HTMLDivElement>) {
     if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
     event.preventDefault();
-    resizeCopilot(copilotWidth + (event.key === "ArrowLeft" ? 16 : -16));
+    resizeAgentPanel(agentPanelWidth + (event.key === "ArrowLeft" ? 16 : -16));
   }
   function resizeAssetDrawer(nextHeight: number, availableHeight: number) {
     const minimum = Math.round(availableHeight * 0.7);
@@ -307,9 +307,9 @@ export function CreationView({
   return (
     <div className="forge-lite">
       <main
-        className={`forge-lite-main${copilotVisible ? "" : " agent-collapsed"}`}
+        className={`forge-lite-main${agentPanelVisible ? "" : " agent-collapsed"}`}
         style={
-          copilotVisible ? { gridTemplateColumns: `minmax(0, 1fr) ${copilotWidth}px` } : undefined
+          agentPanelVisible ? { gridTemplateColumns: `minmax(0, 1fr) ${agentPanelWidth}px` } : undefined
         }
       >
         <WorkflowCanvas
@@ -319,8 +319,8 @@ export function CreationView({
           renderers={workflowNodeRenderers}
           nodeActions={controller.nodes}
           controller={controller.canvas}
-          mentionInCopilot={(nodeId) => {
-            copilotRef.current?.addNodeMentionById(nodeId);
+          addNodeMention={(nodeId) => {
+            agentPanelRef.current?.addNodeMentionById(nodeId);
           }}
           overlay={
             <BottomModeBar
@@ -336,37 +336,37 @@ export function CreationView({
             />
           }
         />
-        {copilotVisible && (
+        {agentPanelVisible && (
           <div
             className="forge-workspace-divider"
-            style={{ right: copilotWidth }}
+            style={{ right: agentPanelWidth }}
             role="separator"
             aria-label="调整画布与助手宽度"
             aria-orientation="vertical"
             aria-valuemin={360}
             aria-valuemax={680}
-            aria-valuenow={copilotWidth}
+            aria-valuenow={agentPanelWidth}
             tabIndex={0}
-            onPointerDown={startCopilotResize}
-            onKeyDown={resizeCopilotWithKeyboard}
+            onPointerDown={startAgentPanelResize}
+            onKeyDown={resizeAgentPanelWithKeyboard}
           />
         )}
-        {copilotVisible ? (
-          <LiveCopilotPanel
+        {agentPanelVisible ? (
+          <LiveAgentPanel
             nodes={data.nodes}
             artifactNodes={data.artifactNodes}
-            controller={copilotController}
-            copilotRef={copilotRef}
+            controller={agentPanelController}
+            agentPanelRef={agentPanelRef}
           />
         ) : (
-          <button className="forge-agent-reopen" onClick={() => setCopilotVisible(true)}>
+          <button className="forge-agent-reopen" onClick={() => setAgentPanelVisible(true)}>
             打开助手
           </button>
         )}
       {picker && (
         <div
           className="canvas-asset-popover-layer"
-          style={{ right: copilotVisible ? copilotWidth : 0 }}
+          style={{ right: agentPanelVisible ? agentPanelWidth : 0 }}
         >
           <section
             ref={assetPickerRef}
@@ -568,17 +568,17 @@ export function CreationView({
           <VideoEditorWorkspace
             {...data.editor}
             controller={controller.editor}
-            copilot={{
-              ...controller.copilot,
+            agentPanel={{
+              ...controller.agentPanel,
               // 剪辑面板固定在剪辑作用域读写；项目级 active 指针只描述“最近所在会话”，
               // 不能作为面板该显示哪个会话的依据，否则画布与剪辑会互相抢消息。
-              read: () => controller.copilot.read("editor", data.editor!.nodeId),
+              read: () => controller.agentPanel.read("editor", data.editor!.nodeId),
               send: (payload) => {
-                const conversationId = controller.copilot
+                const conversationId = controller.agentPanel
                   .read("editor", data.editor!.nodeId)
                   .activeConversationId;
-                controller.copilot.openVideoEditorConversation?.(data.editor!.nodeId);
-                return controller.copilot.send({ ...payload, conversationId });
+                controller.agentPanel.openVideoEditorConversation?.(data.editor!.nodeId);
+                return controller.agentPanel.send({ ...payload, conversationId });
               },
             }}
           />

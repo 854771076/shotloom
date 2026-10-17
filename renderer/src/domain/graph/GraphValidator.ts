@@ -132,8 +132,7 @@ export function validateGraphMutations(
   }
 
   // New nodes must have a type
-  for (let i = 0; i < createdNodes.length; i++) {
-    const node = createdNodes[i];
+  for (const [i, node] of createdNodes.entries()) {
     if (!node.type) {
       errors.push({
         code: 'MISSING_NODE_TYPE',

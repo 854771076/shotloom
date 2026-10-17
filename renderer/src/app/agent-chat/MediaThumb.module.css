@@ -61,14 +61,14 @@
   height: var(--icon-xl);
   padding: 6px;
   border-radius: 999px;
-  background: rgb(0 0 0 / 45%);
+  background: var(--overlay-control);
   transition: transform var(--slk-dur) var(--slk-ease);
 }
 
 @media (hover: hover) {
   .play:hover > svg {
     transform: scale(1.08);
-    background: rgb(0 0 0 / 60%);
+    background: var(--overlay-control-hover);
   }
 }
 
@@ -79,7 +79,7 @@
   padding: 0 4px;
   border-radius: var(--radius-sm);
   color: var(--slk-label-inverted);
-  background: rgb(0 0 0 / 62%);
+  background: var(--overlay-control);
   font-size: var(--text-caption-10);
   font-variant-numeric: tabular-nums;
   line-height: 15px;

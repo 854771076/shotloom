@@ -202,7 +202,10 @@ fn validate_current_project(project: &Value) -> Result<(), String> {
     Ok(())
 }
 
-fn list_project_tree(root: &Path) -> Result<Vec<Value>, String> {
+/// 项目树递归的硬性上限：目录结构来自磁盘，符号链接和深目录不能把原生进程带进无限递归。
+const MAX_PROJECT_TREE_DEPTH: usize = 8;
+
+fn list_project_tree(root: &Path, depth: usize) -> Result<Vec<Value>, String> {
     let mut result = Vec::new();
     if !root.exists() {
         return Ok(result);
@@ -210,7 +213,12 @@ fn list_project_tree(root: &Path) -> Result<Vec<Value>, String> {
     let mut entries = fs::read_dir(root)
         .map_err(|error| error.to_string())?
         .filter_map(Result::ok)
-        .filter(|entry| entry.path().is_dir())
+        .filter(|entry| {
+            entry
+                .file_type()
+                .map(|file_type| file_type.is_dir())
+                .unwrap_or(false)
+        })
         .filter(|entry| {
             !(root.join(SHARED_ASSET_LIBRARY_FILE).exists()
                 && entry.file_name().to_string_lossy() == "assets")
@@ -228,8 +236,10 @@ fn list_project_tree(root: &Path) -> Result<Vec<Value>, String> {
                 .and_then(Value::as_str)
                 .unwrap_or(&fallback_name);
             result.push(json!({"kind":"project","name":project_name,"filePath":project_path.to_string_lossy(),"projectDir":directory.to_string_lossy(),"updatedAt":project.get("updatedAt").cloned().unwrap_or(Value::Null)}));
+        } else if depth >= MAX_PROJECT_TREE_DEPTH {
+            result.push(json!({"kind":"folder","name":entry.file_name().to_string_lossy(),"folderDir":directory.to_string_lossy(),"children":[],"truncated":true}));
         } else {
-            result.push(json!({"kind":"folder","name":entry.file_name().to_string_lossy(),"folderDir":directory.to_string_lossy(),"children":list_project_tree(&directory)?}));
+            result.push(json!({"kind":"folder","name":entry.file_name().to_string_lossy(),"folderDir":directory.to_string_lossy(),"children":list_project_tree(&directory, depth + 1)?}));
         }
     }
     Ok(result)
@@ -307,8 +317,7 @@ pub fn project_rename_entry(path: String, name: String) -> Result<Value, String>
     )
 }
 
-#[tauri::command]
-pub fn project_clone_entry(path: String, name: Option<String>) -> Result<Value, String> {
+fn clone_entry(path: String, name: Option<String>) -> Result<Value, String> {
     let source = PathBuf::from(path);
     let fallback = format!(
         "{}-copy",
@@ -326,12 +335,24 @@ pub fn project_clone_entry(path: String, name: Option<String>) -> Result<Value, 
 }
 
 #[tauri::command]
-pub fn project_list_root(root: String) -> Result<Value, String> {
-    Ok(json!(list_project_tree(Path::new(&root))?))
+pub async fn project_clone_entry(path: String, name: Option<String>) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || clone_entry(path, name))
+        .await
+        .map_err(|error| format!("项目克隆任务异常：{error}"))?
+}
+
+fn list_root(root: String) -> Result<Value, String> {
+    Ok(json!(list_project_tree(Path::new(&root), 0)?))
 }
 
 #[tauri::command]
-pub fn project_save(directory: String, mut project: Value) -> Result<Value, String> {
+pub async fn project_list_root(root: String) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || list_root(root))
+        .await
+        .map_err(|error| format!("项目目录遍历任务异常：{error}"))?
+}
+
+fn save_project(directory: String, mut project: Value) -> Result<Value, String> {
     validate_current_project(&project)?;
     {
         let _guard = lock_shared_asset_library()?;
@@ -349,7 +370,13 @@ pub fn project_save(directory: String, mut project: Value) -> Result<Value, Stri
 }
 
 #[tauri::command]
-pub fn project_read_file(path: String) -> Result<Value, String> {
+pub async fn project_save(directory: String, project: Value) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || save_project(directory, project))
+        .await
+        .map_err(|error| format!("项目保存任务异常：{error}"))?
+}
+
+fn read_project_file(path: String) -> Result<Value, String> {
     let mut project = read_json(Path::new(&path), Value::Null)?;
     validate_current_project(&project)?;
     {
@@ -360,7 +387,13 @@ pub fn project_read_file(path: String) -> Result<Value, String> {
 }
 
 #[tauri::command]
-pub fn project_open_folder(directory: String) -> Result<Value, String> {
+pub async fn project_read_file(path: String) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || read_project_file(path))
+        .await
+        .map_err(|error| format!("项目读取任务异常：{error}"))?
+}
+
+fn open_project_folder(directory: String) -> Result<Value, String> {
     let directory = PathBuf::from(directory);
     let path = directory.join(PROJECT_FILE);
     let mut project = read_json(&path, Value::Null)?;
@@ -375,6 +408,13 @@ pub fn project_open_folder(directory: String) -> Result<Value, String> {
     Ok(
         json!({"ok":true,"filePath":path.to_string_lossy(),"projectDir":directory.to_string_lossy(),"project":project}),
     )
+}
+
+#[tauri::command]
+pub async fn project_open_folder(directory: String) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || open_project_folder(directory))
+        .await
+        .map_err(|error| format!("项目打开任务异常：{error}"))?
 }
 
 fn write_project_zip_directory(
@@ -426,8 +466,7 @@ fn write_project_zip_directory(
     Ok(())
 }
 
-#[tauri::command]
-pub fn project_export_package(source: String, target: String) -> Result<Value, String> {
+fn export_package(source: String, target: String) -> Result<Value, String> {
     let source = PathBuf::from(source);
     let target = PathBuf::from(target);
     if !source.is_dir() || !source.join(PROJECT_FILE).is_file() {
@@ -505,6 +544,13 @@ pub fn project_export_package(source: String, target: String) -> Result<Value, S
     }))
 }
 
+#[tauri::command]
+pub async fn project_export_package(source: String, target: String) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || export_package(source, target))
+        .await
+        .map_err(|error| format!("项目包导出任务异常：{error}"))?
+}
+
 fn rewrite_imported_project_paths(value: &mut Value, source_root: &str, target_root: &Path) {
     match value {
         Value::Array(items) => {
@@ -541,8 +587,7 @@ fn rewrite_imported_project_paths(value: &mut Value, source_root: &str, target_r
     }
 }
 
-#[tauri::command]
-pub fn project_import_package(source: String, target_root: String) -> Result<Value, String> {
+fn import_package(source: String, target_root: String) -> Result<Value, String> {
     const MAX_PACKAGE_FILES: usize = 20_000;
     const MAX_PACKAGE_BYTES: u64 = 20 * 1024 * 1024 * 1024;
     let source = PathBuf::from(source);
@@ -659,6 +704,13 @@ pub fn project_import_package(source: String, target_root: String) -> Result<Val
 }
 
 #[tauri::command]
+pub async fn project_import_package(source: String, target_root: String) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || import_package(source, target_root))
+        .await
+        .map_err(|error| format!("项目包导入任务异常：{error}"))?
+}
+
+#[tauri::command]
 pub fn project_create_episode_folder(
     parent: String,
     shared: String,
@@ -673,13 +725,19 @@ pub fn project_create_episode_folder(
     )
 }
 
-#[tauri::command]
-pub fn project_trash_entry(path: String) -> Result<Value, String> {
+fn trash_entry(path: String) -> Result<Value, String> {
     let target = PathBuf::from(path);
     if target.exists() {
         trash::delete(&target).map_err(|error| error.to_string())?;
     }
     Ok(json!({"ok":true}))
+}
+
+#[tauri::command]
+pub async fn project_trash_entry(path: String) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || trash_entry(path))
+        .await
+        .map_err(|error| format!("项目移除任务异常：{error}"))?
 }
 
 #[cfg(test)]
@@ -700,7 +758,7 @@ mod tests {
         .unwrap();
         fs::write(source.join("assets").join("image.bin"), b"asset-bytes").unwrap();
 
-        let result = project_export_package(
+        let result = export_package(
             source.to_string_lossy().into_owned(),
             target.to_string_lossy().into_owned(),
         )
@@ -721,7 +779,7 @@ mod tests {
             assert_eq!(asset, b"asset-bytes");
         }
 
-        let imported = project_import_package(
+        let imported = import_package(
             target.to_string_lossy().into_owned(),
             root.join("imports").to_string_lossy().into_owned(),
         )
@@ -733,6 +791,33 @@ mod tests {
             b"asset-bytes"
         );
 
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn project_tree_stops_at_deep_directories_and_ignores_symlinks() {
+        let root = std::env::temp_dir().join(format!("shotloom-tree-depth-{}", chrono_stamp()));
+        fs::create_dir_all(root.join("nested")).unwrap();
+        let boundary = list_project_tree(&root, MAX_PROJECT_TREE_DEPTH).unwrap();
+        assert_eq!(
+            boundary
+                .first()
+                .and_then(|entry| entry.get("truncated"))
+                .and_then(Value::as_bool),
+            Some(true)
+        );
+        let inside_limit = list_project_tree(&root, MAX_PROJECT_TREE_DEPTH - 1).unwrap();
+        assert!(inside_limit
+            .first()
+            .and_then(|entry| entry.get("truncated"))
+            .is_none());
+
+        std::os::unix::fs::symlink(root.join("nested"), root.join("escape")).unwrap();
+        let top = list_project_tree(&root, 0).unwrap();
+        assert!(!top
+            .iter()
+            .any(|entry| entry.get("name").and_then(Value::as_str) == Some("escape")));
         fs::remove_dir_all(root).unwrap();
     }
 

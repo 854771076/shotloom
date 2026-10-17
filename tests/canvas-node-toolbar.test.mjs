@@ -1,25 +1,26 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { readGenerationNodeSource } from './helpers/generationNodeSource.mjs';
+import { readSource } from './helpers/sourceContract.mjs';
 
-const toolbar = readFileSync(new URL('../renderer/src/app/canvas/CanvasNodeToolbar.tsx', import.meta.url), 'utf8');
-const workflowCanvas = readFileSync(new URL('../renderer/src/app/canvas/WorkflowCanvas.tsx', import.meta.url), 'utf8');
+const toolbar = readSource('renderer/src/app/canvas/CanvasNodeToolbar.tsx');
+const workflowCanvas = readSource('renderer/src/app/canvas/WorkflowCanvas.tsx');
 const canvas = toolbar + workflowCanvas;
-const cropEditor = readFileSync(new URL('../renderer/src/app/components/ImageCropEditor.tsx', import.meta.url), 'utf8');
-const annotationEditor = readFileSync(new URL('../renderer/src/app/components/ImageAnnotationEditor.tsx', import.meta.url), 'utf8');
-const generation = readFileSync(new URL('../renderer/src/app/canvas/GenerationNode.tsx', import.meta.url), 'utf8');
-const basicNodes = readFileSync(new URL('../renderer/src/app/canvas/CanvasNodes.tsx', import.meta.url), 'utf8');
-const director = readFileSync(new URL('../renderer/src/app/canvas/ThreeDDirectorNode.tsx', import.meta.url), 'utf8');
+const cropEditor = readSource('renderer/src/app/components/ImageCropEditor.tsx');
+const annotationEditor = readSource('renderer/src/app/components/ImageAnnotationEditor.tsx');
+const generation = readGenerationNodeSource();
+const basicNodes = readSource('renderer/src/app/canvas/CanvasNodes.tsx');
+const director = readSource('renderer/src/app/canvas/ThreeDDirectorNode.tsx');
 const styles = ['canvas.css', 'media-overlays.css']
-  .map((name) => readFileSync(new URL(`../renderer/styles/${name}`, import.meta.url), 'utf8'))
+  .map((name) => readSource(`../renderer/styles/${name}`))
   .join('\n');
-const adapter = readFileSync(new URL('../renderer/src/app/adapters/canvasAdapter.ts', import.meta.url), 'utf8')
-  + readFileSync(new URL('../renderer/src/app/adapters/canvas/canvasMediaActions.ts', import.meta.url), 'utf8');
-const api = readFileSync(new URL('../renderer/src/services/tauriApi.js', import.meta.url), 'utf8');
-const audioRust = readFileSync(new URL('../src-tauri/src/commands/audio.rs', import.meta.url), 'utf8');
-const fileRust = readFileSync(new URL('../src-tauri/src/commands/file.rs', import.meta.url), 'utf8');
-const imageRust = readFileSync(new URL('../src-tauri/src/commands/image.rs', import.meta.url), 'utf8');
-const nodeChrome = await import('../renderer/src/utils/canvasNodeChrome.mjs');
+const adapter = readSource('renderer/src/app/adapters/canvasAdapter.ts')
+  + readSource('renderer/src/app/adapters/canvas/canvasMediaActions.ts');
+const api = readSource('renderer/src/services/tauriApi.ts');
+const audioRust = readSource('src-tauri/src/commands/audio.rs');
+const fileRust = readSource('src-tauri/src/commands/file.rs');
+const imageRust = readSource('src-tauri/src/commands/image.rs');
+const nodeChrome = await import('../renderer/src/utils/canvasNodeChrome.ts');
 
 test('画布节点外框与选中操作工具栏保持职责分离', () => {
   assert.match(workflowCanvas, /import \{ CanvasNodeToolbar \}/);
@@ -34,7 +35,7 @@ test('加入对话只在节点选中工具栏中显示', () => {
   assert.match(canvas, /<NodeToolbar[\s\S]*?canvas-node-selection-toolbar--hidden[\s\S]*?isVisible=\{selected && !imageAnnotationOpen\}[\s\S]*?offset=\{toolbarOffset\}[\s\S]*?>[\s\S]*?加入对话[\s\S]*?<\/NodeToolbar>/);
   assert.match(canvas, /mentionNode\(node\.id\)/);
   // 3D 导演台节点不挂引用入口，工具栏整体不渲染，而不是留下一个空壳。
-  assert.match(toolbar, /node\.type === "threeDDirector" \? null : mentionInCopilot/);
+  assert.match(toolbar, /node\.type === "threeDDirector" \? null : addNodeMention/);
   assert.match(toolbar, /hasToolbar = isTextNode \|\| canUpload \|\| mentionNode \|\|/);
   assert.match(styles, /\.canvas-node-selection-toolbar \{[\s\S]*?z-index: var\(--layer-canvas-control\)/);
   for (const source of [generation, basicNodes, director]) {
@@ -43,10 +44,10 @@ test('加入对话只在节点选中工具栏中显示', () => {
 });
 
 test('画布不存在便签与画板节点', () => {
-  const navigation = readFileSync(new URL('../renderer/src/app/constants/navigation.ts', import.meta.url), 'utf8');
-  const nodeTypes = readFileSync(new URL('../renderer/src/services/agentTypes.ts', import.meta.url), 'utf8');
-  const registry = readFileSync(new URL('../renderer/src/app/canvas/nodeRegistry.ts', import.meta.url), 'utf8');
-  const graphIr = readFileSync(new URL('../renderer/src/domain/graph/GraphIR.ts', import.meta.url), 'utf8');
+  const navigation = readSource('renderer/src/app/constants/navigation.ts');
+  const nodeTypes = readSource('renderer/src/services/agentTypes.ts');
+  const registry = readSource('renderer/src/app/canvas/nodeRegistry.ts');
+  const graphIr = readSource('renderer/src/domain/graph/GraphIR.ts');
   assert.doesNotMatch(nodeTypes, /'note'|'board'/);
   assert.doesNotMatch(graphIr, /boardText|boardData/);
   for (const source of [navigation, registry, workflowCanvas, styles]) {

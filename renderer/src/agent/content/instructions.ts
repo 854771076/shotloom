@@ -1,7 +1,6 @@
 import { settingsStore } from '@/store/settingsStore';
 import { EDITOR_AGENT_ID, TEXT_AGENT_ID } from '../agents/definitions.ts';
 import { contractsForAgentType, formatContractsBlock } from './contractLoader';
-import systemBasePrompt from './prompts/system-base.md?raw';
 import canvasAgentPrompt from './prompts/canvas-agent.md?raw';
 import editorAgentPrompt from './prompts/editor-agent.md?raw';
 import textAgentPrompt from './prompts/text-agent.md?raw';
@@ -33,9 +32,7 @@ export function buildAgentSystemPrompt(
     ].filter(Boolean).join('\n\n');
   }
   const canRunNodes = settingsStore.agentCanRunNodes === true;
-  // Keep system-base as a compatibility fallback for older bundles while each
-  // primary Agent now has an explicit prompt file of its own.
-  const base = (canvasAgentPrompt.trim() ? canvasAgentPrompt : systemBasePrompt)
+  const base = canvasAgentPrompt
     .replace('{{mode_contract}}', canRunNodes
       ? '画布写入遵守本地策略；设置已允许 Agent 运行节点。复杂制作的范围和执行阶段由 Agent 根据用户完整语义与真实依赖管理。'
       : '画布可按用户要求创建和配置节点；“允许 Agent 运行节点”已关闭，任何生成任务都会在统一权限边界被拒绝。')
@@ -66,13 +63,13 @@ export function buildSubagentPrompt(agentId: string, instructions = ''): string 
 }
 
 /**
- * 本轮随用户消息一起送出的真实上下文（引用节点、附件、仍在进行的制作计划）只有一个拼装处。
- * 两个引擎若各写一份，同一句用户请求就会看到不同的附加信息，引擎对比也就失去意义。
+ * 本轮随用户消息一起送出的真实上下文（引用节点、附件、仍在进行的制作计划）只有一个拼装处：
+ * 主 Agent 和每个子 Agent 都走这里，附加信息才不会随调用点漂移。
  */
 export function buildRunContextBlock(input: {
-  nodeMentions?: JsonObject[];
-  attachments?: JsonObject[];
-  planSummary?: JsonObject | null;
+  nodeMentions?: JsonObject[] | undefined;
+  attachments?: JsonObject[] | undefined;
+  planSummary?: JsonObject | null | undefined;
 }): string {
   return [
     input.nodeMentions?.length ? `Mentioned nodes: ${JSON.stringify(input.nodeMentions)}` : '',
@@ -81,4 +78,27 @@ export function buildRunContextBlock(input: {
       ? `Existing Production Plan candidate; continue it only if the newest request is genuinely related: ${JSON.stringify(input.planSummary)}`
       : '',
   ].filter(Boolean).join('\n');
+}
+
+/**
+ * 终态结论提示：本轮已经真实改动项目，却没有提交通过核验的终态时追加的一轮。
+ * 它只声明"缺一份可核验的结论"这一本地事实，不评判任务本身做得够不够——那仍然是
+ * report_outcome 的核验职责，不是应用代码的语义判断。
+ */
+export function buildConcludeTurnInstruction(verificationIssue: string): string {
+  return [
+    'This run has already changed the project, but no verified outcome was submitted.',
+    verificationIssue ? `The previous report_outcome was rejected: ${verificationIssue}` : '',
+    'Check the real state with read-only tools, then call report_outcome with status, summary and evidence quoting toolCallIds verbatim from actual receipts.',
+    'If the work is genuinely unfinished, submit partial or blocked with the remaining items; do not end with only a prose summary.',
+  ].filter(Boolean).join('\n');
+}
+
+/**
+ * 运行中注入的用户补充消息只有一个拼装处。
+ * 措辞只声明"这是运行进行中到达的用户输入"，要不要因此改变做法仍由模型判断，
+ * 应用代码不替它决定这是修正、追加还是打断。
+ */
+export function buildSteeringMessage(text: string): string {
+  return `用户在本次运行进行中补充了指令，请在下一步一并处理：${text}`;
 }

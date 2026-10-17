@@ -4,7 +4,7 @@ import {
   applyImageStylePreset,
   getImageStylePreset,
   IMAGE_STYLE_PRESETS,
-} from '../renderer/src/utils/imageStylePresets.mjs';
+} from '../renderer/src/utils/imageStylePresets.ts';
 
 test('图片风格预设使用唯一 id 且不依赖艺术家名称', () => {
   const ids = IMAGE_STYLE_PRESETS.map((preset) => preset.id);

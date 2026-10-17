@@ -6,7 +6,7 @@ import {
   type WheelEvent,
 } from "react";
 import { createPortal } from "react-dom";
-import { desktopApi } from "../../services/desktopApi.js";
+import { desktopApi } from "../../services/desktopApi.ts";
 import {
   acquireMediaPreview,
   type CachedMediaLease,
@@ -15,9 +15,10 @@ import { IconSymbol } from "./IconSymbol";
 import { useWorkbenchSurfaceRoot } from "../layout/workbenchSurface";
 import { TextAgentPanel } from "../agent-chat/TextAgentPanel";
 import { registerTextDraftTarget } from "../../agent/runtime/textDraftBridge";
-import { showToast, useOverlayStore } from "../store/overlayStore";
-import { markdownToRichHtml, richHtmlToMarkdown } from "../../utils/richTextMarkdown.mjs";
-import { diffTextLines } from "../../utils/textVersionDiff.mjs";
+import { useOverlayStore } from "../store/overlayStore";
+import { showToast } from "../../store/notificationStore";
+import { markdownToRichHtml, richHtmlToMarkdown } from "../../utils/richTextMarkdown.ts";
+import { diffTextLines } from "../../utils/textVersionDiff.ts";
 
 const MIN_ZOOM = .5, MAX_ZOOM = 5, STEP = .25;
 function formatMediaTime(value: number) {

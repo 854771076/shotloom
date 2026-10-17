@@ -82,7 +82,7 @@ type ViewportCaptureLabel = {
 };
 type ViewportCaptureFrameRect = NonNullable<ReturnType<typeof getViewportAspectFrameRect>>;
 
-export function shouldRenderViewportGrid(hasPanorama: boolean, snapToGrid: boolean) {
+export function shouldRenderViewportGrid(_hasPanorama: boolean, _snapToGrid: boolean) {
   return true;
 }
 
@@ -146,7 +146,10 @@ function toSnapshotTuple(vector: Vector3): [number, number, number] {
 
 function areCameraSnapshotsClose(a: CameraShotSnapshot, b: CameraShotSnapshot) {
   const tupleClose = (left: [number, number, number], right: [number, number, number]) =>
-    left.every((value, index) => Math.abs(value - right[index]) < 0.00001);
+    left.every((value, index) => {
+      const other = right[index];
+      return other !== undefined && Math.abs(value - other) < 0.00001;
+    });
 
   return (
     Math.abs(a.fov - b.fov) < 0.00001 &&

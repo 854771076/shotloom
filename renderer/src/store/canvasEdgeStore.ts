@@ -5,9 +5,7 @@
  * branching.
  */
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Edge = Record<string, any>;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Project = { edges?: Edge[]; [key: string]: any };
 
 /**
@@ -23,13 +21,4 @@ export function toggleCanvasEdge(
   if (!edge) return false;
   edge.enabled = enabled ?? (edge.enabled === false);
   return true;
-}
-
-/**
- * Check whether an edge is enabled. Absent `enabled` field defaults to true.
- */
-export function isEdgeEnabled(project: Project, edgeId: string): boolean {
-  const edge = (project.edges || []).find((e) => e.id === edgeId);
-  if (!edge) return false;
-  return edge.enabled !== false;
 }

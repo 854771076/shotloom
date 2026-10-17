@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { BoundedMediaCache } from '../renderer/src/services/boundedMediaCache.mjs';
+import { BoundedMediaCache } from '../renderer/src/services/boundedMediaCache.ts';
 
 const buffer = (bytes) => new ArrayBuffer(bytes);
 

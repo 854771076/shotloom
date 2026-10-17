@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { updatedTextVersions } from '../renderer/src/utils/textNodeVersions.mjs';
+import { updatedTextVersions } from '../renderer/src/utils/textNodeVersions.ts';
 
 test('text versions preserve saved content and recovery creates a new revision', () => {
   const first = updatedTextVersions({ textContent: '初稿', updatedAt: '2026-01-01T00:00:00.000Z' }, '修改稿', '2026-01-02T00:00:00.000Z');

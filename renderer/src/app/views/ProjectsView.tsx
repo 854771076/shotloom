@@ -1,5 +1,5 @@
 import { type MouseEvent, useEffect, useMemo, useRef, useState } from "react";
-import { formatTime } from "../../utils/format.js";
+import { formatTime } from "../../utils/format.ts";
 import { EmptyState } from "../components/EmptyState";
 import { IconSymbol } from "../components/IconSymbol";
 import {

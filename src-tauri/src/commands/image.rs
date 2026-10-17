@@ -45,9 +45,8 @@ fn trim_preview_cache(directory: &Path) {
     }
 }
 
-#[tauri::command]
-pub fn file_read_image_preview(
-    app: AppHandle,
+fn read_image_preview(
+    app: &AppHandle,
     path: String,
     max_size: u32,
 ) -> Result<Value, String> {
@@ -70,7 +69,7 @@ pub fn file_read_image_preview(
     digest.update(modified.to_le_bytes());
     digest.update(max_size.to_le_bytes());
 
-    let cache_directory = app_data(&app)?.join("preview-cache");
+    let cache_directory = app_data(app)?.join("preview-cache");
     fs::create_dir_all(&cache_directory).map_err(|error| error.to_string())?;
     let cache_path = cache_directory.join(format!("{:x}.jpg", digest.finalize()));
     let bytes = if cache_path.is_file() {
@@ -110,6 +109,17 @@ pub fn file_read_image_preview(
     Ok(json!(
         base64::engine::general_purpose::STANDARD.encode(bytes)
     ))
+}
+
+#[tauri::command]
+pub async fn file_read_image_preview(
+    app: AppHandle,
+    path: String,
+    max_size: u32,
+) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || read_image_preview(&app, path, max_size))
+        .await
+        .map_err(|error| format!("图片预览任务异常：{error}"))?
 }
 
 #[derive(Deserialize)]

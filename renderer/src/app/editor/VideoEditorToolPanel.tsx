@@ -48,7 +48,7 @@ export function VideoEditorToolPanel({
   textNotice: string;
   toolNotice: string;
   videoClipCount: number;
-  primaryVideoAssetId?: string;
+  primaryVideoAssetId?: string | undefined;
   sourceThumbnail: string;
   playbackUrl: string;
   runtimeMediaUrls: Record<string, string>;

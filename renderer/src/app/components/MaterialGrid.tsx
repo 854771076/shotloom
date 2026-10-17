@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState } from "react";
-import { formatSize } from "../../utils/format.js";
+import { formatSize } from "../../utils/format.ts";
 import { useMediaPreviewCache } from "../canvas/useMediaPreviewCache";
 import { type IconName, IconSymbol } from "./IconSymbol";
 

@@ -15,8 +15,6 @@ interface MediaPayload {
   textAgentNodeId?: string;
 }
 interface OverlayState {
-  toast: string;
-  toastTone: "default" | "success";
   media: {
     open: boolean;
     src: string;
@@ -30,16 +28,11 @@ interface OverlayState {
     onCaptureFrame: ((seconds: number) => void | Promise<void>) | null;
     textAgentNodeId: string;
   };
-  toastTimer: number | null;
-  showToast: (message: string, tone?: "default" | "success") => void;
   openMedia: (payload: MediaPayload) => boolean;
   closeMedia: () => void;
 }
 
-export const useOverlayStore = create<OverlayState>((set, get) => ({
-  toast: "",
-  toastTone: "default",
-  toastTimer: null,
+export const useOverlayStore = create<OverlayState>((set) => ({
   media: {
     open: false,
     src: "",
@@ -52,14 +45,6 @@ export const useOverlayStore = create<OverlayState>((set, get) => ({
     onCopyVersion: null,
     onCaptureFrame: null,
     textAgentNodeId: "",
-  },
-  showToast: (message, tone = "default") => {
-    if (get().toastTimer) window.clearTimeout(get().toastTimer!);
-    const toastTimer = window.setTimeout(
-      () => set({ toast: "", toastTone: "default", toastTimer: null }),
-      tone === "success" ? 3600 : 2400,
-    );
-    set({ toast: String(message || ""), toastTone: tone, toastTimer });
   },
   openMedia: (payload) => {
     const kind = payload.kind === "video" || payload.kind === "text" ? payload.kind : "image";
@@ -88,9 +73,5 @@ export const useOverlayStore = create<OverlayState>((set, get) => ({
     })),
 }));
 
-export const showToast = (message: string) =>
-  useOverlayStore.getState().showToast(message);
-export const showSuccessToast = (message: string) =>
-  useOverlayStore.getState().showToast(message, "success");
 export const openMediaViewer = (payload: MediaPayload) =>
   useOverlayStore.getState().openMedia(payload);

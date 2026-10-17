@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { focusCanvasNodes } from "../adapters/canvasAdapter";
 import { IconSymbol } from "./IconSymbol";
-import { hasOpenProject, navigateToRoute, openRecentProject, store, touchProject } from "../../store/projectStore.js";
-import { desktopApi } from "../../services/desktopApi.js";
+import { hasOpenProject, navigateToRoute, openRecentProject, store, touchProject } from "../../store/projectStore.ts";
+import { desktopApi } from "../../services/desktopApi.ts";
 import { useAppStore, type AppRoute } from "../store/appStore";
 
 type SearchResult = {
@@ -31,7 +31,7 @@ function searchItems(project: any, projectPath: string): SearchResult[] {
   for (const task of project.tasks || []) {
     items.push({
       id: `task:${task.id}`, kind: "任务", title: String(task.title || task.name || task.prompt || "生成任务"),
-      detail: `${context} · ${String(task.status || "")}`, route: "tasks", nodeId: task.nodeId ? String(task.nodeId) : undefined, projectPath, projectName: context,
+      detail: `${context} · ${String(task.status || "")}`, route: "tasks", ...(task.nodeId ? { nodeId: String(task.nodeId) } : {}), projectPath, projectName: context,
     });
   }
   for (const asset of project.assets || []) {
@@ -46,7 +46,7 @@ function searchItems(project: any, projectPath: string): SearchResult[] {
       detail: `${context} · ${String(material.resourceType || material.sourceType || "")}`, route: "materials", projectPath, projectName: context,
     });
   }
-  for (const conversation of project.copilotConversations || []) {
+  for (const conversation of project.agentConversations || []) {
     items.push({
       id: `conversation:${conversation.id}`, kind: "对话", title: String(conversation.title || "新对话"),
       detail: `${context} · ${(conversation.messages || []).map((message: any) => String(message.content || "")).join(" ")}`,
@@ -110,7 +110,7 @@ export function ProjectSearch({ onClose }: { onClose: () => void }) {
     navigateToRoute(item.route);
     useAppStore.setState({ route: item.route });
     if (item.conversationId) {
-      (store.project as any).activeCopilotConversationId = item.conversationId;
+      (store.project as any).activeAgentConversationId = item.conversationId;
       touchProject();
     }
     if (item.nodeId && item.route === "creation") {

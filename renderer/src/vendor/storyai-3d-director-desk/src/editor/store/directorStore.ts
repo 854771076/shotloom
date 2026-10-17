@@ -51,8 +51,8 @@ export interface CrowdCharactersInput {
 }
 
 export interface DirectorStateOptions {
-  includePersistedLocalAssets?: boolean;
-  includePersistedScene?: boolean;
+  includePersistedLocalAssets?: boolean | undefined;
+  includePersistedScene?: boolean | undefined;
   persistenceScopeId?: string | null;
 }
 
@@ -74,7 +74,7 @@ export interface DirectorState extends DirectorUiState {
 
 export interface DirectorClipboardEntry {
   object: DirectorObject;
-  camera?: DirectorCameraShot;
+  camera?: DirectorCameraShot | undefined;
 }
 
 interface DirectorInternalState {
@@ -479,7 +479,7 @@ function createUndoStackEntry(state: DirectorRuntimeState) {
 export function createDefaultDirectorProject({
   includePersistedLocalAssets = false,
 }: {
-  includePersistedLocalAssets?: boolean;
+  includePersistedLocalAssets?: boolean | undefined;
 } = {}): DirectorProject {
   const camera: DirectorCameraShot = {
     id: "cam_1",
@@ -774,6 +774,7 @@ export function getCrowdAnchorTransform(
     position[2] / memberCount,
   ]);
   const referenceMember = crowdMembers[0];
+  if (!referenceMember) return null;
 
   return createTransform(
     anchorPosition,
@@ -1064,7 +1065,7 @@ function pasteClipboardEntries(state: DirectorRuntimeState): DirectorRuntimeStat
     ...state,
     selectedObjectId: pastedObjectIds[pastedObjectIds.length - 1] ?? null,
     selectedObjectIds: pastedObjectIds,
-    selectedCrowdId: pastedCrowdIds.length === 1 ? pastedCrowdIds[0] : null,
+    selectedCrowdId: pastedCrowdIds.length === 1 ? (pastedCrowdIds[0] ?? null) : null,
     directorInspectorMode: "auto",
     clipboardPasteCount: pasteIteration,
     project: {

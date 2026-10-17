@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { normalizeInputRole } from '../renderer/src/utils/generationInputRole.mjs';
+import { normalizeInputRole } from '../renderer/src/utils/generationInputRole.ts';
 
 test('生成请求保留当前输入角色', () => {
   assert.equal(normalizeInputRole('textContext'), 'textContext');

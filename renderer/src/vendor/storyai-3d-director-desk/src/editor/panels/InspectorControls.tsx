@@ -58,7 +58,7 @@ type RangeNumberFieldProps = {
 type InspectorSelectOption = {
   value: string;
   label: string;
-  disabled?: boolean;
+  disabled?: boolean | undefined;
 };
 
 type OptionElementProps = {
@@ -82,7 +82,8 @@ function parseStep(step: string | undefined) {
 function decimalPlaces(value: FieldValue | undefined) {
   const stringValue = String(value ?? "");
   const decimal = stringValue.match(/\.(\d+)/);
-  return decimal ? decimal[1].length : 0;
+  const digits = decimal?.[1];
+  return digits ? digits.length : 0;
 }
 
 function clampValue(value: number, min?: string, max?: string) {
@@ -155,7 +156,7 @@ export function InspectorPanel({
   title: string;
   ariaLabel: string;
   tabs?: InspectorTab[];
-  className?: string;
+  className?: string | undefined;
   children: ReactNode;
   footer?: ReactNode;
 }) {

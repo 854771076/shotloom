@@ -1,5 +1,4 @@
 import { store as projectStore, touchProject } from '@/store/projectStore';
-import { addCanvasEdge } from '@/store/canvasGraphStore';
 import {
   findAgentBatch,
   listAgentBatches,
@@ -24,47 +23,32 @@ import {
   recordCanvasTransactionHistory,
 } from '@/store/canvasHistoryStore';
 import { settingsStore } from '@/store/settingsStore';
-import { validateAgentActionShape } from '@/composables/agentActionValidator';
+import { validateAgentActionShape } from '@/services/agent/agentActionValidator';
 import { agentNodeAliasMaps, buildAgentCanvasSnapshot } from '@/services/agentCanvasSnapshot';
-import { registerDefaultAgentActions } from '@/services/agent/registerDefaultActions';
-import { validateAgentInputRole } from '@/services/agentInputRole';
-import { getGenerationInputModes } from '@/domain/catalog/ModelCatalog';
-import {
-  defaultInputSlot,
-  isSlotValidForMode,
-  type GenerationInputMode,
-  type GenerationInputSlot,
-} from '@/domain/graph/GenerationInputContract';
-import {
-  defaultAgentNodePosition,
-  numberFromAgentAction as numberFromAction,
-  sizeFromAgentAction as sizeFromAction,
-} from '@/services/agentNodeFactory';
+import { defaultAgentNodePosition } from '@/services/agentNodeFactory';
 import { layoutAgentNodes, placeAgentNodesIncrementally } from '@/services/agentLayoutService';
 import {
   AgentProjectChangedError,
   createAgentProjectQueue,
 } from '@/services/agentProjectQueue';
 import { assertAgentProject, getAgentProjectIdentity, getAgentProjectKey } from '@/services/agentProjectIdentity';
-import { dispatchAction } from '@/services/agent/actionRegistry';
+import { applyAgentAction, type ActionHandlerContext } from '@/services/agent/agentActionHandlers';
 import { recordPerformanceMetric } from '@/services/performanceMetrics';
 import {
   captureCanvasTransaction,
   filterChangedCanvasTransaction,
-} from '@/utils/canvasTransaction.mjs';
+} from '@/utils/canvasTransaction.ts';
 import type {
   AgentAction,
   AgentActionRequest,
   AgentActionResult,
   AgentBatchResult,
-  AgentInputRole,
   AgentNode,
   JsonObject,
 } from '@/services/agentTypes';
 
 type LooseRecord = Record<string, any>;
 const store: LooseRecord = projectStore as LooseRecord;
-registerDefaultAgentActions();
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -114,25 +98,14 @@ function persistentTempIdSnapshot() {
   return { tempIdMap, tempIdById };
 }
 
-/** @param {number} value @param {number} fallback @returns {number} */
 /**
- * 通过别名或 ID 解析节点对象。
- * @param {string} idOrAlias
- * @param {Map<string,string>} tempIdMap
- * @returns {Object|null}
+ * 解析节点 ID：优先查本批次 tempIdMap，其次解析跨批次持久的 tempId 与语义引用，
+ * 再回落到稳定别名，最后原样返回。模型可以长期引用同一别名，不需要重新读取整张画布。
  */
-function resolveNode(idOrAlias: string, tempIdMap: Map<string, string>): AgentNode | null {
-  const id = resolveNodeId(idOrAlias, tempIdMap);
-  return store.project.nodes.find((node: AgentNode) => node.id === id) || null;
-}
-
-/**
- * 解析节点 ID：优先查 tempIdMap，其次解析稳定节点别名，最后原样返回。
- * @param {string|number} idOrAlias
- * @param {Map<string,string>} tempIdMap
- * @returns {string|null}
- */
-function resolveNodeId(idOrAlias: string | number | null | undefined, tempIdMap: Map<string, string>): string | null {
+function resolveNodeId(
+  idOrAlias: string | number | null | undefined,
+  tempIdMap: Map<string, string>,
+): string | null {
   if (!idOrAlias) return null;
   const rawId = String(idOrAlias);
   if (tempIdMap.has(rawId)) return tempIdMap.get(rawId) || null;
@@ -143,75 +116,17 @@ function resolveNodeId(idOrAlias: string | number | null | undefined, tempIdMap:
   return rawId;
 }
 
-/**
- * 从 inputLinks 列表创建从源节点到目标节点的边。
- * @param {Array<{nodeId:string,role:string}>} inputLinks
- * @param {string} targetId
- * @param {Map<string,string>} tempIdMap
- */
-function connectInputLinks(
-  inputLinks: AgentAction['inputLinks'] = [],
-  targetId: string,
+/** 通过别名、语义引用或真实 ID 解析画布上的节点对象。 */
+function resolveNode(
+  idOrAlias: string | null | undefined,
   tempIdMap: Map<string, string>,
-) {
-  const results = [];
-  for (const link of inputLinks || []) {
-    const sourceId = resolveNodeId(link?.nodeId, tempIdMap);
-    if (!sourceId) continue;
-    const source = store.project.nodes.find((node: AgentNode) => node.id === sourceId);
-    const target = store.project.nodes.find((node: AgentNode) => node.id === targetId);
-    const requestedRole = String(link?.role || '') as AgentInputRole;
-    const roleValidation = validateAgentInputRole(store.project, source, target, requestedRole);
-    if (!roleValidation.valid) {
-      results.push({ sourceId, targetId, applied: false, error: roleValidation.error });
-      continue;
-    }
-    const role = roleValidation.role;
-    const required = link?.required !== false;
-    const modes = getGenerationInputModes(String(target?.model || ''));
-    const activeMode = modes.find((item) => item.value === target?.inputMode) || modes[0];
-    const roleSupported = role === 'textContext' || (role === 'referenceImage' && (activeMode?.maxImages || 0) > 0)
-      || (role === 'inputVideo' && (activeMode?.maxVideos || 0) > 0)
-      || (role === 'referenceAudio' && (activeMode?.maxAudios || 0) > 0);
-    if (!roleSupported) {
-      results.push({ sourceId, targetId, applied: false, error: `输入模式 ${activeMode?.label || target?.inputMode || '未设置'} 不支持 ${role}` });
-      continue;
-    }
-    const occupied = (store.project.edges || []).filter((edge: any) => edge.target === targetId)
-      .map((edge: any) => edge.data?.inputSlot).filter(Boolean) as GenerationInputSlot[];
-    const slot = role === 'textContext' ? undefined : String(link?.slot || defaultInputSlot(
-      (activeMode?.value || 'reference') as GenerationInputMode,
-      role,
-      occupied,
-    )) as GenerationInputSlot;
-    if (activeMode && slot && !isSlotValidForMode(activeMode.value, slot, role)) {
-      results.push({ sourceId, targetId, applied: false, error: `槽位 ${slot} 不属于输入模式 ${activeMode.value}` });
-      continue;
-    }
-    if (activeMode && role !== 'textContext') target.inputMode = activeMode.value;
-    results.push({
-      sourceId,
-      targetId,
-      role,
-      required,
-      ...addCanvasEdge(store.project, sourceId, targetId, {
-        touch: false,
-        updateExisting: true,
-        edge: {
-          kind: 'typed-input',
-          data: {
-            inputRole: role,
-            ...(slot ? { inputSlot: slot } : {}),
-            required,
-          },
-        },
-      }),
-    });
-  }
-  return results;
+): AgentNode | null {
+  const id = resolveNodeId(idOrAlias, tempIdMap);
+  if (!id) return null;
+  return (store.project.nodes || []).find((node: AgentNode) => node.id === id) || null;
 }
 
-function defaultNodePosition(action: AgentAction = { type: '' }, tempIdMap = new Map<string, string>()) {
+function defaultNodePosition(action: AgentAction, tempIdMap: Map<string, string>) {
   const anchorNodeIds = (action.inputLinks || [])
     .map((link) => resolveNodeId(link?.nodeId, tempIdMap))
     .filter(Boolean);
@@ -232,7 +147,7 @@ const CREATE_NODE_ACTIONS = new Set([
   'place_asset_on_canvas',
 ]);
 
-const SINGLE_NODE_REF_KEYS: Record<string, string[]> = {
+const SINGLE_NODE_REF_KEYS: Record<string, [string, ...string[]]> = {
   update_gen_config: ['nodeId'],
   start_generation: ['nodeId'],
   delete_node: ['nodeId'],
@@ -476,45 +391,37 @@ function transactionFromJournal(journal: CanvasTransactionJournal) {
 
 // ── Action dispatcher ──────────────────────────────────────────────────────
 
+/** 执行器把上下文固定成一份：动作实现只能读项目本体和稳定引用解析。 */
+function actionContext(tempIdMap: Map<string, string>): ActionHandlerContext {
+  return {
+    project: store.project,
+    tempIdMap,
+    resolveNode: (ref) => resolveNode(ref, tempIdMap),
+    resolveNodeId: (ref) => resolveNodeId(ref, tempIdMap),
+    defaultNodePosition: (action) => defaultNodePosition(action, tempIdMap),
+  };
+}
+
 /**
  * 将单个 agent action 应用到当前画布。
- * @param {Object} action
- * @param {Map<string,string>} tempIdMap
- * @returns {{ applied: boolean, createdNodeId?: string, taskId?: string, nodeId?: string, error?: string }}
+ *
+ * tempId 在多轮和流式重放中保持幂等：相同临时 ID 已落地时直接复用，
+ * 防止网络重试或模型修复批次时复制节点。这一层必须留在执行器里，
+ * 因为跨批次持久的 tempId 映射归执行器所有。
  */
-async function applyAgentAction(action: AgentAction, tempIdMap: Map<string, string>): Promise<AgentActionResult> {
-  const type = action?.type;
-  // tempId 在多轮和流式重放中保持幂等：相同临时 ID 已落地时直接复用，
-  // 防止网络重试或模型修复批次时复制节点。
-  if (CREATE_NODE_ACTIONS.has(type) && action.tempId) {
+async function runAgentAction(action: AgentAction, tempIdMap: Map<string, string>): Promise<AgentActionResult> {
+  if (CREATE_NODE_ACTIONS.has(action?.type) && action.tempId) {
     ensurePersistentTempIdProject();
     const existingNodeId = persistentTempIdMap.get(String(action.tempId));
     const existingNode = existingNodeId
-      ? store.project.nodes.find((node: AgentNode) => node.id === existingNodeId)
+      ? (store.project.nodes || []).find((node: AgentNode) => node.id === existingNodeId)
       : null;
     if (existingNode) {
       tempIdMap.set(action.tempId, existingNode.id);
-      return {
-        applied: true,
-        deduplicated: true,
-        nodeId: existingNode.id,
-      };
+      return { applied: true, deduplicated: true, nodeId: existingNode.id };
     }
   }
-  // 通过 ActionRegistry 分发（替代原来的 if/else 链）
-  const agentCtx: Record<string, unknown> = {
-    project: store.project,
-    resolveNode: (value: string) => resolveNode(value, tempIdMap),
-    resolveNodeId: (value: string | number | null | undefined) => resolveNodeId(value, tempIdMap),
-    numberFromAction,
-    sizeFromAction,
-    defaultNodePosition: (value: AgentAction) => defaultNodePosition(value, tempIdMap),
-    connectInputLinks: (links: AgentAction['inputLinks'], targetId: string) => connectInputLinks(links, targetId, tempIdMap),
-    tempIdMap,
-  };
-  const registeredResult = await dispatchAction(action, agentCtx);
-  if (registeredResult?.applied) return registeredResult;
-  return registeredResult || { applied: false, error: `Action ${type} was not applied` };
+  return applyAgentAction(action, actionContext(tempIdMap));
 }
 
 // ── Public API ──────────────────────────────────────────────────────────────
@@ -603,7 +510,7 @@ async function executeAgentActionsNow(
         continue;
       }
       captureActionState(journal, action, tempIdMap);
-      const result = await applyAgentAction(action, tempIdMap);
+      const result = await runAgentAction(action, tempIdMap);
       actionResults.push({
         index,
         type: action?.type || '',

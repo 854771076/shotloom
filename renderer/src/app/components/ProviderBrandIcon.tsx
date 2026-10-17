@@ -1,4 +1,4 @@
-import { getProviderIcon } from "../../domain/provider/ProviderBrandIcons.js";
+import { getProviderIcon } from "../../domain/provider/ProviderBrandIcons.ts";
 
 interface ProviderBrandIconProps {
   icon?: string;

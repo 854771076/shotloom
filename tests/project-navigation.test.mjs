@@ -3,7 +3,7 @@ import test from 'node:test';
 import {
   hasPersistedProject,
   resolveProjectRoute,
-} from '../renderer/src/utils/projectNavigation.mjs';
+} from '../renderer/src/utils/projectNavigation.ts';
 
 const openProject = {
   projectDir: '/projects/demo',

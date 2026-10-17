@@ -11,14 +11,14 @@ import { useWorkbenchSurfaceRoot } from "../layout/workbenchSurface";
 import { EDITOR_AGENT_ID } from "../../agent/agents/definitions";
 import {
   createOpenVideoStudioProject,
-} from "../../services/openVideoRuntime.js";
+} from "../../services/openVideoRuntime.ts";
 import {
   editorClipDuration,
   normalizeVideoEditorProject,
   removeEmptyEditorTrack,
   updateEditorTrack,
   videoEditorDuration,
-} from "../../utils/videoEditorProject.mjs";
+} from "../../utils/videoEditorProject.ts";
 import "./VideoEditorWorkspace.css";
 import type {
   VideoEditorAsset,
@@ -83,7 +83,7 @@ export interface VideoEditorWorkspaceProps {
   };
   assets?: VideoEditorAsset[];
   controller: VideoEditorController;
-  copilot?: AgentController & {
+  agentPanel?: AgentController & {
     subscribe: (listener: () => void) => () => void;
     getRevision: () => number;
     read: () => {
@@ -97,13 +97,13 @@ export interface VideoEditorWorkspaceProps {
   };
 }
 
-function VideoEditorAgentPanel({ copilot, onClose, nodeId }: {
-  copilot: NonNullable<VideoEditorWorkspaceProps["copilot"]>;
+function VideoEditorAgentPanel({ agentPanel, onClose, nodeId }: {
+  agentPanel: NonNullable<VideoEditorWorkspaceProps["agentPanel"]>;
   onClose: () => void;
   nodeId: string;
 }) {
-  useSyncExternalStore(copilot.subscribe, copilot.getRevision, copilot.getRevision);
-  const data = copilot.read();
+  useSyncExternalStore(agentPanel.subscribe, agentPanel.getRevision, agentPanel.getRevision);
+  const data = agentPanel.read();
   return <div className="ov-agent-panel">
     <AgentChatPanel
       agentId={EDITOR_AGENT_ID}
@@ -116,11 +116,11 @@ function VideoEditorAgentPanel({ copilot, onClose, nodeId }: {
       textModel={data.textModel}
       textModels={data.textModels}
       controller={{
-        ...copilot,
+        ...agentPanel,
         close: onClose,
         // 剪辑面板的会话管理必须落在剪辑作用域，不能跟随项目级 active 指针。
-        newConversation: () => copilot.newConversation(nodeId),
-        clear: () => copilot.clear(data.activeConversationId),
+        newConversation: () => agentPanel.newConversation(nodeId),
+        clear: () => agentPanel.clear(data.activeConversationId),
       }}
     />
   </div>;
@@ -141,7 +141,7 @@ export function VideoEditorWorkspace(
     metadata,
     assets = [],
     controller,
-    copilot,
+    agentPanel,
   }: VideoEditorWorkspaceProps,
 ) {
   const surface = useWorkbenchSurfaceRoot();
@@ -169,8 +169,8 @@ export function VideoEditorWorkspace(
   const [activeTool, setActiveTool] = useState("media");
   const [agentVisible, setAgentVisible] = useState(true);
   const previousConversationRef = useRef("");
-  const copilotRef = useRef(copilot);
-  copilotRef.current = copilot;
+  const agentPanelRef = useRef(agentPanel);
+  agentPanelRef.current = agentPanel;
   const controllerRef = useRef(controller);
   controllerRef.current = controller;
   const [selectedId, setSelectedId] = useState("");
@@ -325,7 +325,6 @@ export function VideoEditorWorkspace(
     beginTimelineScrub,
     visualTransformRef,
     timelineDragRef,
-    timelineTrimRef,
   } = useVideoEditorGestures({
     projectRef,
     setProject,
@@ -361,7 +360,6 @@ export function VideoEditorWorkspace(
     createStudioProject,
     setTime,
     setPlaying,
-    setSelectedId,
   });
   const visibleTracks = useMemo(
     () => project.tracks.filter((track) =>
@@ -399,7 +397,6 @@ export function VideoEditorWorkspace(
     setSelectedId,
     time,
     duration,
-    videoClips,
     runtimeRef,
     runtimeMutationRef,
     createStudioProject,
@@ -432,20 +429,20 @@ export function VideoEditorWorkspace(
   }
 
   useEffect(() => {
-    const activeCopilot = copilotRef.current;
-    if (!activeCopilot || activeCopilot.read().busy) return;
-    previousConversationRef.current = activeCopilot.read().activeConversationId;
-    activeCopilot.openVideoEditorConversation?.(nodeId);
+    const activeAgentPanel = agentPanelRef.current;
+    if (!activeAgentPanel || activeAgentPanel.read().busy) return;
+    previousConversationRef.current = activeAgentPanel.read().activeConversationId;
+    activeAgentPanel.openVideoEditorConversation?.(nodeId);
   }, [nodeId]);
   const closeAgent = () => {
     setAgentVisible(false);
     if (previousConversationRef.current) {
-      copilot?.selectConversation(previousConversationRef.current);
+      agentPanel?.selectConversation(previousConversationRef.current);
       previousConversationRef.current = "";
     }
   };
   useEffect(() => () => {
-    if (previousConversationRef.current) copilotRef.current?.selectConversation(previousConversationRef.current);
+    if (previousConversationRef.current) agentPanelRef.current?.selectConversation(previousConversationRef.current);
   }, []);
   useVideoEditorShortcuts({
     exporting,
@@ -503,9 +500,9 @@ export function VideoEditorWorkspace(
         onToggleAgent={() => {
           if (agentVisible) closeAgent();
           else {
-            if (copilot?.read().busy) return;
-            previousConversationRef.current = copilot?.read().activeConversationId || "";
-            copilot?.openVideoEditorConversation?.(nodeId);
+            if (agentPanel?.read().busy) return;
+            previousConversationRef.current = agentPanel?.read().activeConversationId || "";
+            agentPanel?.openVideoEditorConversation?.(nodeId);
             setAgentVisible(true);
           }
         }}
@@ -614,7 +611,7 @@ export function VideoEditorWorkspace(
           }}
           onResetView={() => runtimeRef.current?.resetView()}
         />
-        {agentVisible && copilot && <VideoEditorAgentPanel copilot={copilot} nodeId={nodeId} onClose={closeAgent} />}
+        {agentVisible && agentPanel && <VideoEditorAgentPanel agentPanel={agentPanel} nodeId={nodeId} onClose={closeAgent} />}
         <VideoEditorTimeline
         timelineRef={timelineRef}
         duration={duration}

@@ -1,5 +1,5 @@
 import type { MouseEvent } from "react";
-import { formatTime } from "../../utils/format.js";
+import { formatTime } from "../../utils/format.ts";
 import { IconSymbol } from "./IconSymbol";
 
 export interface ProjectLibraryEntry {
@@ -20,7 +20,8 @@ interface CloneProgress {
 
 interface ProjectCardProps {
   project: ProjectLibraryEntry;
-  cloneProgress?: CloneProgress | null;
+  // 调用方按项目目录查复制进度表，没有进度时取到的是 undefined，而不是缺省属性。
+  cloneProgress?: CloneProgress | null | undefined;
   isCurrent?: boolean;
   onOpen: (project: ProjectLibraryEntry) => void;
   onMenu: (event: MouseEvent<HTMLButtonElement>) => void;

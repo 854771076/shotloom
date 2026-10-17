@@ -131,13 +131,28 @@
 
 .stepLine {
   display: grid;
-  grid-template-columns: 14px auto minmax(0, 1fr);
+  /* 耗时与箭头各占一列，箭头列恒为 --icon-xs 宽：hover 出现时不抖布局。 */
+  grid-template-columns: 14px auto minmax(0, 1fr) auto var(--icon-xs);
   align-items: baseline;
   gap: 6px;
+  width: 100%;
   min-height: 22px;
+  padding: 0 4px 0 0;
+  border: 0;
+  border-radius: var(--slk-radius-sm);
   color: var(--slk-label-tertiary);
+  background: transparent;
+  text-align: left;
   font-size: var(--text-body-12);
   line-height: 20px;
+  transition: color var(--slk-dur-fast) var(--slk-ease);
+}
+
+@media (hover: hover) {
+  button.stepLine:hover {
+    color: var(--slk-label-secondary);
+    background: var(--slk-hover-wash);
+  }
 }
 
 .stepIcon {
@@ -182,12 +197,77 @@
   opacity: 0.5;
 }
 
-/* 缩进 = stepLine 的 14px 图标列 + 6px 间距，让产出与状态文字左对齐。 */
-.stepOutput {
+/* 耗时与箭头是摘要行的固定尾部：耗时不截断，箭头悬停才现形。 */
+.stepDuration {
+  color: var(--slk-label-caption);
+  font-family: var(--font-mono);
+  font-size: var(--text-caption-11);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.stepChevron {
+  width: var(--icon-xs);
+  height: var(--icon-xs);
+  align-self: center;
+  color: var(--slk-label-caption);
+  opacity: 0;
+  transition:
+    opacity var(--slk-dur-fast) var(--slk-ease),
+    transform var(--slk-dur-fast) var(--slk-ease);
+}
+
+button.stepLine:hover .stepChevron,
+button.stepLine:focus-visible .stepChevron,
+.step[data-open] .stepChevron {
+  opacity: 1;
+}
+
+.step[data-open] .stepChevron {
+  transform: rotate(90deg);
+}
+
+/* 展开体是延迟加载的证据卡：参数与结果各成一节，只在这里给全文。 */
+.stepBody {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-left: 20px;
+  max-width: 520px;
+}
+
+.ioSection {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  margin-left: 20px;
+}
+
+.ioLabel {
+  color: var(--slk-label-caption);
+  font-size: var(--text-caption-10);
+  font-weight: 500;
+  letter-spacing: var(--tracking-wide);
+  line-height: 14px;
+}
+
+.ioCode {
+  margin: 0;
+  max-height: 240px;
+  padding: 8px 9px;
+  border: 0.5px solid var(--slk-border-l1);
+  border-radius: var(--slk-radius-md);
+  overflow: auto;
+  color: var(--slk-label-secondary);
+  background: var(--slk-bg-code);
+  font-family: var(--font-mono);
+  font-size: var(--text-caption-11);
+  line-height: 18px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.ioText {
+  margin: 0;
   color: var(--slk-label-tertiary);
   font-size: var(--text-body-12);
   line-height: 20px;
@@ -218,8 +298,38 @@
   color: var(--slk-state-error);
 }
 
+/* 失败信息是收起行上最需要看见的事实：错误摘要直接染红，不用展开才知道坏了什么。 */
+.step[data-status="error"] .stepSummary {
+  color: var(--slk-state-error);
+}
+
 .step[data-status="success"] .stepIcon {
   color: var(--slk-state-success);
+}
+
+/* 进行中的文字用扫光而不是 spinner：与"思考中"共用一种动效语言，
+   状态同时保留文字、颜色与标题提示三层冗余。 */
+.shimmer,
+.trace[data-running] .headTitle,
+.branch[data-status="running"] .branchState {
+  background-image: linear-gradient(
+    90deg,
+    var(--slk-label-tertiary) 0%,
+    var(--slk-label-primary) 45%,
+    var(--slk-label-tertiary) 90%
+  );
+  background-size: 220% 100%;
+  background-position: 0 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: trace-sweep 1.5s linear infinite;
+}
+
+@keyframes trace-sweep {
+  to {
+    background-position: -220% 0;
+  }
 }
 
 /* ---------- 子 Agent 分支 ---------- */
@@ -406,5 +516,13 @@
 @media (prefers-reduced-motion: reduce) {
   .trace[data-running] .stop {
     animation: none;
+  }
+
+  .shimmer,
+  .trace[data-running] .headTitle,
+  .branch[data-status="running"] .branchState {
+    animation: none;
+    background-image: none;
+    color: var(--slk-label-secondary);
   }
 }

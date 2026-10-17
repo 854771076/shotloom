@@ -4,7 +4,7 @@ import {
   executeUpdateRestart,
   cancelUpdateDownload,
   updateStore,
-} from "../../store/updateStore.js";
+} from "../../store/updateStore.ts";
 import type {
   UpdateDialogController,
   UpdateDialogData,

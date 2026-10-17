@@ -117,7 +117,7 @@
 }
 
 .userBody[data-clamped] .markdown {
-  mask-image: linear-gradient(to bottom, rgb(0 0 0) calc(100% - 28px), transparent);
+  mask-image: linear-gradient(to bottom, black calc(100% - 28px), transparent);
 }
 
 .expand {
@@ -132,6 +132,13 @@
 .deliveryError {
   padding-right: 14px;
   color: var(--slk-state-error);
+  font-size: var(--text-caption-11);
+  line-height: 16px;
+}
+
+.deliveryPending {
+  padding-right: 14px;
+  color: var(--slk-label-caption);
   font-size: var(--text-caption-11);
   line-height: 16px;
 }

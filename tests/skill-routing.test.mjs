@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import { agentDefinition } from '../renderer/src/agent/agents/definitions.ts';
 import { selectAgentSkills } from '../renderer/src/agent/core/visibility.ts';
+import { readSource, sourceExists } from './helpers/sourceContract.mjs';
 
-const loopBuiltins = readFileSync(new URL('../renderer/src/agent/loop/builtinTools.ts', import.meta.url), 'utf8');
-const catalog = readFileSync(new URL('../renderer/src/agent/tools/catalogTools.ts', import.meta.url), 'utf8');
-const prompt = readFileSync(new URL('../renderer/src/agent/content/prompts/system-base.md', import.meta.url), 'utf8');
+const loopBuiltins = readSource('renderer/src/agent/loop/builtinTools.ts');
+const catalog = readSource('renderer/src/agent/tools/catalogTools.ts');
+const prompt = readSource('renderer/src/agent/content/prompts/canvas-agent.md');
 
 const enabledSkills = [
   { id: 'general' }, { id: 'video-production' }, { id: 'short-drama' }, { id: 'video-editing' },
@@ -38,6 +38,6 @@ test('Skill 由 Agent 定义解析后交给 loop 的 skill 工具按需加载', 
 test('Skill 路由仍要求完整语义，不恢复关键词猜测', () => {
   assert.match(prompt, /不得按孤立关键词路由/);
   assert.match(prompt, /角色版、角色三视图、角色转面.*必须加载 `character-board` Skill/);
-  assert.equal(existsSync(new URL('../renderer/src/utils/skillRouting.mjs', import.meta.url)), false);
-  assert.equal(existsSync(new URL('../renderer/src/agent/runtime/skillRoutingDecision.ts', import.meta.url)), false);
+  assert.equal(sourceExists('renderer/src/utils/skillRouting.mjs'), false);
+  assert.equal(sourceExists('renderer/src/agent/runtime/skillRoutingDecision.ts'), false);
 });

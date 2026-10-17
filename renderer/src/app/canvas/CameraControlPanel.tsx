@@ -6,7 +6,7 @@ import {
   FOCAL_LENGTH_OPTIONS,
   LENS_OPTIONS,
   normalizeCameraConfig,
-} from "../../utils/cameraConfig.js";
+} from "../../utils/cameraConfig.ts";
 
 const definitions = [
   { key: "camera", label: "摄影机", options: CAMERA_OPTIONS },
@@ -31,11 +31,14 @@ export function CameraControlPanel({
   onClose,
 }: CameraControlPanelProps) {
   const normalized = normalizeCameraConfig(config) as Record<string, string>;
+  function indexOfOption(options: readonly string[], value: string | undefined) {
+    return Math.max(0, value === undefined ? -1 : options.indexOf(value));
+  }
   function select(key: string, value: string | undefined) {
     if (value && normalized[key] !== value) onChange({ ...normalized, [key]: value });
   }
   function step(key: string, options: readonly string[], amount: number) {
-    const current = Math.max(0, options.indexOf(normalized[key]));
+    const current = indexOfOption(options, normalized[key]);
     const next = Math.max(0, Math.min(options.length - 1, current + amount));
     select(key, options[next]);
   }
@@ -47,7 +50,7 @@ export function CameraControlPanel({
       </header>
       <div className="camera-wheel-grid">
         {definitions.map((definition) => {
-          const index = Math.max(0, definition.options.indexOf(normalized[definition.key]));
+          const index = indexOfOption(definition.options, normalized[definition.key]);
           return (
             <div
               key={definition.key}
@@ -88,7 +91,7 @@ export function CameraControlPanel({
           <input type="checkbox" checked={enabled} onChange={(event) => onToggle(event.target.checked)} />
           <span>{enabled ? "已应用到生成" : "不应用到生成"}</span>
         </label>
-        <button type="button" onClick={() => onChange({ ...DEFAULT_CAMERA_CONFIG })}>恢复默认</button>
+        <button type="button" onClick={() => onChange(normalizeCameraConfig(DEFAULT_CAMERA_CONFIG))}>恢复默认</button>
       </footer>
     </section>
   );

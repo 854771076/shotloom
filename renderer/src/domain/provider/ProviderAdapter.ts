@@ -61,21 +61,24 @@ export interface ImageEditPayload {
   maskFile?: string;
 }
 
-export interface ProviderTask {
+export type ProviderTask = {
   remoteTaskId: string;
   status: 'queued' | 'running' | 'completed' | 'failed' | 'timeout' | 'cancelled' | 'error';
   progress: number;
   result?: unknown;
   error?: string;
   raw?: unknown;
-}
+};
 
-export interface ProviderTaskState {
+export type ProviderTaskState = {
+  /** 轮询/mock 路径会原样带回任务 id，供调用方在回执里核对。 */
+  remoteTaskId?: string;
   status: string;
   progress: number;
   result?: unknown;
   error?: string;
-}
+  raw?: unknown;
+};
 
 export interface GenerationResult {
   url?: string;
@@ -100,13 +103,13 @@ export interface CompiledProviderRequest {
   providerId: string;
   body?: unknown;
   multipart?: boolean;
-  inputImages?: Array<{ filePath: string; fileName: string; fieldName: string; mimeType?: string }>;
-  maskResource?: { filePath: string; fileName: string; mimeType?: string } | null;
+  inputImages?: Array<{ filePath: string; fileName: string; fieldName: string; mimeType?: string | undefined }> | undefined;
+  maskResource?: { filePath: string; fileName: string; mimeType?: string | undefined } | null;
   maskField?: string;
-  signal?: AbortSignal;
+  signal?: AbortSignal | undefined;
   timeoutMs?: number;
-  headers?: Record<string, string>;
-  auth?: ModelRuntimeContract['auth'];
+  headers?: Record<string, string> | undefined;
+  auth?: ModelRuntimeContract['auth'] | undefined;
   responseEncoding?: 'json' | 'binary';
   contract?: ModelRuntimeContract;
   protocolTemplate?: unknown;
@@ -126,9 +129,9 @@ export interface ProviderAdapter {
   /** 内置接口地址；适配器级唯一来源，Rust 侧不再维护任何厂商地址表。 */
   readonly baseUrl: string;
   /** 没有内置地址、必须由用户填写的厂商（如 Qwen 工作空间地址）。 */
-  readonly baseUrlRequired?: boolean;
+  readonly baseUrlRequired?: boolean | undefined;
   compileRequest(context: CompileContext): CompiledProviderRequest;
   submit(request: CompiledProviderRequest): Promise<ProviderTask>;
   poll(task: ProviderTask, contract: ModelRuntimeContract, signal?: AbortSignal): Promise<ProviderTaskState>;
-  cancel?(task: ProviderTask): Promise<void>;
+  cancel?(task: { remoteTaskId: string }): Promise<void>;
 }

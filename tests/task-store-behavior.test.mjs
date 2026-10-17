@@ -5,48 +5,22 @@
  */
 import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { createServer } from 'vite';
+import { createRendererEnv } from './helpers/rendererSsr.mjs';
 
-let server;
+let env;
 let taskStore;
 let store;
 
 const storage = new Map();
 
 before(async () => {
-  // 领域 store 在浏览器里才有的全局，这里补最小实现。
-  globalThis.localStorage = {
-    getItem: (key) => storage.get(key) ?? null,
-    setItem: (key, value) => storage.set(key, String(value)),
-    removeItem: (key) => storage.delete(key),
-    clear: () => storage.clear(),
-  };
-  globalThis.window = {
-    // 定时器不真正触发：这些测试只关心同步的状态迁移，避免测试结束后
-    // 仍有 scheduleAutoSave/sessionPersist 的回调在 localStorage 清理后运行。
-    setTimeout: () => 0,
-    clearTimeout: () => {},
-    setInterval: () => 0,
-    clearInterval: () => {},
-  };
-  const rendererRoot = fileURLToPath(new URL('../renderer', import.meta.url));
-  server = await createServer({
-    configFile: false,
-    root: rendererRoot,
-    resolve: { alias: { '@': path.join(rendererRoot, 'src') } },
-    server: { middlewareMode: true, hmr: false },
-    appType: 'custom',
-  });
-  taskStore = await server.ssrLoadModule('/src/store/taskStore.js');
-  ({ store } = await server.ssrLoadModule('/src/store/projectStore.js'));
+  env = await createRendererEnv({ storage, withWindow: true });
+  taskStore = await env.load('store/taskStore');
+  ({ store } = await env.load('store/projectStore'));
 });
 
 after(async () => {
-  await server?.close();
-  delete globalThis.localStorage;
-  delete globalThis.window;
+  await env?.dispose();
 });
 
 function seedProject({ nodeStatus = 'running', taskStatus = 'running', runner = 'remote', remoteTaskId = '' } = {}) {

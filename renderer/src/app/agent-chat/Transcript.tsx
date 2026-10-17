@@ -107,7 +107,7 @@ function MessageRow({
   controller,
 }: {
   message: PresentedAgentMessage;
-  next?: PresentedAgentMessage;
+  next?: PresentedAgentMessage | undefined;
   isLast: boolean;
   busy: boolean;
   artifactNodes: WorkflowNodeData[];
@@ -131,6 +131,9 @@ function MessageRow({
               <ReferenceCard key={`${reference.label}-${index}`} reference={reference} />
             ))}
           </div>
+        )}
+        {busy && message.deliveryStage === "sent" && (
+          <small className={styles.deliveryPending}>等当前任务结束后处理</small>
         )}
         {message.deliveryStage === "failed" && message.deliveryError &&
           !repeatsFollowingFailure(message, next) && (

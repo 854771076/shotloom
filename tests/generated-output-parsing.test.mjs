@@ -4,7 +4,7 @@ import test from 'node:test';
 import {
   compactGeneratedOutput,
   extractGeneratedFiles,
-} from '../renderer/src/utils/generatedOutputParsing.mjs';
+} from '../renderer/src/utils/generatedOutputParsing.ts';
 
 test('归档解析同时接受协议层 b64Json 和供应商 b64_json', () => {
   assert.deepEqual(extractGeneratedFiles({ files: [{ b64Json: 'YWJj' }] })

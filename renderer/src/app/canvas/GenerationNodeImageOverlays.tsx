@@ -1,0 +1,88 @@
+import { useContext, type RefObject } from "react";
+import { desktopApi } from "../../services/desktopApi.ts";
+import { ImageCropEditor } from "../components/ImageCropEditor";
+import { ImageAnnotationEditor, ImageAnnotationOverlay, type ImageAnnotation } from "../components/ImageAnnotationEditor";
+import { CanvasOverlayRootContext, type WorkflowNodeActions, type WorkflowNodeData } from "./WorkflowCanvas";
+
+/**
+ * 本地图片的编辑覆盖层：裁剪保留来源连线由 action 负责，
+ * 标注则把合成结果写回节点，预览优先使用标注图。
+ */
+export function GenerationNodeImageOverlays({
+  node,
+  actions,
+  activeKind,
+  activeFilePath,
+  previewUrl,
+  imageWidth,
+  imageHeight,
+  semanticZoom,
+  anchorRef,
+  imageCropOpen,
+  onImageCropClose,
+  imageAnnotationOpen,
+  onImageAnnotationClose,
+}: {
+  node: WorkflowNodeData;
+  actions: WorkflowNodeActions;
+  activeKind: string;
+  activeFilePath: string;
+  previewUrl: string;
+  imageWidth: number;
+  imageHeight: number;
+  semanticZoom: number;
+  anchorRef: RefObject<HTMLDivElement | null>;
+  imageCropOpen: boolean;
+  onImageCropClose: (() => void) | undefined;
+  imageAnnotationOpen: boolean;
+  onImageAnnotationClose: (() => void) | undefined;
+}) {
+  const root = useContext(CanvasOverlayRootContext);
+  const isImagePreview = activeKind === "image" && Boolean(previewUrl);
+  return (
+    <>
+      {imageCropOpen && isImagePreview && activeFilePath && (
+        <ImageCropEditor
+          nodeId={node.id}
+          root={root}
+          imageWidth={imageWidth}
+          imageHeight={imageHeight}
+          onCancel={() => onImageCropClose?.()}
+          onConfirm={(rect) => actions.cropImage(node.id, rect)}
+          onSplit={(rows, cols, selected, rect) => actions.splitImageGrid(node.id, rows, cols, selected, rect)}
+        />
+      )}
+      {isImagePreview && !imageAnnotationOpen && Array.isArray(node.annotationData) && (
+        <ImageAnnotationOverlay annotations={node.annotationData as ImageAnnotation[]} />
+      )}
+      {imageAnnotationOpen && isImagePreview && (
+        <ImageAnnotationEditor
+          imageUrl={previewUrl}
+          imageWidth={imageWidth}
+          imageHeight={imageHeight}
+          semanticZoom={semanticZoom}
+          root={root}
+          anchorRef={anchorRef}
+          onCancel={() => onImageAnnotationClose?.()}
+          onSave={async ({ blob }) => {
+            const dataUrl = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(String(reader.result || ""));
+              reader.onerror = () => reject(reader.error || new Error("标注图片读取失败"));
+              reader.readAsDataURL(blob);
+            });
+            const preferredName = `${String(node.title || "image").replace(/[\\/:*?"<>|]/g, "_")}-annotated.png`;
+            const saved = await desktopApi.file.saveDataUrlToProject(dataUrl, preferredName);
+            actions.update(node.id, {
+              annotationData: [],
+              annotationImagePath: String(saved?.filePath || saved?.path || ""),
+              annotationImageUrl: dataUrl,
+              updatedAt: new Date().toISOString(),
+            });
+            onImageAnnotationClose?.();
+          }}
+        />
+      )}
+    </>
+  );
+}

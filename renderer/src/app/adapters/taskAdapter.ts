@@ -4,8 +4,8 @@ import {
   clearTasks,
   isHistoricalModelTask,
   retryTask,
-} from "../../store/taskStore.js";
-import { store } from "../../store/projectStore.js";
+} from "../../store/taskStore.ts";
+import { store } from "../../store/projectStore.ts";
 import type { GenerationTask } from "../views/TasksView";
 
 export function taskViewData(): GenerationTask[] {

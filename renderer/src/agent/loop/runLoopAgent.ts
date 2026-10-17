@@ -3,7 +3,7 @@ import { assertAgentProject, getAgentProjectIdentity, getAgentProjectKey } from 
 import { desktopApi } from '@/services/desktopApi';
 import { store } from '@/store/projectStore';
 import { settingsStore } from '@/store/settingsStore';
-import { canvasMutationFingerprint } from '@/utils/canvasMutationFingerprint.mjs';
+import { canvasMutationFingerprint } from '@/utils/canvasMutationFingerprint.ts';
 import { agentDefinition } from '../agents/definitions.ts';
 import { buildAgentSystemPrompt, buildRunContextBlock } from '../content/instructions';
 import { resolveImageAttachments } from '../content/attachments';
@@ -22,6 +22,7 @@ import {
   saveConversationTranscript,
   type ChatMessage,
 } from './transcript';
+import { createAgentRunFacts } from '../core/runFacts';
 import type { AgentPromptPayload, AgentRunResult, AgentRuntimeEvent, AgentToolContext, AgentToolReceipt, JsonObject } from '../core/types';
 
 /**
@@ -33,14 +34,18 @@ import type { AgentPromptPayload, AgentRunResult, AgentRuntimeEvent, AgentToolCo
 
 const LOOP_RUNTIME_MODEL_CONTRACT = '模型循环、会话历史、上下文裁剪与子 Agent 全部由 Shotloom 自研 Agent Loop 管理；历史里的工具结果都是本地真实回执。超出上下文预算时，较早的对话会整组丢弃且不再对你可见，需要旧信息就用只读工具重新查看真实状态，不要假设自己记得全部历史。工具结果过长时历史里只保留头尾摘要，完整输出落盘在本项目内，摘要会给出可用于 read_tool_output 的 callId；不要拿摘要的开头去推测被省略的内容。';
 
-const activeLoopRuns = new Map<string, AbortController>();
+/**
+ * 正在运行的 loop：一个进行中的请求 + 它收到的运行中补充。
+ * 补充消息只在循环的步边界被取用，所以它不会插进未应答的工具调用之后。
+ */
+const activeLoopRuns = new Map<string, { controller: AbortController; steering: string[] }>();
 
 function uid(prefix: string) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
 function conversationRecord(conversationId: string): JsonObject | undefined {
-  return (store.project.copilotConversations as JsonObject[] | undefined || [])
+  return (store.project.agentConversations as JsonObject[] | undefined || [])
     .find((item) => String(item.id || '') === conversationId);
 }
 
@@ -152,13 +157,15 @@ export async function runLoopAgent(
   for (const receipt of (continuation?.toolReceipts as AgentToolReceipt[] | undefined) || []) {
     if (receipt?.callId) restoredReceipts.set(receipt.callId, receipt);
   }
-  state.set('successfulToolCallIds', new Set<string>(
-    ((continuation?.successfulToolCallIds as string[] | undefined) || []).map(String),
-  ));
-  state.set('toolReceipts', restoredReceipts);
-  if (continuation?.hasAppliedActions === true) state.set('hasAppliedActions', true);
-  if (continuation?.activeProductionPlanId) state.set('activeProductionPlanId', String(continuation.activeProductionPlanId));
-  state.set('expectedCanvasFingerprint', canvasMutationFingerprint(store.project));
+  const run = createAgentRunFacts({
+    hasAppliedActions: continuation?.hasAppliedActions === true,
+    expectedCanvasFingerprint: canvasMutationFingerprint(store.project),
+    activeProductionPlanId: String(continuation?.activeProductionPlanId || ''),
+    toolReceipts: restoredReceipts,
+    successfulToolCallIds: new Set<string>(
+      ((continuation?.successfulToolCallIds as string[] | undefined) || []).map(String),
+    ),
+  });
 
   const toolContext: AgentToolContext = {
     requestId, turnId: `${requestId}:root`, projectKey,
@@ -167,7 +174,7 @@ export async function runLoopAgent(
     conversationId, agentId, agentSessionId: requestId,
     signal: controller.signal, loadedSkillIds: new Set<string>(),
     attachments: payload.attachments || [],
-    capabilities: { nodeExecution: settingsStore.agentCanRunNodes === true }, state, emit,
+    capabilities: { nodeExecution: settingsStore.agentCanRunNodes === true }, run, state, emit,
   };
 
   let plan: LoopModelPlan;
@@ -180,7 +187,8 @@ export async function runLoopAgent(
     throw new RuntimeDiagnosticError(diagnosis);
   }
 
-  activeLoopRuns.set(requestId, controller);
+  const steering: string[] = [];
+  activeLoopRuns.set(requestId, { controller, steering });
   emit({
     type: 'run_started', runtime: 'loop', mode: 'standard', title: message.slice(0, 80) || 'Agent 任务',
     conversationId, model, createdAt: new Date().toISOString(),
@@ -215,15 +223,15 @@ export async function runLoopAgent(
       callModel: createModelCaller(controller.signal),
       emit,
       onMessagesChanged: commitTranscript,
+      takeSteeringMessages: () => steering.splice(0, steering.length),
     });
     let outcome = state.get('verifiedOutcome') as JsonObject | undefined;
     const reply = result.reply || String(outcome?.summary || '');
-    if (state.get('hasAppliedActions') === true && !outcome) {
-      const receipts = state.get('toolReceipts') as Map<string, AgentToolReceipt>;
+    if (run.hasAppliedActions && !outcome) {
       outcome = {
         status: 'partial',
         summary: reply || '项目操作已经执行，但 Agent 没有提交完整终态说明。',
-        evidence: { toolCallIds: [...receipts.values()].filter((receipt) => receipt.applied).map((receipt) => receipt.callId) },
+        evidence: { toolCallIds: [...run.toolReceipts.values()].filter((receipt) => receipt.applied).map((receipt) => receipt.callId) },
         remaining: ['需要根据当前画布和任务状态补充最终核验'],
       };
     }
@@ -234,7 +242,7 @@ export async function runLoopAgent(
       requestId,
       reply,
       model,
-      toolCallCount: (state.get('successfulToolCallIds') as Set<string>).size,
+      toolCallCount: run.successfulToolCallIds.size,
       outcome,
     };
   } catch (cause) {
@@ -251,7 +259,7 @@ export async function runLoopAgent(
     // 中断可能停在 tool_calls 与工具结果之间；落盘的历史必须仍然对 provider 合法，
     // 并且按这次调用的真实进度说明它做到了哪一步，模型下一轮既不会把未执行的调用
     // 当成已完成，也不会重试一个已经写进画布的调用。
-    commitTranscript(closeDanglingToolCalls(transcript, interruptedToolNoteFor(state, unattributedDangling)));
+    commitTranscript(closeDanglingToolCalls(transcript, interruptedToolNoteFor(run, state, unattributedDangling)));
     controller.abort();
     activeLoopRuns.delete(requestId);
     noteRecoveryState(true);
@@ -259,8 +267,21 @@ export async function runLoopAgent(
 }
 
 export async function abortLoopAgent(requestId: string): Promise<boolean> {
-  const controller = activeLoopRuns.get(requestId);
-  if (!controller) return false;
-  controller.abort();
+  const run = activeLoopRuns.get(requestId);
+  if (!run) return false;
+  run.controller.abort();
+  return true;
+}
+
+/**
+ * 把用户在运行中补充的指令交给这一轮，循环会在下一步请求前把它写成一条真实用户消息。
+ *
+ * 运行已经结束或 id 不认识时返回 false：调用方必须改走排队通道，不能把"注入失败"
+ * 说成"已经送达"。空文本同样返回 false，避免界面上留下一条看不见内容的注入消息。
+ */
+export function steerLoopAgent(requestId: string, text: string): boolean {
+  const run = activeLoopRuns.get(requestId);
+  if (!run || !text.trim()) return false;
+  run.steering.push(text.trim());
   return true;
 }

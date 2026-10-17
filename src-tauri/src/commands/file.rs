@@ -18,14 +18,20 @@ pub fn file_global_asset_root(app: AppHandle) -> Result<Value, String> {
     Ok(json!(root.to_string_lossy()))
 }
 
-#[tauri::command]
-pub fn file_trash(path: String) -> Result<Value, String> {
+fn trash_path(path: String) -> Result<Value, String> {
     let path = PathBuf::from(path);
     if !path.exists() {
         return Ok(json!({"ok": true, "missing": true}));
     }
     trash::delete(&path).map_err(|error| error.to_string())?;
     Ok(json!({"ok": true, "path": path.to_string_lossy()}))
+}
+
+#[tauri::command]
+pub async fn file_trash(path: String) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || trash_path(path))
+        .await
+        .map_err(|error| format!("回收站任务异常：{error}"))?
 }
 
 #[tauri::command]
@@ -62,6 +68,29 @@ pub fn file_show_item_in_folder(path: String) -> Result<Value, String> {
     Ok(json!({"ok": true, "path": path.to_string_lossy()}))
 }
 
+/// 渲染进程不再持有 `shell.open` 权限：路径只能由这里校验后交给系统默认程序。
+/// 边界是"目录或媒体文件"，可执行 bundle 与脚本一律拒绝，避免打开路径变成执行代码。
+#[tauri::command]
+pub fn file_open_path(path: String) -> Result<Value, String> {
+    let target = fs::canonicalize(&path).map_err(|_| format!("要打开的路径不存在：{path}"))?;
+    if !super::media_paths::is_safe_open_target(&target) {
+        return Err(format!("只能打开目录或媒体文件：{path}"));
+    }
+
+    #[cfg(target_os = "macos")]
+    let opener = ("open", vec![target.as_os_str().to_os_string()]);
+    #[cfg(target_os = "windows")]
+    let opener = ("explorer.exe", vec![target.as_os_str().to_os_string()]);
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let opener = ("xdg-open", vec![target.as_os_str().to_os_string()]);
+
+    Command::new(opener.0)
+        .args(opener.1)
+        .spawn()
+        .map_err(|error| format!("无法打开路径：{error}"))?;
+    Ok(json!({"ok": true, "path": target.to_string_lossy()}))
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ResourcePackageFile {
@@ -94,8 +123,7 @@ fn unique_file_path(directory: &Path, name: &str) -> PathBuf {
     target
 }
 
-#[tauri::command]
-pub fn file_export_resource_package(
+fn export_resource_package(
     target: String,
     manifest: Value,
     files: Vec<ResourcePackageFile>,
@@ -140,7 +168,17 @@ pub fn file_export_resource_package(
 }
 
 #[tauri::command]
-pub fn file_import_resource_package(
+pub async fn file_export_resource_package(
+    target: String,
+    manifest: Value,
+    files: Vec<ResourcePackageFile>,
+) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || export_resource_package(target, manifest, files))
+        .await
+        .map_err(|error| format!("资源包导出任务异常：{error}"))?
+}
+
+fn import_resource_package(
     source: String,
     target_directory: String,
 ) -> Result<Value, String> {
@@ -225,7 +263,18 @@ pub fn file_import_resource_package(
 }
 
 #[tauri::command]
-pub fn file_read_array_buffer(path: String) -> Result<Value, String> {
+pub async fn file_import_resource_package(
+    source: String,
+    target_directory: String,
+) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        import_resource_package(source, target_directory)
+    })
+    .await
+    .map_err(|error| format!("资源包导入任务异常：{error}"))?
+}
+
+fn read_array_buffer(path: String) -> Result<Value, String> {
     let bytes = fs::read(path).map_err(|error| error.to_string())?;
     Ok(json!(
         base64::engine::general_purpose::STANDARD.encode(bytes)
@@ -233,7 +282,13 @@ pub fn file_read_array_buffer(path: String) -> Result<Value, String> {
 }
 
 #[tauri::command]
-pub fn file_write(path: String, data: String, append: bool) -> Result<Value, String> {
+pub async fn file_read_array_buffer(path: String) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || read_array_buffer(path))
+        .await
+        .map_err(|error| format!("文件读取任务异常：{error}"))?
+}
+
+fn write_file(path: String, data: String, append: bool) -> Result<Value, String> {
     let path = PathBuf::from(path);
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|error| error.to_string())?;
@@ -256,7 +311,13 @@ pub fn file_write(path: String, data: String, append: bool) -> Result<Value, Str
 }
 
 #[tauri::command]
-pub fn file_copy(source: String, target: String) -> Result<Value, String> {
+pub async fn file_write(path: String, data: String, append: bool) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || write_file(path, data, append))
+        .await
+        .map_err(|error| format!("文件写入任务异常：{error}"))?
+}
+
+fn copy_file(source: String, target: String) -> Result<Value, String> {
     let target = PathBuf::from(target);
     if let Some(parent) = target.parent() {
         fs::create_dir_all(parent).map_err(|error| error.to_string())?;
@@ -265,18 +326,42 @@ pub fn file_copy(source: String, target: String) -> Result<Value, String> {
     file_result(&target)
 }
 
+#[tauri::command]
+pub async fn file_copy(source: String, target: String) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || copy_file(source, target))
+        .await
+        .map_err(|error| format!("文件复制任务异常：{error}"))?
+}
+
 
 #[tauri::command]
 pub fn file_path_exists(path: String) -> Value {
     json!(Path::new(&path).exists())
 }
 
-#[tauri::command]
-pub fn file_checksum(path: String) -> Result<Value, String> {
-    let bytes = fs::read(path).map_err(|error| error.to_string())?;
+fn checksum_file(path: String) -> Result<Value, String> {
+    let mut input = fs::File::open(&path).map_err(|error| error.to_string())?;
+    let size = input.metadata().map_err(|error| error.to_string())?.len();
+    // 校验和的对象可能是几 GB 的视频，必须分块喂给哈希器，不能整体读进内存。
+    let mut digest = Sha256::new();
+    let mut buffer = [0u8; 64 * 1024];
+    loop {
+        let read = input.read(&mut buffer).map_err(|error| error.to_string())?;
+        if read == 0 {
+            break;
+        }
+        digest.update(&buffer[..read]);
+    }
     Ok(
-        json!({"checksum":format!("{:x}", Sha256::digest(&bytes)),"checksumAlgorithm":"sha256","size":bytes.len()}),
+        json!({"checksum":format!("{:x}", digest.finalize()),"checksumAlgorithm":"sha256","size":size}),
     )
+}
+
+#[tauri::command]
+pub async fn file_checksum(path: String) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || checksum_file(path))
+        .await
+        .map_err(|error| format!("校验和任务异常：{error}"))?
 }
 
 #[tauri::command]

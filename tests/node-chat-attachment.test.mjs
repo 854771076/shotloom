@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   nodeChatAttachmentKey,
   resolveNodeChatImageAttachment,
-} from '../renderer/src/services/nodeChatAttachment.mjs';
+} from '../renderer/src/services/nodeChatAttachment.ts';
 
 test('节点加入对话时携带当前选中的图片产物', () => {
   const attachment = resolveNodeChatImageAttachment({

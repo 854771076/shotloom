@@ -15,7 +15,6 @@ import {
   Expand,
   Grid2X2,
   Grid3X3,
-  Image,
   ImagePlus,
   Move3D,
   Plus,
@@ -58,7 +57,6 @@ type ToolbarAction = {
 };
 
 const DEFAULT_VIEWPORT_TOOLBAR_HEIGHT = 46;
-const VIEWPORT_TOOLBAR_BOTTOM_OFFSET = 40;
 const DEFAULT_CROWD_ROWS = 3;
 const DEFAULT_CROWD_COLUMNS = 3;
 const DEFAULT_CROWD_SPACING = 1.2;
@@ -113,7 +111,7 @@ export function ViewportToolbar({
   const [geometryMenuStyle, setGeometryMenuStyle] = useState<CSSProperties>({});
   const [crowdPanelStyle, setCrowdPanelStyle] = useState<CSSProperties>({});
   const [modelLibraryPanelStyle, setModelLibraryPanelStyle] = useState<CSSProperties>({});
-  const [crowdBodyType, setCrowdBodyType] = useState<CharacterBodyType>(BODY_TYPE_OPTIONS[0]?.bodyType ?? "mannequin");
+  const [crowdBodyType] = useState<CharacterBodyType>(BODY_TYPE_OPTIONS[0]?.bodyType ?? "mannequin");
   const [crowdRows, setCrowdRows] = useState(String(DEFAULT_CROWD_ROWS));
   const [crowdColumns, setCrowdColumns] = useState(String(DEFAULT_CROWD_COLUMNS));
   const [crowdSpacing, setCrowdSpacing] = useState(String(DEFAULT_CROWD_SPACING));
@@ -416,7 +414,6 @@ export function ViewportToolbar({
           fileName: asset.fileName,
           id: asset.id,
           name: asset.name ?? asset.fileName.replace(/\.(fbx|obj)$/i, ""),
-          thumbUrl: undefined,
           url: asset.url,
         }) satisfies ModelLibraryItem
     );

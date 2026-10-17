@@ -1,5 +1,5 @@
 import { type MouseEvent, type ReactNode, useMemo, useState } from "react";
-import { formatTime } from "../../utils/format.js";
+import { formatTime } from "../../utils/format.ts";
 import { EmptyState } from "../components/EmptyState";
 import { type IconName, IconSymbol } from "../components/IconSymbol";
 import { ProjectScopeHeader } from "../components/ProjectScopeHeader";

@@ -29,7 +29,8 @@ function attachmentMime(attachment: JsonObject) {
     '.avif': 'image/avif', '.gif': 'image/gif', '.jpeg': 'image/jpeg', '.jpg': 'image/jpeg',
     '.png': 'image/png', '.webp': 'image/webp',
   };
-  return Object.entries(extensionMimes).find(([extension]) => source.split(/[?#]/)[0].endsWith(extension))?.[1] || '';
+  const [sourcePath = ''] = source.split(/[?#]/);
+  return Object.entries(extensionMimes).find(([extension]) => sourcePath.endsWith(extension))?.[1] || '';
 }
 
 function arrayBufferDataUrl(buffer: ArrayBuffer, mime: string) {

@@ -6,30 +6,19 @@
  */
 import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { createServer } from 'vite';
+import { createRendererEnv } from './helpers/rendererSsr.mjs';
 
-let server;
+let env;
 let diagnoseRuntimeFailure;
 let RuntimeDiagnosticError;
 
 before(async () => {
-  const rendererRoot = fileURLToPath(new URL('../renderer', import.meta.url));
-  server = await createServer({
-    configFile: false,
-    root: rendererRoot,
-    resolve: { alias: { '@': path.join(rendererRoot, 'src') } },
-    server: { middlewareMode: true, hmr: false },
-    appType: 'custom',
-  });
-  ({ diagnoseRuntimeFailure, RuntimeDiagnosticError } = await server.ssrLoadModule(
-    '/src/agent/runtime/runtimeDiagnostics.ts',
-  ));
+  env = await createRendererEnv();
+  ({ diagnoseRuntimeFailure, RuntimeDiagnosticError } = await env.load('agent/runtime/runtimeDiagnostics'));
 });
 
 after(async () => {
-  await server?.close();
+  await env?.dispose();
 });
 
 const cases = [

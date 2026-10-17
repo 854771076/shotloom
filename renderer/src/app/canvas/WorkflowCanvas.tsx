@@ -38,18 +38,18 @@ import {
   type Viewport,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { canvasNodeDimensions, defaultCanvasNodeDimensions } from "../../services/agentLayoutService";
+import { defaultCanvasNodeDimensions } from "../../services/agentLayoutService";
 import { IconSymbol } from "../components/IconSymbol";
 import type { ImageCropRect } from "../components/ImageCropEditor";
 import {
   draggedCanvasPositions,
   reconcileCanvasNodes,
-} from "../../utils/canvasNodeDrag.mjs";
+} from "../../utils/canvasNodeDrag.ts";
 import {
   CANVAS_NODE_LABEL_HEIGHT,
   CANVAS_NODE_LABEL_OFFSET,
   canvasNodePortBounds,
-} from "../../utils/canvasNodeChrome.mjs";
+} from "../../utils/canvasNodeChrome.ts";
 import { CanvasNodeToolbar } from "./CanvasNodeToolbar";
 import { CanvasContextMenu } from "./CanvasContextMenu";
 import { ARTIFACT_DRAG_TYPE } from "../agent-chat/artifactHelpers";
@@ -392,7 +392,7 @@ const FallbackNode = memo(FallbackNodeInner);
 function CanvasNode({ data, selected, dragging }: NodeProps<FlowNode>) {
   const registry = useContext(RendererContext);
   const actions = useContext(ActionContext)!;
-  const mentionInCopilot = useContext(MentionContext);
+  const addNodeMention = useContext(MentionContext);
   const item = data.node;
   const [resizing, setResizing] = useState(false);
   const [imageCropOpen, setImageCropOpen] = useState(false);
@@ -419,7 +419,7 @@ function CanvasNode({ data, selected, dragging }: NodeProps<FlowNode>) {
         dragging={dragging}
         semanticZoom={semanticZoom}
         actions={actions}
-        mentionInCopilot={mentionInCopilot}
+        addNodeMention={addNodeMention}
         canvasOverlayRoot={canvasOverlayRoot}
         imageCropOpen={imageCropOpen}
         onImageCropOpen={() => setImageCropOpen(true)}
@@ -546,7 +546,7 @@ export function WorkflowCanvas({
   nodeActions,
   controller,
   overlay,
-  mentionInCopilot,
+  addNodeMention,
 }: {
   nodes: WorkflowNodeData[];
   edges: WorkflowEdge[];
@@ -555,7 +555,7 @@ export function WorkflowCanvas({
   nodeActions: WorkflowNodeActions;
   controller: WorkflowCanvasController;
   overlay?: ReactNode;
-  mentionInCopilot?: (nodeId: string) => void;
+  addNodeMention?: (nodeId: string) => void;
 }) {
   const initialZoom = Math.min(
     MAX_CANVAS_ZOOM,
@@ -910,7 +910,7 @@ export function WorkflowCanvas({
   return (
     <RendererContext.Provider value={renderers}>
       <ActionContext.Provider value={nodeActions}>
-        <MentionContext.Provider value={mentionInCopilot || null}>
+        <MentionContext.Provider value={addNodeMention || null}>
         <CanvasPreviewZoomContext.Provider value={previewZoom}>
         <CanvasOverlayRootContext.Provider value={canvasOverlayRoot}>
         <CanvasFocusNodesContext.Provider value={focusCanvasNodes}>

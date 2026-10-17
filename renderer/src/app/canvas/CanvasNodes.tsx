@@ -1,7 +1,7 @@
 import { type ChangeEvent, memo } from "react";
 import { IconSymbol } from "../components/IconSymbol";
 import { ResourcePreview } from "./ResourcePreview";
-import type { WorkflowNodeActions, WorkflowNodeData, WorkflowNodeRenderer } from "./WorkflowCanvas";
+import type { WorkflowNodeActions, WorkflowNodeRenderer } from "./WorkflowCanvas";
 
 export const UtilityNode: WorkflowNodeRenderer = memo(({ node, selected, actions }) => {
   return (

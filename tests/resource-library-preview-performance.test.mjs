@@ -1,19 +1,11 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import test from 'node:test';
 
-const grid = readFileSync(
-  new URL('../renderer/src/app/components/MaterialGrid.tsx', import.meta.url),
-  'utf8',
-);
-const styles = readFileSync(
-  new URL('../renderer/styles/project-materials.css', import.meta.url),
-  'utf8',
-);
-const cacheHook = readFileSync(
-  new URL('../renderer/src/app/canvas/useMediaPreviewCache.ts', import.meta.url),
-  'utf8',
-);
+import test from 'node:test';
+import { readSource } from './helpers/sourceContract.mjs';
+
+const grid = readSource('renderer/src/app/components/MaterialGrid.tsx');
+const styles = readSource('renderer/styles/project-materials.css');
+const cacheHook = readSource('renderer/src/app/canvas/useMediaPreviewCache.ts');
 
 test('素材图片接近可视区域后才读取缓存缩略图', () => {
   assert.match(grid, /sharedPreviewObserver = new IntersectionObserver/);

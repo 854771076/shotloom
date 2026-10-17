@@ -1,6 +1,6 @@
 import { store, touchProject } from '@/store/projectStore';
 import { receiptChangesProject } from '../runtime/toolReceipts';
-import type { AgentToolContext, AgentToolReceipt, JsonObject, JsonValue } from '../core/types';
+import type { AgentRunFacts, AgentToolContext, JsonObject, JsonValue } from '../core/types';
 
 /**
  * Agent loop 的模型可见历史。
@@ -30,10 +30,30 @@ export interface ChatMessage {
   tool_call_id?: string;
   /** Responses 推理项需要随手动维护的历史回传，其他协议忽略。 */
   responseItems?: Record<string, unknown>[];
+  /**
+   * 压缩说明消息的标记。它由上一轮压缩写入历史，下一轮压缩会整条替换，
+   * 因此窗口里永远只有一条压缩说明，不会层层嵌套。
+   */
+  compactionNote?: true;
+  /** 压缩说明已折叠的分组线索，供下一轮压缩继承，避免重复压缩时丢线索。 */
+  compactionLines?: string[];
 }
 
 /** 单条消息的估算只用于决定窗口边界，真实占用仍以模型返回的 usage 上报给界面。 */
 const CHARS_PER_TOKEN = 3;
+
+/** 文本估算：请求前缀（system 提示词与工具 schema）与消息内容共用同一把尺子。 */
+export function estimateTextTokens(value: unknown): number {
+  return Math.ceil(String(value ?? '').length / CHARS_PER_TOKEN);
+}
+
+function messageText(message: ChatMessage): string {
+  if (typeof message.content === 'string') return message.content;
+  if (Array.isArray(message.content)) {
+    return message.content.map((part) => (part.type === 'text' ? part.text : '')).join(' ');
+  }
+  return '';
+}
 
 function messageChars(message: ChatMessage): number {
   if (typeof message.content === 'string') return message.content.length;
@@ -65,6 +85,15 @@ export function markToolCallStarted(context: AgentToolContext, callId: string): 
   context.state.set(STARTED_TOOL_CALLS_KEY, started);
 }
 
+/**
+ * 并发派发前先把标记容器变成同一个实例。
+ * 标记是读-改-写式的：两个调用同时读到"还没有容器"会各自新建一个 Set，
+ * 后写入的那个会把先写入的开始标记整个覆盖掉。
+ */
+export function ensureStartedToolCallTrace(state: Map<string, unknown>): void {
+  if (!state.has(STARTED_TOOL_CALLS_KEY)) state.set(STARTED_TOOL_CALLS_KEY, new Set<string>());
+}
+
 export function startedToolCallIds(state: Map<string, unknown>): Set<string> {
   return (state.get(STARTED_TOOL_CALLS_KEY) as Set<string>) || new Set<string>();
 }
@@ -94,10 +123,11 @@ export function danglingToolCallIds(messages: ChatMessage[]): Set<string> {
  * 没有任何执行记录，既不能宣称已完成，也不能宣称没有效果。
  */
 export function interruptedToolNoteFor(
+  run: AgentRunFacts,
   state: Map<string, unknown>,
   unattributed: Set<string>,
 ): (call: AgentToolCall) => string {
-  const receipts = (state.get('toolReceipts') as Map<string, AgentToolReceipt>) || new Map<string, AgentToolReceipt>();
+  const receipts = run.toolReceipts;
   const started = startedToolCallIds(state);
   const unknownOutcome = (label: string, reason: string) =>
     `${label}${reason}，实际影响未知。它可能有副作用，先用只读工具核验当前状态再决定是否重做，不要直接重复调用。`;
@@ -146,31 +176,106 @@ function groupTranscript(messages: ChatMessage[]): ChatMessage[][] {
   const groups: ChatMessage[][] = [];
   for (const message of messages) {
     const startGroup = message.role === 'user' || message.role === 'assistant';
-    if (startGroup || !groups.length) groups.push([message]);
-    else groups[groups.length - 1].push(message);
+    const lastGroup = groups[groups.length - 1];
+    if (startGroup || !lastGroup) groups.push([message]);
+    else lastGroup.push(message);
   }
   return groups;
 }
 
 export interface TranscriptWindow {
   messages: ChatMessage[];
+  /** 本轮从原文窗口里移出的分组数（含上一轮已折叠的分组之外的新增）。 */
   droppedGroups: number;
   estimatedTokens: number;
+  /** 压缩说明里继承加新增的折叠线索条数。 */
+  foldedLines: number;
 }
 
-/** 从最旧的分组开始丢弃，直到估算占用装进输入预算；至少保留最后一个分组。 */
+/** 头部原文（用户最初的目标）只在它自身足够小时保留，否则一起折叠进说明。 */
+const HEAD_BUDGET_RATIO = 0.15;
+/** 折叠线索本身占预算：太多行会把刚省出来的空间又吃掉。 */
+const MAX_FOLDED_LINES = 40;
+const FOLDED_LINE_CHARS = 120;
+const COMPACTION_NOTE_LABEL = '[上下文已压缩]';
+
+function foldedGroupLine(group: ChatMessage[]): string {
+  // 一行线索：这一组是谁在说话、说了什么开头、执行过哪些工具调用。
+  const opener = group.find((message) => message.role !== 'tool') || group[0];
+  // 纯工具轮次的 assistant 常常没有文本，只写角色会让相邻几组线索一模一样。
+  const text = (messageText(opener || { role: 'user', content: '' })
+    || group.filter((message) => message.role === 'tool').map(messageText).join(' ')).replace(/\s+/g, ' ').slice(0, FOLDED_LINE_CHARS);
+  const calls = group.flatMap((message) => (message.tool_calls || []).map((call) => call.function.name));
+  const base = `${opener?.role || 'assistant'}: ${text || '（无文本内容）'}`;
+  return calls.length ? `${base}（已调用 ${calls.join('、')}）` : base;
+}
+
+function createCompactionNote(lines: string[]): ChatMessage {
+  const header = `${COMPACTION_NOTE_LABEL} 更早的对话已经从上下文移出，你看不到它们的原文。`
+    + '下面按时间顺序列出被省略分组的开头摘要与当时调用过的工具，只能用来判断发生过什么，不能当作事实引用。'
+    + '需要旧信息就用只读工具重新查看画布与任务的真实状态；超长工具结果的完整原文仍可按摘要里的 callId 用 read_tool_output 读回。';
+  return {
+    role: 'user',
+    content: [header, ...lines.map((line, index) => `${index + 1}. ${line}`)].join('\n'),
+    compactionNote: true,
+    compactionLines: lines,
+  };
+}
+
+/**
+ * 三段式压缩：头部原始目标（足够小时保留原文）+ 中段折叠成一条说明 + 尾部尽量多的原文。
+ * 裁剪必须整组进行，并且永远保留最后一组。压缩说明只有一条：上一轮的说明会被整条
+ * 替换，它的折叠线索继承进新说明，所以线索不会因为反复压缩而凭空消失。
+ */
 export function fitTranscript(messages: ChatMessage[], inputBudget: number): TranscriptWindow {
   const groups = groupTranscript(messages);
-  let dropped = 0;
-  while (groups.length - dropped > 1 && estimateMessageTokens(groups.slice(dropped).flat()) > inputBudget) {
-    dropped += 1;
+  const previousNote = groups[0]?.[0]?.compactionNote ? groups[0][0] : null;
+  const historyGroups = previousNote ? groups.slice(1) : groups;
+  const inheritedLines = previousNote?.compactionLines || [];
+
+  const verbatim = groups.flat();
+  const verbatimTokens = estimateMessageTokens(verbatim);
+  if (!previousNote && estimateMessageTokens(historyGroups.flat()) <= inputBudget) {
+    return { messages: verbatim, droppedGroups: 0, estimatedTokens: verbatimTokens, foldedLines: 0 };
   }
-  const kept = groups.slice(dropped).flat();
-  return { messages: kept, droppedGroups: dropped, estimatedTokens: estimateMessageTokens(kept) };
+  if (historyGroups.length <= 1) {
+    // 只剩最后一组可用时没有可折叠的中段，原样返回，交由 provider 的报错或用户停止收尾。
+    return { messages: verbatim, droppedGroups: 0, estimatedTokens: verbatimTokens, foldedLines: inheritedLines.length };
+  }
+
+  const build = (dropped: number): TranscriptWindow => {
+    const headGroup = historyGroups[0] || [];
+    // 折叠全部中段时就没有"头部原文"可留了，它只在还有中段可折叠时才参与预算判断。
+    const headFits = dropped > 1
+      && estimateMessageTokens(headGroup) <= Math.max(1, Math.floor(inputBudget * HEAD_BUDGET_RATIO));
+    const lines = [
+      ...inheritedLines,
+      ...historyGroups.slice(headFits ? 1 : 0, dropped).map(foldedGroupLine),
+    ].slice(-MAX_FOLDED_LINES);
+    const window = [
+      ...(lines.length ? [createCompactionNote(lines)] : []),
+      ...(headFits ? [headGroup] : []),
+      ...historyGroups.slice(dropped),
+    ].flat();
+    return {
+      messages: window,
+      droppedGroups: dropped,
+      estimatedTokens: estimateMessageTokens(window),
+      foldedLines: lines.length,
+    };
+  };
+
+  // 从"折叠得最少"开始往后加：能多留一组原文就留一组，装得下就收手。
+  for (let dropped = inheritedLines.length ? 0 : 1; dropped < historyGroups.length; dropped += 1) {
+    const candidate = build(dropped);
+    if (candidate.estimatedTokens <= inputBudget) return candidate;
+    if (dropped === historyGroups.length - 1) return candidate;
+  }
+  return build(historyGroups.length - 1);
 }
 
 export function conversationRecord(conversationId: string): JsonObject | undefined {
-  return (store.project.copilotConversations || []).find(
+  return (store.project.agentConversations || []).find(
     (item: JsonObject) => String(item.id || '') === String(conversationId),
   );
 }

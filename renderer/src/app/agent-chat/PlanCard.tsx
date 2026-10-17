@@ -10,11 +10,27 @@ const stageStatusLabel: Record<string, string> = {
   done: "已完成",
 };
 
+// 头部进度按状态分段陈述而不是只报 done/total：进行中/受阻各占一段，
+// 零计数段省略，扫一眼就知道计划此刻卡在哪一类状态上。
+const stageProgress = (stages: NonNullable<AgentPlanView["stages"]>) => {
+  const count = (status: string) => stages.filter((stage) => stage.status === status).length;
+  const done = count("done");
+  const segments: string[] = [];
+  if (done) segments.push(`${done} 已完成`);
+  const doing = count("doing");
+  if (doing) segments.push(`${doing} 进行中`);
+  const blocked = count("blocked");
+  if (blocked) segments.push(`${blocked} 受阻`);
+  const pending = stages.length - done - doing - blocked;
+  if (pending) segments.push(`${pending} 待编排`);
+  return segments.join(" · ");
+};
+
 export function PlanCard({
   plan,
   controller,
 }: {
-  plan?: AgentPlanView;
+  plan?: AgentPlanView | undefined;
   controller: AgentController;
 }) {
   const stages = plan?.stages || [];
@@ -27,6 +43,7 @@ export function PlanCard({
   if (!plan || plan.schemaVersion !== 2 || !stages.length) return null;
 
   const done = stages.filter((stage) => stage.status === "done").length;
+  const progress = stageProgress(stages);
 
   return (
     <section className={styles.card} data-open={open || undefined}>
@@ -41,9 +58,7 @@ export function PlanCard({
           <small>{plan.executionMode === "execute" ? "制作与执行" : "画布规划"}</small>
           <strong>{plan.title || plan.goal || "画布制作"}</strong>
         </span>
-        <span className={styles.headCount}>
-          {done}/{stages.length}
-        </span>
+        <span className={styles.headCount}>{progress}</span>
         <span className={styles.bar} aria-hidden="true">
           <span className={styles.barFill} style={{ width: `${(done / stages.length) * 100}%` }} />
         </span>
@@ -67,7 +82,16 @@ export function PlanCard({
                   aria-expanded={expanded}
                   onClick={() => setExpandedStage(expanded ? null : key)}
                 >
-                  <span className={styles.stageDot} aria-hidden="true" />
+                  {/* 状态三层冗余：图标形状 + 颜色 + 行尾文字，任一通道失效都不丢信息。 */}
+                  <span className={styles.stageMark} aria-hidden="true">
+                    {stage.status === "done" ? (
+                      <IconSymbol name="check" className={styles.stageGlyph} />
+                    ) : stage.status === "blocked" ? (
+                      <IconSymbol name="warning" className={styles.stageGlyph} />
+                    ) : (
+                      <span className={styles.stageDot} />
+                    )}
+                  </span>
                   <span className={styles.stageTitle}>{stage.title || `阶段 ${index + 1}`}</span>
                   <span className={styles.stageStatus}>
                     {stageStatusLabel[String(stage.status || "")] || stage.status}

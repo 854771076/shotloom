@@ -1,5 +1,6 @@
 use super::{
     common::{file_result, read_json, user_file},
+    media_paths,
     system_proxy::resolved_system_proxy_url,
 };
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
@@ -7,7 +8,12 @@ use futures_util::StreamExt;
 use reqwest::{header, multipart, Method, Url};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::{collections::HashMap, path::Path, time::Duration};
+use std::{
+    collections::HashMap,
+    net::IpAddr,
+    path::Path,
+    time::Duration,
+};
 use tauri::{AppHandle, Emitter};
 use tokio::sync::{oneshot, Mutex};
 
@@ -183,6 +189,78 @@ mod request_url_tests {
     }
 }
 
+fn is_public_ip(address: IpAddr) -> bool {
+    match address {
+        IpAddr::V4(v4) => !(v4.is_loopback()
+            || v4.is_private()
+            || v4.is_link_local()
+            || v4.is_unspecified()
+            || v4.is_broadcast()
+            || v4.is_documentation()
+            || v4.is_multicast()),
+        IpAddr::V6(v6) => {
+            if let Some(mapped) = v6.to_ipv4_mapped() {
+                return is_public_ip(IpAddr::V4(mapped));
+            }
+            let segments = v6.segments();
+            !(v6.is_loopback()
+                || v6.is_unspecified()
+                || v6.is_multicast()
+                || segments[0] & 0xfe00 == 0xfc00
+                || segments[0] == 0xfe80)
+        }
+    }
+}
+
+/// 只有公网可路由地址才允许在厂商配置之外被访问；回环、内网、链路本地与元数据地址
+/// （169.254.169.254、metadata.google.internal 等）只能命中厂商自己的 endpoint。
+fn is_public_host(host: &str) -> bool {
+    if host.is_empty()
+        || host == "localhost"
+        || host.ends_with(".localhost")
+        || host.ends_with(".local")
+        || host.ends_with(".internal")
+    {
+        return false;
+    }
+    match host.trim_start_matches('[').trim_end_matches(']').parse::<IpAddr>() {
+        Ok(address) => is_public_ip(address),
+        Err(_) => true,
+    }
+}
+
+fn host_of(url: &Url) -> String {
+    url.host_str().unwrap_or_default().to_ascii_lowercase()
+}
+
+fn host_of_text(base_url: &str) -> String {
+    Url::parse(base_url)
+        .map(|url| host_of(&url))
+        .unwrap_or_default()
+}
+
+/// 厂商的结果下载经常落在同域 CDN 上，所以按"同主机或父子域"判定，而不是逐字比较 origin。
+fn host_belongs_to_base(host: &str, base_host: &str) -> bool {
+    if host.is_empty() || base_host.is_empty() {
+        return false;
+    }
+    host == base_host
+        || host.ends_with(&format!(".{base_host}"))
+        || base_host.ends_with(&format!(".{host}"))
+}
+
+/// 出网请求的统一边界：非厂商域名不得访问内网，凭证也只在厂商域名内注入。
+fn guard_outbound_url(url: &Url, base_url: &str) -> Result<bool, String> {
+    let host = host_of(url);
+    let provider = host_belongs_to_base(&host, &host_of_text(base_url));
+    if !provider && !is_public_host(&host) {
+        return Err(format!(
+            "模型请求目标 {host} 不是厂商配置的公网地址，已被网关拒绝"
+        ));
+    }
+    Ok(provider)
+}
+
 fn gateway_client(timeout_ms: u64) -> Result<reqwest::Client, String> {
     let mut builder = reqwest::Client::builder()
         .connect_timeout(Duration::from_secs(15))
@@ -265,7 +343,9 @@ fn body_with_auth(
 }
 
 async fn resource_bytes(
+    app: &AppHandle,
     client: &reqwest::Client,
+    base_url: &str,
     resource: &GenerationResource,
 ) -> Result<Vec<u8>, String> {
     if let Some(path) = resource
@@ -273,7 +353,14 @@ async fn resource_bytes(
         .as_deref()
         .filter(|value| !value.is_empty())
     {
-        return std::fs::read(path)
+        let resolved = media_paths::resolve_input_file(
+            &super::common::app_data(app)?,
+            media_paths::home_root().as_deref(),
+            path,
+        )?;
+        return tauri::async_runtime::spawn_blocking(move || std::fs::read(&resolved))
+            .await
+            .map_err(|error| format!("模型输入文件读取任务失败：{error}"))?
             .map_err(|error| format!("无法读取模型输入文件 {path}: {error}"));
     }
     let url = resource.url.as_deref().unwrap_or_default();
@@ -286,8 +373,11 @@ async fn resource_bytes(
             .map_err(|error| format!("无法解析模型输入 Data URL: {error}"));
     }
     if url.starts_with("https://") || url.starts_with("http://") {
+        let parsed =
+            Url::parse(url).map_err(|error| format!("模型输入 URL 无效：{error}"))?;
+        guard_outbound_url(&parsed, base_url)?;
         let response = client
-            .get(url)
+            .get(parsed)
             .send()
             .await
             .map_err(|error| format!("无法下载模型输入：{error}"))?;
@@ -322,7 +412,7 @@ async fn build_request(
             form = form.text(name.clone(), value.clone());
         }
         for resource in &input.resources {
-            let bytes = resource_bytes(&client, resource).await?;
+            let bytes = resource_bytes(app, &client, &base_url, resource).await?;
             let fallback = Path::new(resource.file_path.as_deref().unwrap_or_default())
                 .file_name()
                 .and_then(|value| value.to_str())
@@ -487,6 +577,10 @@ pub async fn generation_download(
     if !matches!(url.scheme(), "http" | "https") {
         return Err("生成结果下载只允许 HTTP(S) URL".into());
     }
+    // 结果 URL 来自厂商响应，属于外部输入：跨出厂商域名时不得访问内网，也不再携带 Key。
+    // 同域之外的下载链接都是自带签名的临时地址，去掉凭证不会改变正常下载。
+    let from_provider = guard_outbound_url(&url, &base_url)?;
+    let api_key = from_provider.then(|| api_key.clone()).unwrap_or_default();
     let client = gateway_client(request.timeout_ms)?;
     let method = Method::from_bytes(request.method.as_deref().unwrap_or("GET").as_bytes())
         .map_err(|_| "生成结果下载 method 非法".to_string())?;
@@ -579,5 +673,43 @@ mod tests {
             json!({ "workflowId": "workflow-1", "apiKey": "secret" }),
         );
         assert!(body.get("apiKey").is_none());
+    }
+
+    #[test]
+    fn outbound_urls_are_allowed_on_the_provider_domain_only_when_private() {
+        let base = "https://starrouter.io/v1";
+        assert!(guard_outbound_url(
+            &Url::parse("https://cdn.starrouter.io/result/clip.mp4").unwrap(),
+            base
+        )
+        .unwrap());
+        assert!(!guard_outbound_url(
+            &Url::parse("https://signed-other-cdn.test/result/clip.mp4").unwrap(),
+            base
+        )
+        .unwrap());
+        let internal = Url::parse("http://169.254.169.254/latest/meta-data/iam").unwrap();
+        let error = guard_outbound_url(&internal, base).expect_err("metadata endpoint must be refused");
+        assert!(error.contains("不是厂商配置的公网地址"));
+        assert!(guard_outbound_url(
+            &Url::parse("http://metadata.google.internal/").unwrap(),
+            base
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn locally_configured_provider_endpoints_keep_working() {
+        let base = "http://127.0.0.1:8188/api";
+        assert!(guard_outbound_url(
+            &Url::parse("http://127.0.0.1:8188/view?filename=a.png").unwrap(),
+            base
+        )
+        .unwrap());
+        assert!(guard_outbound_url(
+            &Url::parse("http://localhost:3000/leak").unwrap(),
+            base
+        )
+        .is_err());
     }
 }

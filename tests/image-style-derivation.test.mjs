@@ -1,15 +1,10 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import test from 'node:test';
 
-const adapterSource = readFileSync(
-  new URL('../renderer/src/app/adapters/canvasAdapter.ts', import.meta.url),
-  'utf8',
-);
-const serviceSource = readFileSync(
-  new URL('../renderer/src/services/coloredPencilNodeService.ts', import.meta.url),
-  'utf8',
-);
+import test from 'node:test';
+import { readSource } from './helpers/sourceContract.mjs';
+
+const adapterSource = readSource('renderer/src/app/adapters/canvasAdapter.ts');
+const serviceSource = readSource('renderer/src/services/coloredPencilNodeService.ts');
 
 test('本地彩铅处理创建完整的普通图片节点并接入原工作流', () => {
   assert.match(serviceSource, /type: 'imageGeneration'/);
@@ -17,7 +12,7 @@ test('本地彩铅处理创建完整的普通图片节点并接入原工作流',
   assert.match(serviceSource, /model: sourceNode\.model \|\| ''/);
   assert.match(serviceSource, /config: \{ \.\.\.\(sourceNode\.config \|\| \{\}\) \}/);
   assert.match(serviceSource, /project\.nodes\.push\(derived\)/);
-  assert.match(serviceSource, /addCanvasEdge\(project, sourceNode\.id, derived\.id/);
+  assert.match(serviceSource, /addCanvasEdge\(project[\s\S]{0,40}?sourceNode\.id, derived\.id/);
   assert.match(serviceSource, /edge\.data\?\.skipTaskInput !== true/);
   assert.match(serviceSource, /rewireColoredPencilDownstreamEdges\(/);
   assert.match(serviceSource, /edge\.source = derivedNodeId/);

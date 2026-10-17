@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { reconcileOrphanedNodeTaskState } from '../renderer/src/utils/taskStateReconciliation.mjs';
+import { reconcileOrphanedNodeTaskState } from '../renderer/src/utils/taskStateReconciliation.ts';
 
 test('没有活跃任务时用当前模型最近的终态任务清理节点假运行状态', () => {
   const node = {

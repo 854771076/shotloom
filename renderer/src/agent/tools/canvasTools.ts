@@ -13,9 +13,9 @@ import { settingsStore } from '@/store/settingsStore';
 import { setSelectedNodeIds } from '@/store/nodeStore';
 import { redoCanvas, undoCanvas } from '@/store/canvasHistoryStore';
 import actionContract from '@/config/agent-action-contract.json';
-import { validateAgentActionShape } from '@/composables/agentActionValidator';
+import { validateAgentActionShape } from '@/services/agent/agentActionValidator';
 import { buildAgentActionSchema, flattenAgentActionSchema, normalizeAgentActions } from './agentProtocol';
-import { canvasMutationFingerprint } from '@/utils/canvasMutationFingerprint.mjs';
+import { canvasMutationFingerprint } from '@/utils/canvasMutationFingerprint.ts';
 import { desktopApi } from '@/services/desktopApi';
 
 function imageDataUrl(bytes: ArrayBuffer) {
@@ -58,9 +58,9 @@ function assertContextProject(context: AgentToolContext) {
 
 function assertCanvasWriteFence(context: AgentToolContext) {
   assertContextProject(context);
-  const expected = String(context.state.get('expectedCanvasFingerprint') || '');
+  const { expectedCanvasFingerprint } = context.run;
   const current = canvasMutationFingerprint(projectStore.project);
-  if (expected && expected !== current) {
+  if (expectedCanvasFingerprint && expectedCanvasFingerprint !== current) {
     const error = new Error('画布在 Agent 读取后已被其他操作修改；请重新调用 canvas_list_nodes 或 canvas_get_node 后再写入');
     error.name = 'AgentCanvasRevisionConflictError';
     throw error;
@@ -68,7 +68,7 @@ function assertCanvasWriteFence(context: AgentToolContext) {
 }
 
 function advanceCanvasWriteFence(context: AgentToolContext) {
-  context.state.set('expectedCanvasFingerprint', canvasMutationFingerprint(projectStore.project));
+  context.run.expectedCanvasFingerprint = canvasMutationFingerprint(projectStore.project);
 }
 
 function focusedActionSchema(types: string[]) {
@@ -135,8 +135,8 @@ async function executeActions(input: CanvasActionToolInput, context: AgentToolCo
   const request: AgentActionRequest = {
     actions: valid.map((item) => item.action),
     title: input.title || (hasMedia ? 'Agent 生成任务' : 'Agent 画布操作'),
-    autoLayout: input.autoLayout,
-    selectCreated: input.selectCreated,
+    ...(input.autoLayout === undefined ? {} : { autoLayout: input.autoLayout }),
+    ...(input.selectCreated === undefined ? {} : { selectCreated: input.selectCreated }),
     requireConfirmation: false,
     source: `typescript-agent:${context.requestId}`,
     projectKey: context.projectKey,

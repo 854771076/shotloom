@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createOpenVideoProject, createOpenVideoStudioProject } from '../renderer/src/services/openVideoRuntime.js';
-import { addEditorClip, addEditorTrack, createVideoEditorProject } from '../renderer/src/utils/videoEditorProject.mjs';
+import { createOpenVideoProject, createOpenVideoStudioProject } from '../renderer/src/services/openVideoRuntime.ts';
+import { addEditorClip, addEditorTrack, createVideoEditorProject } from '../renderer/src/utils/videoEditorProject.ts';
 
 test('OpenVideo 项目桥接把剪辑片段转换成连续主轨并保留源入出点', () => {
   const project = createOpenVideoProject({

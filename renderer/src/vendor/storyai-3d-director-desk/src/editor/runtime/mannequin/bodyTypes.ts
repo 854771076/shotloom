@@ -113,8 +113,10 @@ function preset(
   };
 }
 
+const malePreset = preset("mannequin", "男性素体", 2.62);
+
 export const CHARACTER_BODY_PRESETS: CharacterBodyPreset[] = [
-  preset("mannequin", "男性素体", 2.62),
+  malePreset,
   preset("female", "女性素体", 2.52, {
     pelvisScale: [1.42, 0.56, 0.78],
     torsoLowerRadius: 0.16,
@@ -279,7 +281,7 @@ export function normalizeBodyType(value?: string | null): CharacterBodyType {
 
 export function getBodyPreset(value?: string | null): CharacterBodyPreset {
   const bodyType = normalizeBodyType(value);
-  return CHARACTER_BODY_PRESETS.find((preset) => preset.bodyType === bodyType) ?? CHARACTER_BODY_PRESETS[0];
+  return CHARACTER_BODY_PRESETS.find((item) => item.bodyType === bodyType) ?? malePreset;
 }
 
 export function getGroundedLabelY(value?: string | null): number {

@@ -9,8 +9,11 @@ const extKinds = {
 export function generationMediaKind(item: Record<string, unknown>): "image" | "video" | "audio" | "text" | "" {
   const type = String(item.resourceType || item.mimeType || "").toLowerCase();
   const ext =
-    String(item.fileName || item.filePath || item.url || item.previewUrl || "")
-      .split(/[?#]/)[0]
+    (
+      String(item.fileName || item.filePath || item.url || item.previewUrl || "").split(
+        /[?#]/,
+      )[0] ?? ""
+    )
       .split(".")
       .pop()
       ?.toLowerCase() || "";

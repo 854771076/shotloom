@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { readFileSync } from 'node:fs';
+
+import { readSource } from './helpers/sourceContract.mjs';
 
 // 提示词现在由共享模块装配；范围判断仍必须是模型的语义职责，不允许出现代码预分类。
-const instructions = readFileSync(new URL('../renderer/src/agent/content/instructions.ts', import.meta.url), 'utf8');
-const lifecycle = readFileSync(new URL('../renderer/src/agent/tools/lifecycleTools.ts', import.meta.url), 'utf8');
-const governance = readFileSync(new URL('../renderer/src/agent/content/contracts/production-governance.md', import.meta.url), 'utf8');
+const instructions = readSource('renderer/src/agent/content/instructions.ts');
+const lifecycle = readSource('renderer/src/agent/tools/lifecycleTools.ts');
+const governance = readSource('renderer/src/agent/content/contracts/production-governance.md');
 
 test('制作范围由主 Agent 理解完整语义，不由运行时代码预分类', () => {
   assert.doesNotMatch(instructions, /decideProductionRequest|productionScopeAmbiguous|requiresProductionPlan/);

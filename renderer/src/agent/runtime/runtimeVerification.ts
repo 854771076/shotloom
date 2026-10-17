@@ -13,7 +13,7 @@ export interface OutcomeVerificationInput {
   outcome: AgentOutcome;
   hasAppliedActions: boolean;
   toolReceipts: Map<string, AgentToolReceipt>;
-  productionPlan?: JsonObject;
+  productionPlan?: JsonObject | undefined;
 }
 
 export function verifyAgentOutcome(input: OutcomeVerificationInput) {

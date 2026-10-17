@@ -2,15 +2,15 @@ import type { Connection } from "@xyflow/react";
 import { canvasNodeDimensions, layoutAgentNodes } from "../../services/agentLayoutService";
 import { createColoredPencilImageNode } from "../../services/coloredPencilNodeService";
 // Canonical edge persistence: addCanvasEdge(store.project, connection.source, connection.target).
-import { desktopApi } from "../../services/desktopApi.js";
+import { desktopApi } from "../../services/desktopApi.ts";
 import {
   applyMaterialToCanvas,
   copyFileIntoProjectAssets,
   inferFileResourceType,
   registerImportedMaterial,
-} from "../../store/assetStore.js";
-import { useLocalAssetInProject } from "../../store/localAssetLibraryStore.js";
-import { addCanvasEdge } from "../../store/canvasGraphStore.js";
+} from "../../store/assetStore.ts";
+import { useLocalAssetInProject } from "../../store/localAssetLibraryStore.ts";
+import { addCanvasEdge } from "../../store/canvasGraphStore.ts";
 import { getGenerationInputModes } from "../../domain/catalog/ModelCatalog";
 import {
   defaultInputSlot,
@@ -19,36 +19,36 @@ import {
   type GenerationInputSlot,
 } from "../../domain/graph/GenerationInputContract";
 import { validateAgentInputRole } from "../../services/agentInputRole";
-import { pasteStagedWorkflow, stageSelectedWorkflow } from "../../store/clipboardStore.js";
+import { pasteStagedWorkflow, stageSelectedWorkflow } from "../../store/clipboardStore.ts";
 import {
   recordCanvasHistory,
   recordCanvasHistoryState,
   recordCanvasPositionHistory,
   redoCanvas,
   undoCanvas,
-} from "../../store/canvasHistoryStore.js";
+} from "../../store/canvasHistoryStore.ts";
 import {
   addNode,
   deleteNodeById,
   deleteSelectedNodes,
   selectNode,
   setSelectedNodeIds,
-} from "../../store/nodeStore.js";
+} from "../../store/nodeStore.ts";
 import {
   persistCanvasViewport,
   store as rawStore,
   touchProject,
-} from "../../store/projectStore.js";
+} from "../../store/projectStore.ts";
 import {
   archiveResourceNode,
   connectResourceToNode,
   replaceResourceNode,
   selectGeneratedOutput,
-} from "../../store/resourceNodeStore.js";
-import { runNode } from "../../store/taskStore.js";
-import { uid } from "../../utils/format.js";
-import { updatedTextVersions } from "../../utils/textNodeVersions.mjs";
-import { showSuccessToast, showToast } from "../store/overlayStore";
+} from "../../store/resourceNodeStore.ts";
+import { runNode } from "../../store/taskStore.ts";
+import { uid } from "../../utils/format.ts";
+import { updatedTextVersions } from "../../utils/textNodeVersions.ts";
+import { showSuccessToast, showToast } from "../../store/notificationStore";
 import type {
   WorkflowCanvasController,
   WorkflowNodeActions,
@@ -243,7 +243,7 @@ export const canvasController: WorkflowCanvasController = {
     node.x = Math.round(position.x);
     node.y = Math.round(position.y);
     node.resourceType = resourceType;
-    node.sourceType = "copilot-artifact";
+    node.sourceType = "agent-artifact";
     node.sourceArtifactId = artifactId;
     node.content = content;
     if (resourceType === "text") node.textContent = content;
@@ -256,7 +256,7 @@ export const canvasController: WorkflowCanvasController = {
       resourceType,
       mimeType: String(source.mimeType || ""),
       content,
-      source: "copilot-artifact",
+      source: "agent-artifact",
     };
     touchProject();
   },
@@ -547,7 +547,7 @@ export const nodeActions: WorkflowNodeActions = {
       const mediaType = String(
         candidate.resourceType || candidate.mimeType || candidate.type || node.resourceType || "",
       ).toLowerCase();
-      const location = String(
+      const locationWithoutQuery = String(
         candidate.fileName ||
           candidate.filePath ||
           candidate.path ||
@@ -555,9 +555,8 @@ export const nodeActions: WorkflowNodeActions = {
           candidate.remoteUrl ||
           candidate.previewUrl ||
           "",
-      )
-        .split(/[?#]/)[0]
-        .toLowerCase();
+      ).split(/[?#]/)[0];
+      const location = (locationWithoutQuery ?? "").toLowerCase();
       const imageSource =
         node.type === "imageGeneration" ||
         mediaType.includes("image") ||

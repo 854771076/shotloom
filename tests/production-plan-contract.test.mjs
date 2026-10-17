@@ -1,17 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 
-const tools = readFileSync(new URL('../renderer/src/agent/tools/productionPlanTools.ts', import.meta.url), 'utf8');
-const loop = readFileSync(new URL('../renderer/src/agent/loop/runLoopAgent.ts', import.meta.url), 'utf8')
-  + readFileSync(new URL('../renderer/src/agent/loop/agentLoop.ts', import.meta.url), 'utf8');
-const canvas = readFileSync(new URL('../renderer/src/agent/tools/canvasTools.ts', import.meta.url), 'utf8');
-const store = readFileSync(new URL('../renderer/src/store/projectStore.js', import.meta.url), 'utf8')
-  + readFileSync(new URL('../renderer/src/store/projectNormalization.js', import.meta.url), 'utf8');
-const planStore = readFileSync(new URL('../renderer/src/agent/runtime/productionPlanStore.ts', import.meta.url), 'utf8');
-const lifecycle = readFileSync(new URL('../renderer/src/agent/tools/lifecycleTools.ts', import.meta.url), 'utf8');
-const catalog = readFileSync(new URL('../renderer/src/agent/tools/catalogTools.ts', import.meta.url), 'utf8');
-const governance = readFileSync(new URL('../renderer/src/agent/content/contracts/production-governance.md', import.meta.url), 'utf8');
+import { readSource } from './helpers/sourceContract.mjs';
+
+const tools = readSource('renderer/src/agent/tools/productionPlanTools.ts');
+const loop = readSource('renderer/src/agent/loop/runLoopAgent.ts')
+  + readSource('renderer/src/agent/loop/agentLoop.ts');
+const canvas = readSource('renderer/src/agent/tools/canvasTools.ts');
+const store = readSource('renderer/src/store/projectStore.ts')
+  + readSource('renderer/src/store/projectNormalization.ts');
+const planStore = readSource('renderer/src/agent/runtime/productionPlanStore.ts');
+const lifecycle = readSource('renderer/src/agent/tools/lifecycleTools.ts');
+const catalog = readSource('renderer/src/agent/tools/catalogTools.ts');
+const governance = readSource('renderer/src/agent/content/contracts/production-governance.md');
 
 test('Production Plan 提供持久化阶段工具而不是临时文本计划', () => {
   for (const name of ['plan_write', 'plan_get_stage_status', 'plan_get_stage_detail', 'plan_patch_stage', 'plan_update_stage_state']) {

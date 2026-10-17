@@ -7,14 +7,13 @@ import { loadModelCatalog } from './helpers/modelCatalog.mjs';
  */
 import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
-import path from 'node:path';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { createServer } from 'vite';
+
+import { createRendererEnv } from './helpers/rendererSsr.mjs';
+import { readSource } from './helpers/sourceContract.mjs';
 
 const catalogJson = loadModelCatalog();
 
-let server;
+let env;
 let getProviderAdapter;
 let getProviderAdapters;
 let findProviderAdapter;
@@ -23,22 +22,15 @@ let normalizeProviderConfigs;
 let getProviderModelRows;
 
 before(async () => {
-  const rendererRoot = fileURLToPath(new URL('../renderer', import.meta.url));
-  server = await createServer({
-    configFile: false,
-    root: rendererRoot,
-    resolve: { alias: { '@': path.join(rendererRoot, 'src') } },
-    server: { middlewareMode: true, hmr: false },
-    appType: 'custom',
-  });
+  env = await createRendererEnv();
   ({ getProviderAdapter, getProviderAdapters, findProviderAdapter, resolveProviderBaseUrl } =
-    await server.ssrLoadModule('/src/domain/provider/adapters/index.ts'));
-  ({ normalizeProviderConfigs } = await server.ssrLoadModule('/src/domain/provider/ProviderConfig.ts'));
-  ({ getProviderModelRows } = await server.ssrLoadModule('/src/domain/provider/ModelAvailability.ts'));
+    await env.load('domain/provider/adapters/index'));
+  ({ normalizeProviderConfigs } = await env.load('domain/provider/ProviderConfig'));
+  ({ getProviderModelRows } = await env.load('domain/provider/ModelAvailability'));
 });
 
 after(async () => {
-  await server?.close();
+  await env?.dispose();
 });
 
 test('每个内置厂商只有一个适配器，且覆盖目录里出现的厂商', () => {
@@ -93,10 +85,7 @@ test('设置只保留内置厂商的 Key 与生效地址，丢弃自定义厂商
 });
 
 test('运行入口按厂商 id 取适配器，模型任务不再自行拼接地址', () => {
-  const taskService = readFileSync(
-    new URL('../renderer/src/services/modelTaskService.js', import.meta.url),
-    'utf8',
-  );
+  const taskService = readSource('renderer/src/services/modelTaskService.ts');
   assert.match(taskService, /getProviderAdapter\(modelContract\.provider\)\s*\.poll/);
   assert.doesNotMatch(taskService, /getProviderTransport|normalizeRemoteTask|desktopApi\.model\./);
 });

@@ -55,10 +55,10 @@ export interface DirectorAssetRef {
   kind: DirectorAssetKind;
   sourceType: "model" | "image";
   fileName: string;
-  name?: string;
+  name?: string | undefined;
   url: string;
-  assetSource?: DirectorAssetSource;
-  projectionMode?: PanoramaProjectionMode;
+  assetSource?: DirectorAssetSource | undefined;
+  projectionMode?: PanoramaProjectionMode | undefined;
 }
 
 export interface DirectorObject {
@@ -68,14 +68,14 @@ export interface DirectorObject {
   visible: boolean;
   locked: boolean;
   transform: DirectorTransform;
-  bodyType?: CharacterBodyType;
-  color?: string;
-  assetRefId?: string;
-  geometryType?: GeometryPrimitiveType;
-  crowdId?: string;
-  crowdLabel?: string;
+  bodyType?: CharacterBodyType | undefined;
+  color?: string | undefined;
+  assetRefId?: string | undefined;
+  geometryType?: GeometryPrimitiveType | undefined;
+  crowdId?: string | undefined;
+  crowdLabel?: string | undefined;
   linkedCameraId?: string | null;
-  characterRig?: CharacterRigState;
+  characterRig?: CharacterRigState | undefined;
 }
 
 export interface DirectorCameraCapture {

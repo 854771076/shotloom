@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import test from 'node:test';
 
-const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
+import test from 'node:test';
+import { readSource } from './helpers/sourceContract.mjs';
+
+const read = (path) => readSource(path);
 
 test('画布模型请求统一进入原生 Generation Gateway', () => {
-  const api = read('renderer/src/services/tauriApi.js');
+  const api = read('renderer/src/services/tauriApi.ts');
   assert.match(api, /generation_request/);
   assert.match(api, /generation_stream/);
   assert.match(api, /generation_download/);
@@ -35,7 +36,7 @@ test('Generation Gateway 在原生层持有凭据、代理、multipart 和取消
   assert.match(rust, /response_encoding/);
   assert.match(rust, /body_base64/);
   assert.match(rust, /BASE64\.encode\(&bytes\)/);
-  const api = read('renderer/src/services/tauriApi.js');
+  const api = read('renderer/src/services/tauriApi.ts');
   assert.match(api, /responseEncoding === 'binary'/);
   assert.match(api, /__responseBodyBase64/);
 });

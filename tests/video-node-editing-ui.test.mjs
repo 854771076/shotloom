@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
+import { readGenerationNodeSource } from './helpers/generationNodeSource.mjs';
 const readCanvasAdapter = async () =>
   await readFile(new URL('../renderer/src/app/adapters/canvasAdapter.ts', import.meta.url), 'utf8')
   + await readFile(new URL('../renderer/src/app/adapters/canvas/videoEditorActions.ts', import.meta.url), 'utf8');
@@ -57,7 +58,7 @@ test('剪辑工作区只编排组件和领域 Hook', async () => {
 });
 test('视频节点通过选中工具栏加入原剪辑台', async () => {
   const [source, toolbar, adapter] = await Promise.all([
-    readFile(new URL('../renderer/src/app/canvas/GenerationNode.tsx', import.meta.url), 'utf8'),
+    Promise.resolve(readGenerationNodeSource()),
     readFile(new URL('../renderer/src/app/canvas/CanvasNodeToolbar.tsx', import.meta.url), 'utf8'),
     readCanvasAdapter(),
   ]);
@@ -120,11 +121,11 @@ test('独立剪辑工作区接入真实桌面导出', async () => {
     'utf8',
   );
   const runtime = await readFile(
-    new URL('../renderer/src/services/openVideoRuntime.js', import.meta.url),
+    new URL('../renderer/src/services/openVideoRuntime.ts', import.meta.url),
     'utf8',
   );
   const tauri = await readFile(
-    new URL('../renderer/src/services/tauriApi.js', import.meta.url),
+    new URL('../renderer/src/services/tauriApi.ts', import.meta.url),
     'utf8',
   );
   for (const pattern of [
@@ -158,9 +159,9 @@ test('独立剪辑工作区接入真实桌面导出', async () => {
   assert.doesNotMatch(tauri, /structuredClone\(project\)/);
   assert.match(
     runtime,
-    /updateClip\(id, updates\) \{\s*return studio\.updateClip\(id, updates\);\s*\}/,
+    /updateClip\(id: string, updates: AnyRecord\) \{\s*return studio\.updateClip\(id, updates\);\s*\}/,
   );
-  assert.doesNotMatch(runtime, /updateClip\(id, updates\) \{\s*core\.clip\.update/);
+  assert.doesNotMatch(runtime, /updateClip\(id: string, updates: AnyRecord\) \{\s*core\.clip\.update/);
   assert.match(
     workspace,
     /const normalizedStyle = findEditorClip\(next, selectedId\)\?\.clip\.style;\s*Object\.assign\(runtimeUpdates, normalizedStyle \|\| updates\.style\)/,

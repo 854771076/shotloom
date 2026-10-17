@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import test from 'node:test';
 
-const tauriApi = readFileSync(new URL('../renderer/src/services/tauriApi.js', import.meta.url), 'utf8');
-const projectStore = readFileSync(new URL('../renderer/src/store/projectStore.js', import.meta.url), 'utf8');
-const rustProject = readFileSync(new URL('../src-tauri/src/commands/project.rs', import.meta.url), 'utf8');
-const rustLib = readFileSync(new URL('../src-tauri/src/lib.rs', import.meta.url), 'utf8');
+import test from 'node:test';
+import { readSource } from './helpers/sourceContract.mjs';
+
+const tauriApi = readSource('renderer/src/services/tauriApi.ts');
+const projectStore = readSource('renderer/src/store/projectStore.ts');
+const rustProject = readSource('src-tauri/src/commands/project.rs');
+const rustLib = readSource('src-tauri/src/lib.rs');
 
 test('项目导出连接保存对话框与原生 ZIP 命令', () => {
   assert.match(tauriApi, /case 'project:export-package': return invoke\('project_export_package'/);

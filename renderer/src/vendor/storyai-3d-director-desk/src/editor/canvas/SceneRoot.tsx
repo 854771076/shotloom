@@ -94,9 +94,9 @@ function ViewportTransformControls({
   translationSnap,
 }: {
   mode: TransformMode;
-  object: TransformControlsProps["object"];
+  object: NonNullable<TransformControlsProps["object"]>;
   onObjectChange: () => void;
-  translationSnap?: number | null;
+  translationSnap: number | null;
 }) {
   const controlsRef = useRef<TransformControlsImpl | null>(null);
   const setControlsRef = useCallback((controls: TransformControlsImpl | null) => {
@@ -118,7 +118,7 @@ function ViewportTransformControls({
         onObjectChange();
         endUndoBatch();
       }}
-      translationSnap={translationSnap ?? undefined}
+      translationSnap={translationSnap}
       userData={{ [HIDE_FROM_VIEWPORT_CAPTURE_KEY]: true }}
     />
   );
@@ -205,7 +205,10 @@ function createBoxWireframeLines({
   const y1 = cy + height / 2;
   const z0 = cz - depth / 2;
   const z1 = cz + depth / 2;
-  const corners: Record<string, CameraWirePoint> = {
+  const corners: Record<
+    "bbl" | "bbr" | "btl" | "btr" | "fbl" | "fbr" | "ftl" | "ftr",
+    CameraWirePoint
+  > = {
     bbl: [x0, y0, z0],
     bbr: [x1, y0, z0],
     btl: [x0, y1, z0],
@@ -399,7 +402,7 @@ function GeometryPrimitiveModel({
   color = "#d7e7ff",
   geometryType,
 }: {
-  color?: string;
+  color?: string | undefined;
   geometryType: GeometryPrimitiveType;
 }) {
   const material = <meshStandardMaterial color={color} metalness={0.02} roughness={0.68} />;
@@ -467,7 +470,7 @@ function ObjectSceneNode({
   translationSnap,
   onSelect,
 }: {
-  asset?: DirectorAssetRef;
+  asset?: DirectorAssetRef | undefined;
   item: DirectorObject;
   selected: boolean;
   showLabels: boolean;
@@ -658,7 +661,7 @@ function ViewportCameraRig({
   translationSnap,
 }: {
   camera: DirectorCameraShot;
-  object?: DirectorObject;
+  object?: DirectorObject | undefined;
   selected: boolean;
   showLabel: boolean;
   transformMode: TransformMode;

@@ -7,12 +7,12 @@
 
 import workflowTemplate from '../../../config/runninghub-minimax-h3-workflow.json';
 import { desktopApi } from '@/services/desktopApi';
-import { renderProtocolTemplate } from '@/utils/modelProtocol.mjs';
-import { providerRequestTimeoutMs } from '@/utils/providerRequestTimeout.mjs';
+import { renderProtocolTemplate } from '@/utils/modelProtocol.ts';
+import { providerRequestTimeoutMs } from '@/utils/providerRequestTimeout.ts';
 import {
   buildRunningHubMinimaxH3Workflow,
   runningHubTaskState,
-} from '@/utils/runningHubWorkflow.mjs';
+} from '@/utils/runningHubWorkflow.ts';
 import type {
   CompiledProviderRequest, CompileContext, ProviderAdapter,
   ProviderTask, ProviderTaskState, ResourceRef,
@@ -44,7 +44,8 @@ function resourceUrl(ref: ResourceRef): string {
 
 function resourceMimeType(ref: ResourceRef): string {
   if (readText(ref.mimeType)) return readText(ref.mimeType);
-  const name = readText(ref.fileName || ref.filePath).split(/[?#]/)[0].toLowerCase();
+  const stem = readText(ref.fileName || ref.filePath).split(/[?#]/)[0] ?? '';
+  const name = stem.toLowerCase();
   if (/\.jpe?g$/.test(name)) return 'image/jpeg';
   if (/\.png$/.test(name)) return 'image/png';
   if (/\.mp4$/.test(name)) return 'video/mp4';

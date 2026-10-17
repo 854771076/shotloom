@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+
 import {
   LOOP_TRIP,
   LOOP_WINDOW,
@@ -14,24 +14,13 @@ import {
 import {
   describeArgumentChanges,
   userOverrideNote,
-} from '../renderer/src/utils/toolArgumentDiff.mjs';
+} from '../renderer/src/utils/toolArgumentDiff.ts';
+import { readSource } from './helpers/sourceContract.mjs';
 
-const contract = readFileSync(
-  new URL('../renderer/src/agent/content/contracts/anti-loop.md', import.meta.url),
-  'utf8',
-);
-const contractLoader = readFileSync(
-  new URL('../renderer/src/agent/content/contractLoader.ts', import.meta.url),
-  'utf8',
-);
-const executor = readFileSync(
-  new URL('../renderer/src/agent/runtime/executeToolCall.ts', import.meta.url),
-  'utf8',
-);
-const coordinator = readFileSync(
-  new URL('../renderer/src/app/copilot/agentInteractionCoordinator.ts', import.meta.url),
-  'utf8',
-);
+const contract = readSource('renderer/src/agent/content/contracts/anti-loop.md');
+const contractLoader = readSource('renderer/src/agent/content/contractLoader.ts');
+const executor = readSource('renderer/src/agent/runtime/executeToolCall.ts');
+const coordinator = readSource('renderer/src/app/agent-session/agentInteractionCoordinator.ts');
 /** 模拟一次工具调用：命中则返回 trip，否则记录。 */
 function call(state, toolName, input) {
   const fingerprint = toolCallFingerprint(toolName, input);
@@ -138,7 +127,7 @@ test('契约告诉模型的触发规则与 LoopGuard 常量一致', () => {
 
 test('循环拦截发生在工具执行之前，并把拒绝交给既有回执流程', () => {
   const guardCall = executor.indexOf('await reviewRepeatedToolCall(');
-  const executeCall = executor.indexOf('await prepared.definition.execute(guarded.input, context)');
+  const executeCall = executor.indexOf('prepared.definition.execute(guarded.input, context)');
   assert.ok(guardCall > 0 && executeCall > 0, '执行管道必须同时包含拦截与执行');
   assert.ok(guardCall < executeCall, '拦截必须先于工具执行');
   assert.match(executor, /repeatedToolCall: true/);
@@ -168,8 +157,8 @@ test('用户改过的参数必须重新校验后执行，并回写说明', () =>
   assert.match(coordinator, /modifiedArgs/);
   // 用户改了参数却不重新校验，就等于把注册表的 schema 校验绕过去了。
   const reprepareIndex = executor.indexOf('prepareAgentToolCall(toolName, JSON.stringify(modified), context)');
-  const executeIndex = executor.indexOf('await prepared.definition.execute(guarded.input, context)');
-  assert.ok(reprepareIndex > 0 && reprepareIndex !== executeIndex);
+  const executeIndex = executor.indexOf('prepared.definition.execute(guarded.input, context)');
+  assert.ok(reprepareIndex > 0 && reprepareIndex < executeIndex, '改参重校验必须发生在派发之前');
 });
 
 test('参数改动说明只描述变化的顶层字段', () => {

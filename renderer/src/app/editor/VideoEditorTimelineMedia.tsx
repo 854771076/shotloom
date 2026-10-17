@@ -11,7 +11,7 @@ export function VideoEditorRuler({
 }: {
   duration: number;
   zoom: number;
-  onScrubPointerDown?: (event: React.PointerEvent<HTMLDivElement>, originLeft: number) => void;
+  onScrubPointerDown?: ((event: React.PointerEvent<HTMLDivElement>, originLeft: number) => void) | undefined;
 }) {
   const step = zoom >= 100 ? 1 : zoom >= 48 ? 5 : 10;
   const ticks = [];

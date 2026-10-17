@@ -36,24 +36,6 @@ function roundToEven(value: number) {
   return rounded % 2 === 0 ? rounded : rounded + 1;
 }
 
-function getContainPlacement(
-  sourceWidth: number,
-  sourceHeight: number,
-  targetWidth: number,
-  targetHeight: number
-): ContainPlacement {
-  const scale = Math.min(targetWidth / sourceWidth, targetHeight / sourceHeight);
-  const width = sourceWidth * scale;
-  const height = sourceHeight * scale;
-
-  return {
-    x: (targetWidth - width) / 2,
-    y: (targetHeight - height) / 2,
-    width,
-    height,
-  };
-}
-
 function getCoverPlacement(
   sourceWidth: number,
   sourceHeight: number,
@@ -153,9 +135,11 @@ export function softenPanoramaPolePixels(
       for (let channel = 0; channel < 4; channel += 1) {
         const topOriginal = pixels[topIndex + channel] ?? 0;
         const bottomOriginal = pixels[bottomIndex + channel] ?? 0;
-        next[topIndex + channel] = Math.round(topPoleColor[channel] + (topOriginal - topPoleColor[channel]) * blend);
+        const topReference = topPoleColor[channel] ?? 0;
+        const bottomReference = bottomPoleColor[channel] ?? 0;
+        next[topIndex + channel] = Math.round(topReference + (topOriginal - topReference) * blend);
         next[bottomIndex + channel] = Math.round(
-          bottomPoleColor[channel] + (bottomOriginal - bottomPoleColor[channel]) * blend
+          bottomReference + (bottomOriginal - bottomReference) * blend
         );
       }
     }

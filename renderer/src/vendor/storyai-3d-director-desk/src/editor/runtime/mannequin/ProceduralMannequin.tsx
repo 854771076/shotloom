@@ -4,9 +4,9 @@ import { degreesToRadians, getBodyTypePoseLimit, getRotationFromControls, getSin
 import { Foot, Hand, Head, Joint, Segment, Torso } from "./mannequinParts";
 
 interface ProceduralMannequinProps {
-  bodyType?: CharacterBodyType;
-  color?: string;
-  rigState?: CharacterRigState;
+  bodyType?: CharacterBodyType | undefined;
+  color?: string | undefined;
+  rigState?: CharacterRigState | undefined;
 }
 
 function clampDegrees(value: number, bodyType?: CharacterBodyType) {

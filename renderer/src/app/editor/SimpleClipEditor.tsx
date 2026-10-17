@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { IconSymbol } from "../components/IconSymbol";
-import { desktopApi } from "../../services/desktopApi.js";
-import { editorMediaMimeType } from "../../utils/editorMediaImport.mjs";
+import { desktopApi } from "../../services/desktopApi.ts";
+import { editorMediaMimeType } from "../../utils/editorMediaImport.ts";
 import "./SimpleClipEditor.css";
 
 export interface SimpleClipEditorProps {
@@ -47,7 +47,8 @@ export function SimpleClipEditor({ title = "剪辑", sourceUrl, sourceFile = "",
 
   function changeTimelineZoom(direction: -1 | 1) {
     const index = zoomSteps.indexOf(timelineZoom);
-    setTimelineZoom(zoomSteps[Math.max(0, Math.min(zoomSteps.length - 1, index + direction))]);
+    const next = zoomSteps[Math.max(0, Math.min(zoomSteps.length - 1, index + direction))];
+    if (next !== undefined) setTimelineZoom(next);
   }
 
   useEffect(() => {
@@ -127,9 +128,10 @@ export function SimpleClipEditor({ title = "剪辑", sourceUrl, sourceFile = "",
   function splitAtPlayhead() {
     if (!duration || current <= 0.05 || current >= duration - 0.05) return;
     const index = segments.findIndex((segment) => current > segment.start + 0.05 && current < segment.end - 0.05);
-    if (index < 0) return;
+    const segment = index < 0 ? undefined : segments[index];
+    if (!segment) return;
     const next = [...segments];
-    next.splice(index, 1, { start: segments[index].start, end: current }, { start: current, end: segments[index].end });
+    next.splice(index, 1, { start: segment.start, end: current }, { start: current, end: segment.end });
     setSegments(next);
     setSelectedIndex(index + 1);
   }

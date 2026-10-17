@@ -1,4 +1,4 @@
-import { desktopApi } from "../../services/desktopApi.js";
+import { desktopApi } from "../../services/desktopApi.ts";
 import {
   addMaterialToAssetLibrary,
   deleteAssetFromLibrary,
@@ -9,16 +9,17 @@ import {
   migrateProjectMaterialsIntoAssets,
   renameAssetInLibrary,
   renameMaterialFile,
-} from "../../store/assetStore.js";
+} from "../../store/assetStore.ts";
 import {
   deleteLocalLibraryAsset,
   loadLocalAssetLibrary,
   localAssetCards,
   promoteMaterialToLocalLibrary,
   useLocalAssetInProject,
-} from "../../store/localAssetLibraryStore.js";
-import { store, touchProject } from "../../store/projectStore.js";
-import { openMediaViewer, showToast } from "../store/overlayStore";
+} from "../../store/localAssetLibraryStore.ts";
+import { store, touchProject } from "../../store/projectStore.ts";
+import { openMediaViewer } from "../store/overlayStore";
+import { showToast } from "../../store/notificationStore";
 import type { MaterialItem } from "../components/MaterialGrid";
 import type { AssetsController } from "../views/AssetsView";
 import type { MaterialsController } from "../views/MaterialsView";
@@ -40,8 +41,8 @@ export function resourceLibraryData() {
       materials.get(String(asset.materialId || "")) || ({} as MaterialItem);
     return {
       ...material,
-      id: material.id || asset.id,
-      assetId: asset.id,
+      id: String(material.id || asset.id || ""),
+      assetId: String(asset.id || ""),
       name: asset.name || material.name || "未命名素材",
       path: material.path || "",
       ext: material.ext || "",
@@ -130,10 +131,10 @@ export const assetsController: AssetsController = {
   preview,
   showFile,
   rename(item, name) {
-    return renameAssetInLibrary(item.assetId || item.id, name);
+    return renameAssetInLibrary(String(item.assetId || item.id || ""), name);
   },
   deleteProjectAsset(item) {
-    return deleteAssetFromLibrary(item.assetId || item.id);
+    return deleteAssetFromLibrary(String(item.assetId || item.id || ""));
   },
   async deleteLocalAsset(item) {
     if (!item.assetId) return false;

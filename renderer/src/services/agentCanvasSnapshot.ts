@@ -4,10 +4,10 @@ import { listAgentSteps } from '@/store/agentStepStore';
 import { listAgentEvaluations } from '@/store/agentEvaluationStore';
 import { listGeneratedResourcesForNode } from '@/store/resourceNodeStore';
 import { buildCanvasContext } from '@/services/agentCanvasContext';
-import { agentNodeAliasMaps } from './agentNodeAlias.mjs';
-import type { AgentNode, AgentProject, JsonObject } from './agentTypes';
+import { agentNodeAliasMaps } from './agentNodeAlias.ts';
+import type { AgentProject, JsonObject } from './agentTypes';
 
-export { agentNodeAliasMaps, agentNodeStableAlias } from './agentNodeAlias.mjs';
+export { agentNodeAliasMaps, agentNodeStableAlias } from './agentNodeAlias.ts';
 
 interface SnapshotOptions {
   project: AgentProject;

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { LatestSaveQueue } from '../renderer/src/services/latestSaveQueue.mjs';
+import { LatestSaveQueue } from '../renderer/src/services/latestSaveQueue.ts';
 
 test('latest save queue serializes writes and supersedes intermediate snapshots', async () => {
   const saves = [];

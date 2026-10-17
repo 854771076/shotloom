@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { resolveCrispCanvasViewport, resolveFloatingOverlayPosition } from '../renderer/src/utils/floatingCanvasOverlay.mjs';
+import { resolveCrispCanvasViewport, resolveFloatingOverlayPosition } from '../renderer/src/utils/floatingCanvasOverlay.ts';
 
 test('画布浮层使用取整后的屏幕坐标并水平居中', () => {
   assert.deepEqual(resolveFloatingOverlayPosition({

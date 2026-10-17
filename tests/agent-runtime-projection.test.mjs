@@ -1,17 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CopilotRuntimePresenter } from '../renderer/src/app/copilot/CopilotRuntimePresenter.ts';
+import { AgentRuntimePresenter } from '../renderer/src/app/agent-session/runtimePresenter.ts';
 import { artifactsForMessage } from '../renderer/src/app/agent-chat/artifactHelpers.ts';
 import { traceGroups } from '../renderer/src/app/agent-chat/traceTimeline.ts';
 import { agentTitle } from '../renderer/src/agent/agents/definitions.ts';
 
-test('Copilot presenter owns runtime-to-message projection', () => {
-  const presenter = new CopilotRuntimePresenter();
+test('Agent runtime presenter owns runtime-to-message projection', () => {
+  const presenter = new AgentRuntimePresenter();
   assert.equal(presenter.consume({ type: 'text_delta', delta: '已完成' }).textChanged, true);
   const turn = presenter.consume({ type: 'turn_start', turn: 1, summary: '检查画布' });
   const tool = presenter.consume({
     type: 'tool_start', requestId: 'run-1', toolCallId: 'tool-1',
     toolName: 'canvas_create_node', inputSummary: '创建节点',
+    args: { title: '主图' }, startedAt: '2026-10-18T00:00:00.000Z',
   });
   const pending = presenter.consume({
     type: 'interaction_requested', kind: 'tool_confirmation', requestId: 'run-1',
@@ -29,10 +30,19 @@ test('Copilot presenter owns runtime-to-message projection', () => {
   assert.equal(pending.messagePatch.toolCalls[0].interactionId, 'interaction-1');
   assert.equal(question.messagePatch.clarifications[0].questions[0].id, 'ratio');
   assert.equal(pending.persist, true);
+
+  // 完整参数与结算时间必须原样投到工具行：界面展开一步时展示的是真实被喂进去的内容。
+  const finished = presenter.consume({
+    type: 'tool_end', requestId: 'run-1', toolCallId: 'tool-1',
+    receipt: { effect: 'canvas_write', success: true },
+    endedAt: '2026-10-18T00:00:04.000Z',
+  });
+  assert.deepEqual(finished.messagePatch.toolCalls[0].args, { title: '主图' });
+  assert.equal(finished.messagePatch.toolCalls[0].endedAt, '2026-10-18T00:00:04.000Z');
 });
 
 test('对话产物只记录成功写入，并在异步生成完成后关联真实资源节点', () => {
-  const presenter = new CopilotRuntimePresenter();
+  const presenter = new AgentRuntimePresenter();
   presenter.consume({ type: 'tool_end', toolCallId: 'read', receipt: {
     effect: 'read', success: true, applied: false, nodeIds: ['unrelated'], taskIds: [],
   } });
@@ -66,7 +76,7 @@ test('对话产物只记录成功写入，并在异步生成完成后关联真�
 
 // 子 Agent 的派发、步骤与结论按执行者归属，父级后续步骤不会被并回派发前
 test('子 Agent 的派发、步骤与结论按执行者归属，父级后续步骤不会被并回派发前', () => {
-  const presenter = new CopilotRuntimePresenter();
+  const presenter = new AgentRuntimePresenter();
   const root = 'run-1';
   const child = `${root}:sub:production-planner:abc`;
   presenter.consume({ type: 'tool_start', requestId: root, toolCallId: 'p1',
@@ -101,7 +111,7 @@ test('子 Agent 的派发、步骤与结论按执行者归属，父级后续步�
 });
 
 test('并行时的上下文压缩按会话分开，子 Agent 的压缩不会盖掉父级那一条', () => {
-  const presenter = new CopilotRuntimePresenter();
+  const presenter = new AgentRuntimePresenter();
   presenter.consume({ type: 'context_compaction', status: 'completed',
     agentId: 'canvas-primary', agentSessionId: 'run-3' });
   presenter.consume({ type: 'context_compaction', status: 'running',
@@ -117,7 +127,7 @@ test('并行时的上下文压缩按会话分开，子 Agent 的压缩不会盖�
 // 事件没有上报 childAgentId 时身份确实未知：投影保留空串，由界面回落通用文案，
 // 而不是挑一个 Agent 的名字冒充。
 test('子任务的身份未知时不冒充，中断时未结束的工具与子任务一起结算', () => {
-  const presenter = new CopilotRuntimePresenter();
+  const presenter = new AgentRuntimePresenter();
   presenter.consume({ type: 'subagent_started', requestId: 'run-2', parentRunId: 'run-2',
     childSessionId: 'child-2', title: '并行任务' });
   presenter.consume({ type: 'tool_start', requestId: 'run-2', toolCallId: 't2',

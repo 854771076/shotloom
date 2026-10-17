@@ -2,7 +2,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { SideBar } from "./layout/SideBar";
 import { TopBar } from "./layout/TopBar";
 import { setWorkbenchSurfaceRoot } from "./layout/workbenchSurface";
-import { type AppRoute, useAppStore } from "./store/appStore";
+import { useAppStore } from "./store/appStore";
 
 interface AppShellProps {
   platform: string;

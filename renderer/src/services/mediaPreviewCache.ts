@@ -1,5 +1,5 @@
-import { desktopApi } from "./desktopApi.js";
-import { BoundedMediaCache } from "./boundedMediaCache.mjs";
+import { desktopApi } from "./desktopApi.ts";
+import { BoundedMediaCache } from "./boundedMediaCache.ts";
 
 export type CachedMediaKind = "image" | "video" | "audio";
 export type CachedMediaLease = {
@@ -19,7 +19,8 @@ const cache = new BoundedMediaCache({
 });
 
 function extensionMime(path: string, kind: CachedMediaKind): string {
-  const extension = path.split(/[?#]/)[0].split(".").pop()?.toLowerCase() || "";
+  const stem = path.split(/[?#]/)[0] ?? '';
+  const extension = stem.split(".").pop()?.toLowerCase() || "";
   const known: Record<string, string> = {
     png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp",
     gif: "image/gif", avif: "image/avif", bmp: "image/bmp", svg: "image/svg+xml",

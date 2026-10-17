@@ -155,23 +155,23 @@ function layoutFlat(
   const rowHeights = Array.from({ length: rows }, () => 0);
   ordered.forEach((item, index) => {
     const size = canvasNodeDimensions(item.node);
-    columnWidths[index % columns] = Math.max(columnWidths[index % columns], size.width);
+    columnWidths[index % columns] = Math.max(columnWidths[index % columns] ?? 0, size.width);
     rowHeights[Math.floor(index / columns)] = Math.max(
-      rowHeights[Math.floor(index / columns)],
+      rowHeights[Math.floor(index / columns)] ?? 0,
       size.height,
     );
   });
   const columnX = [startX];
   const rowY = [startY];
   for (let index = 1; index < columns; index += 1) {
-    columnX[index] = columnX[index - 1] + columnWidths[index - 1] + columnGap;
+    columnX[index] = (columnX[index - 1] ?? startX) + (columnWidths[index - 1] ?? 0) + columnGap;
   }
   for (let index = 1; index < rows; index += 1) {
-    rowY[index] = rowY[index - 1] + rowHeights[index - 1] + rowGap;
+    rowY[index] = (rowY[index - 1] ?? startY) + (rowHeights[index - 1] ?? 0) + rowGap;
   }
   ordered.forEach((item, index) => {
-    item.node.x = Math.round(columnX[index % columns]);
-    item.node.y = Math.round(rowY[Math.floor(index / columns)]);
+    item.node.x = Math.round(columnX[index % columns] ?? startX);
+    item.node.y = Math.round(rowY[Math.floor(index / columns)] ?? startY);
   });
   return {
     width: columnWidths.reduce((sum, width) => sum + width, 0) + columnGap * (columns - 1),
@@ -283,12 +283,16 @@ function layoutGroup(
   // of Sugiyama crossing reduction. They keep corresponding segment nodes aligned.
   for (let pass = 0; pass < 4; pass += 1) {
     for (let index = 1; index < orderedColumns.length; index += 1) {
-      orderedColumns[index][1].sort((a, b) =>
+      const parentsColumn = orderedColumns[index];
+      if (!parentsColumn) continue;
+      parentsColumn[1].sort((a, b) =>
         neighborRank(a, 'parents') - neighborRank(b, 'parents') || stableItemSort(a, b));
       refreshOrder();
     }
     for (let index = orderedColumns.length - 2; index >= 0; index -= 1) {
-      orderedColumns[index][1].sort((a, b) =>
+      const childrenColumn = orderedColumns[index];
+      if (!childrenColumn) continue;
+      childrenColumn[1].sort((a, b) =>
         neighborRank(a, 'children') - neighborRank(b, 'children') || stableItemSort(a, b));
       refreshOrder();
     }
@@ -304,7 +308,7 @@ function layoutGroup(
   }
   const columnX = [startX];
   for (let depth = 1; depth <= maxDepth; depth += 1) {
-    columnX[depth] = columnX[depth - 1] + widths[depth - 1] + columnGap;
+    columnX[depth] = (columnX[depth - 1] ?? startX) + (widths[depth - 1] ?? 0) + columnGap;
   }
 
   // Columns share row tracks, but each node keeps its own dimensions. This
@@ -321,25 +325,31 @@ function layoutGroup(
   let rowCursor = 0;
   for (let rowIndex = 0; rowIndex < rowCount; rowIndex += 1) {
     rowTops[rowIndex] = rowCursor;
-    rowCursor += rowHeights[rowIndex] + rowGap;
+    rowCursor += (rowHeights[rowIndex] ?? 0) + rowGap;
   }
   const relativeY = new Map<string, number>();
   const columnHeights = new Map<number, number>();
   for (const [depth, columnItems] of orderedColumns) {
     for (let rowIndex = 0; rowIndex < columnItems.length; rowIndex += 1) {
       const item = columnItems[rowIndex];
+      if (!item) continue;
       const height = canvasNodeDimensions(item.node).height;
-      relativeY.set(item.node.id, rowTops[rowIndex] + (rowHeights[rowIndex] - height) / 2);
+      relativeY.set(
+        item.node.id,
+        (rowTops[rowIndex] ?? 0) + ((rowHeights[rowIndex] ?? 0) - height) / 2,
+      );
     }
     const lastRowIndex = columnItems.length - 1;
     columnHeights.set(
       depth,
-      lastRowIndex < 0 ? 1 : rowTops[lastRowIndex] + rowHeights[lastRowIndex],
+      lastRowIndex < 0
+        ? 1
+        : (rowTops[lastRowIndex] ?? 0) + (rowHeights[lastRowIndex] ?? 0),
     );
   }
   const anchorDepth = orderedColumns.reduce((best, [depth]) =>
     (columnHeights.get(depth) || 0) > (columnHeights.get(best) || 0) ? depth : best,
-  orderedColumns[0][0]);
+  orderedColumns[0]?.[0] ?? 0);
   const offsets = new Map<number, number>([[anchorDepth, 0]]);
   const median = (values: number[]) => {
     const sorted = [...values].sort((a, b) => a - b);
@@ -370,11 +380,12 @@ function layoutGroup(
   let height = 0;
   for (const [depth, columnItems] of orderedColumns) {
     const offsetY = offsets.get(depth) || 0;
+    const left = columnX[depth] ?? startX;
     for (const item of columnItems) {
-      item.node.x = Math.round(columnX[depth]);
+      item.node.x = Math.round(left);
       item.node.y = Math.round(startY + offsetY + (relativeY.get(item.node.id) || 0));
     }
-    width = Math.max(width, columnX[depth] - startX + widths[depth]);
+    width = Math.max(width, left - startX + (widths[depth] ?? 0));
     height = Math.max(height, offsetY + (columnHeights.get(depth) || 0));
   }
   return { width, height: Math.max(height, 1) };

@@ -10,7 +10,7 @@ interface SideBarProps {
   onUpdate: () => void;
   onSearch: () => void;
   onToggleSidebar: () => void;
-  onNavigationBlocked?: () => void;
+  onNavigationBlocked?: (() => void) | undefined;
   previewOpen: boolean;
   previewClosing: boolean;
   onPreviewOpenChange: (open: boolean) => void;

@@ -17,7 +17,7 @@ export interface AgentRunContinuation extends JsonObject {
   successfulToolCallIds: string[];
   toolReceipts: AgentToolReceipt[];
   hasAppliedActions: boolean;
-  activeProductionPlanId?: string;
+  activeProductionPlanId?: string | undefined;
   lastActionError: string;
   modelRounds: number;
 }

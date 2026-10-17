@@ -1,8 +1,10 @@
 import { assertAgentProject } from '@/services/agentProjectIdentity';
 import { settingsStore } from '@/store/settingsStore';
-import { prepareAgentToolCall } from '../core/toolRegistry';
+import { AgentToolInputError, prepareAgentToolCall, findParallelSafeAgentTool } from '../core/toolRegistry';
 import { resolveAgentToolPolicy } from '../core/policyEngine';
-import type { AgentToolContext, AgentToolReceipt, JsonObject } from '../core/types';
+import type {
+  AgentToolContext, AgentToolDefinition, AgentToolEffect, JsonObject, PreparedAgentToolCall,
+} from '../core/types';
 import { createAgentInteraction } from './runStore';
 import { waitForAgentApproval } from './runtimeInteractions';
 import {
@@ -15,14 +17,15 @@ import {
   type LoopGuardState,
 } from './loopGuard';
 import { buildToolReceipt, receiptChangesProject } from './toolReceipts';
-import { markToolCallStarted } from '../loop/transcript';
-import { describeArgumentChanges, userOverrideNote } from '@/utils/toolArgumentDiff.mjs';
+import { markToolCallStarted, ensureStartedToolCallTrace } from '../loop/transcript';
+import { describeArgumentChanges, userOverrideNote } from '@/utils/toolArgumentDiff.ts';
 
 /**
  * Agent 工具的唯一执行管道。
  *
  * 权限确认、重复调用拦截、用户改参重校验、回执记账和 tool_start/tool_end 事件只有一份实现。
  * 模型循环不得自行调用 definition.execute，否则会绕过其中任何一层。
+ * 对外只有 executeAgentToolCalls 一个入口：一次模型的回合传一批，管道自己决定哪些能并发。
  */
 export interface AgentToolRun {
   context: AgentToolContext;
@@ -48,19 +51,47 @@ function exposeToolCallId(result: unknown, toolCallId: string): Record<string, u
 }
 
 function continuation(run: AgentToolRun, toolCallId: string, toolName: string) {
-  const receipts = (run.context.state.get('toolReceipts') as Map<string, AgentToolReceipt>) || new Map<string, AgentToolReceipt>();
+  const facts = run.context.run;
   return {
     toolCallId, toolName, model: run.model,
     conversationId: run.context.conversationId, attachments: run.context.attachments,
-    nodeMentions: [], successfulToolCallIds: [...((run.context.state.get('successfulToolCallIds') as Set<string>) || [])],
-    toolReceipts: [...receipts.values()],
-    hasAppliedActions: run.context.state.get('hasAppliedActions') === true,
-    activeProductionPlanId: String(run.context.state.get('activeProductionPlanId') || '') || undefined,
+    nodeMentions: [], successfulToolCallIds: [...facts.successfulToolCallIds],
+    toolReceipts: [...facts.toolReceipts.values()],
+    hasAppliedActions: facts.hasAppliedActions,
+    activeProductionPlanId: facts.activeProductionPlanId || undefined,
     lastActionError: String(run.context.state.get('lastActionError') || ''), modelRounds: 0,
   };
 }
 
 const LOOP_GUARD_STATE_KEY = 'loopGuard';
+
+/** 工具默认时长上限；需要等待用户或真实渲染的工具自己声明 0 退出这个上限。 */
+export const DEFAULT_AGENT_TOOL_TIMEOUT_MS = 120_000;
+
+/**
+ * 给 execute 加上限：一个卡死的本地调用不能让整轮停在"正在处理"，而看门狗只提示不中止。
+ *
+ * 超时不等于"没有效果"：Promise 杀不掉，被放弃的调用可能仍在后台跑并且已经改过项目。
+ * 因此写类工具的回执只能说结果未知，并要求模型先用只读工具核验，而不是把它当成一次干净的重试点；
+ * 只读与内部记账按权限层的分类判定不会改动项目，才可以直接重调。
+ */
+function withToolTimeout<T>(definition: AgentToolDefinition, effect: AgentToolEffect, run: Promise<T>): Promise<T | JsonObject> {
+  const timeoutMs = definition.timeoutMs ?? DEFAULT_AGENT_TOOL_TIMEOUT_MS;
+  if (!(timeoutMs > 0)) return run;
+  const impact = effect === 'read' || effect === 'agent_state_write'
+    ? `这次调用按权限分类（${effect}）不会改动项目，需要信息可以直接重新调用。`
+    : '它可能仍在后台执行并且已经改动项目。先用只读工具核验当前真实状态再决定是否重做，不要直接重复这次调用。';
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<JsonObject>((resolve) => {
+    timer = setTimeout(() => resolve({
+      success: false,
+      timedOut: true,
+      error: `工具 ${definition.id} 超过 ${(timeoutMs / 1000).toFixed(timeoutMs >= 1_000 ? 0 : 1)} 秒没有返回，本次结果未知。${impact}`,
+    }), timeoutMs);
+  });
+  // race 会同时给两个 Promise 挂上处理函数，被放弃的那个之后失败也不会变成未处理的 rejection。
+  return Promise.race([run, deadline]).finally(() => clearTimeout(timer));
+}
 
 interface GuardedToolCall {
   reject: boolean;
@@ -155,14 +186,50 @@ async function reviewRepeatedToolCall(
   };
 }
 
-export async function executeAgentToolCall(
+type ToolRejection = 'invalid_input' | 'permission';
+
+/**
+ * 调用在真正派发之前就被拒绝：把它作为可恢复的工具结果返回，并留下一条失败步骤。
+ *
+ * 这类调用从未进入 execute，所以不写开始标记——中断后补写无应答调用时，
+ * 它才可以如实说"没有产生任何效果"。
+ */
+function refusedToolCall(
+  context: AgentToolContext,
+  call: AgentToolCallRequest,
+  reason: ToolRejection,
+  issues: string[],
+): Record<string, unknown> {
+  const error = issues.join('；');
+  context.state.set('lastActionError', error);
+  context.emit({
+    type: 'tool_end', turnId: context.turnId, toolCallId: call.callId,
+    toolName: call.name, isError: true, error, rejection: reason,
+    toolCallCount: context.run.successfulToolCallIds.size,
+    endedAt: new Date().toISOString(),
+  });
+  return exposeToolCallId({ success: false, rejection: reason, issues, error }, call.callId);
+}
+
+/** 单个调用的完整派发；只有下面的批量入口可以调用它。 */
+async function executeAgentToolCall(
   run: AgentToolRun,
   call: AgentToolCallRequest,
 ): Promise<Record<string, unknown>> {
   const base = run.context;
   const context: AgentToolContext = { ...base, turnId: `${base.requestId}:tool:${call.callId}` };
   assertAgentProject(context.projectKey, context.projectInstanceId, context.projectGeneration);
-  const prepared = prepareAgentToolCall(call.name, call.argumentsJson, context);
+  let prepared: PreparedAgentToolCall;
+  try {
+    prepared = prepareAgentToolCall(call.name, call.argumentsJson, context);
+  } catch (cause) {
+    // 参数与可见性校验失败同样是可恢复回执：结构化的 issues 直接交给模型，让它改输入或换工具，
+    // 并且必须留下一条失败步骤——否则会留下"模型调用过但界面上什么都没发生"的空洞。
+    const issues = cause instanceof AgentToolInputError
+      ? cause.issues
+      : [cause instanceof Error ? cause.message : String(cause)];
+    return refusedToolCall(context, call, 'invalid_input', issues);
+  }
   const effect = prepared.definition.resolveEffect?.(prepared.input, context) || prepared.definition.effect;
   // “询问”模式：只对会改写项目/画布/启动媒体生成的关键工具申请审批；
   // 只读与 Agent 内部记账（read / agent_state_write）不打扰用户。
@@ -170,7 +237,12 @@ export async function executeAgentToolCall(
     ...context,
     requireApproval: settingsStore.agentShellApproval === 'ask',
   });
-  if (policy === 'deny') throw new Error('当前用户设置或权限不允许执行这个工具');
+  if (policy === 'deny') {
+    // 权限与用户设置是代码必须强制的边界，但强制方式是把拒绝作为回执交回模型，
+    // 让它改用别的方案或向用户说明，而不是终止整轮。
+    return refusedToolCall(context, call, 'permission',
+      [`当前用户设置或权限不允许执行 ${prepared.definition.id}（${effect}）`]);
+  }
   if (policy === 'confirm') {
     const stepId = `policy:${call.callId}`;
     const interactionId = `${context.requestId}:tool_confirmation:${stepId}`;
@@ -212,7 +284,9 @@ export async function executeAgentToolCall(
   context.emit({
     type: 'tool_start', turnId: context.turnId, toolCallId: call.callId,
     toolName: prepared.definition.id, effect,
-    inputSummary: prepared.inputSummary, startedAt,
+    // 完整参数随事件走：界面展开一步时要能如实展示"这一步到底被喂了什么"，
+    // 只有摘要会让失败排查失去依据。runStore 仍只持久化 inputSummary。
+    inputSummary: prepared.inputSummary, args: prepared.input, startedAt,
   });
   try {
     // 循环拦截在 execute 之前完成，拒绝时把失败作为普通结果交给既有回执流程处理，
@@ -220,9 +294,11 @@ export async function executeAgentToolCall(
     const guarded = await reviewRepeatedToolCall(run, context, call.callId, prepared.definition.id, prepared.input);
     // 只有真的派发下去才算"已开始执行"；等待用户确认时被打断仍然可以原样重试。
     if (!guarded.reject) markToolCallStarted(context, call.callId);
-    let result: any = guarded.reject
-      ? { success: false, rejected: true, repeatedToolCall: true, error: guarded.message }
-      : await prepared.definition.execute(guarded.input, context);
+    let result: any = await withToolTimeout(prepared.definition, effect, Promise.resolve(
+      guarded.reject
+        ? { success: false, rejected: true, repeatedToolCall: true, error: guarded.message }
+        : prepared.definition.execute(guarded.input, context),
+    ));
     if (guarded.overrideNote && result && typeof result === 'object' && !Array.isArray(result)) {
       // 把用户的手动修改明确告知模型，避免它用原参数再试一遍。
       result = { ...result, userOverrideNote: guarded.overrideNote };
@@ -261,14 +337,10 @@ export async function executeAgentToolCall(
     }
     const receipt = buildToolReceipt(call.callId, prepared.definition.id, effect, result,
       prepared.definition.summarizeResult?.(result));
-    const receipts = (context.state.get('toolReceipts') as Map<string, AgentToolReceipt>) || new Map<string, AgentToolReceipt>();
-    receipts.set(call.callId, receipt);
-    context.state.set('toolReceipts', receipts);
-    if (receiptChangesProject(receipt)) context.state.set('hasAppliedActions', true);
+    context.run.toolReceipts.set(call.callId, receipt);
+    if (receiptChangesProject(receipt)) context.run.hasAppliedActions = true;
     if (result?.success !== false) {
-      const successful = (context.state.get('successfulToolCallIds') as Set<string>) || new Set<string>();
-      successful.add(call.callId);
-      context.state.set('successfulToolCallIds', successful);
+      context.run.successfulToolCallIds.add(call.callId);
     } else {
       context.state.set('lastActionError', String(result?.error || '工具执行失败'));
     }
@@ -276,7 +348,7 @@ export async function executeAgentToolCall(
       type: 'tool_end', turnId: context.turnId, toolCallId: call.callId,
       toolName: prepared.definition.id, isError: result?.success === false,
       error: String(result?.error || ''), receipt,
-      toolCallCount: ((context.state.get('successfulToolCallIds') as Set<string>) || new Set<string>()).size,
+      toolCallCount: context.run.successfulToolCallIds.size,
       endedAt: new Date().toISOString(),
     });
     return exposeToolCallId(result, call.callId);
@@ -288,4 +360,48 @@ export async function executeAgentToolCall(
     });
     throw cause;
   }
+}
+
+/**
+ * 一次调用的失败按工具结果返回，而不是抛出：模型可以改输入或换工具继续，
+ * 不该因为一个可修复的调用失败终止整轮。项目身份变更同样走这条规则，与改动前的循环行为一致。
+ */
+async function executeSingleToolCall(run: AgentToolRun, call: AgentToolCallRequest): Promise<Record<string, unknown>> {
+  try {
+    return await executeAgentToolCall(run, call);
+  } catch (cause) {
+    const error = cause instanceof Error ? cause.message : String(cause);
+    return { success: false, error };
+  }
+}
+
+/**
+ * 一批调用的派发入口：权限、回执和事件仍然逐个走同一条管道，
+ * 只有整批都是并行安全的只读调用时才让它们并发跑，结果按传入顺序返回。
+ *
+ * 并发条件收窄到只读，是因为两个 execute 同时跑会互相踩会话 state 里读-改-写式的容器，
+ * 也可能同时挂在用户确认上。只读工具既不会改项目，按权限层也恒为 allow，因此不会等待；
+ * 写工具、需要动态解析 effect 的工具、要确认或被拒绝的调用一律退回逐个串行。
+ */
+export async function executeAgentToolCalls(
+  run: AgentToolRun,
+  calls: AgentToolCallRequest[],
+): Promise<Record<string, unknown>[]> {
+  const requireApproval = settingsStore.agentShellApproval === 'ask';
+  const parallel = calls.length > 1 && calls.every((call) => {
+    const definition = findParallelSafeAgentTool(call.name, run.context);
+    // 并发与否最终仍由唯一的权限判定函数说了算，不能让并行条件自己另写一份规则。
+    return !!definition && resolveAgentToolPolicy(definition.effect, { ...run.context, requireApproval }) === 'allow';
+  });
+  if (!parallel) {
+    const results: Record<string, unknown>[] = [];
+    for (const call of calls) results.push(await executeSingleToolCall(run, call));
+    return results;
+  }
+  // 派发前把共享容器固定成同一个实例：读-改-写会让后启动的调用覆盖先记录的凭证。
+  // 回执与成功计数已经是 run 上的固定字段，这里只剩会话自己的两个容器。
+  const state = run.context.state;
+  if (!state.has(LOOP_GUARD_STATE_KEY)) state.set(LOOP_GUARD_STATE_KEY, createLoopGuardState());
+  ensureStartedToolCallTrace(state);
+  return Promise.all(calls.map((call) => executeSingleToolCall(run, call)));
 }

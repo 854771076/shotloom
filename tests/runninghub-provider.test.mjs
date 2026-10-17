@@ -1,18 +1,18 @@
 import { loadModelCatalog } from './helpers/modelCatalog.mjs';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 import {
   buildRunningHubMinimaxH3Workflow,
   runningHubOutputUrl,
   runningHubTaskState,
-} from '../renderer/src/utils/runningHubWorkflow.mjs';
+} from '../renderer/src/utils/runningHubWorkflow.ts';
+import { readSource, sourceExists } from './helpers/sourceContract.mjs';
 
 const catalog = loadModelCatalog();
-const template = JSON.parse(readFileSync(new URL('../renderer/src/config/runninghub-minimax-h3-workflow.json', import.meta.url), 'utf8'));
-const adaptersIndexSource = readFileSync(new URL('../renderer/src/domain/provider/adapters/index.ts', import.meta.url), 'utf8');
-const adapterSource = readFileSync(new URL('../renderer/src/domain/provider/adapters/runninghub.ts', import.meta.url), 'utf8');
-const gatewaySource = readFileSync(new URL('../src-tauri/src/commands/generation_gateway.rs', import.meta.url), 'utf8');
+const template = JSON.parse(readSource('renderer/src/config/runninghub-minimax-h3-workflow.json'));
+const adaptersIndexSource = readSource('renderer/src/domain/provider/adapters/index.ts');
+const adapterSource = readSource('renderer/src/domain/provider/adapters/runninghub.ts');
+const gatewaySource = readSource('src-tauri/src/commands/generation_gateway.rs');
 
 test('RunningHub 是内置厂商且密钥由网关注入请求体', () => {
   assert.match(adapterSource, /readonly id = 'runninghub'/);
@@ -85,6 +85,6 @@ test('RunningHub 当前顶层查询响应映射为统一任务状态', () => {
 });
 
 test('RunningHub 示例目录已移除，产品只保留运行时实现和工作流模板', () => {
-  assert.equal(existsSync(new URL('../runninghub', import.meta.url)), false);
-  assert.equal(existsSync(new URL('../renderer/src/config/runninghub-minimax-h3-workflow.json', import.meta.url)), true);
+  assert.equal(sourceExists('runninghub'), false);
+  assert.equal(sourceExists('renderer/src/config/runninghub-minimax-h3-workflow.json'), true);
 });

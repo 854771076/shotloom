@@ -4,7 +4,7 @@ import test from 'node:test';
 import {
   extensionForGeneratedFile,
   semanticOutputFileName,
-} from '../renderer/src/utils/generatedOutputNaming.mjs';
+} from '../renderer/src/utils/generatedOutputNaming.ts';
 
 test('生成资源沿用大模型给出的节点标题', () => {
   assert.equal(semanticOutputFileName('S11 动作爆点 · 六连板', 'png'), 'S11 动作爆点 · 六连板.png');

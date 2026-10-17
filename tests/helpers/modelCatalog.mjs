@@ -1,10 +1,8 @@
-import { readFileSync } from 'node:fs';
+import { readSource } from './sourceContract.mjs';
 
 export function loadModelCatalog() {
-  const manifest = JSON.parse(readFileSync(new URL('../../renderer/src/config/model-catalog-v2.json', import.meta.url), 'utf8'));
-  const files = manifest.providers.map((provider) => JSON.parse(readFileSync(
-    new URL(`../../renderer/src/config/model-catalog-v2/${provider}.json`, import.meta.url), 'utf8',
-  )));
+  const manifest = JSON.parse(readSource('renderer/src/config/model-catalog-v2.json'));
+  const files = manifest.providers.map((provider) => JSON.parse(readSource(`renderer/src/config/model-catalog-v2/${provider}.json`)));
   const models = files.flatMap((file, index) => {
     if (file.provider !== manifest.providers[index] || file.models.some((model) => model.provider !== file.provider)) {
       throw new Error(`厂商模型文件归属不匹配：${manifest.providers[index]}`);

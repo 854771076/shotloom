@@ -5,7 +5,7 @@ import {
   editorMediaMimeType,
   inferEditorMediaType,
   probeEditorMedia,
-} from '../renderer/src/utils/editorMediaImport.mjs';
+} from '../renderer/src/utils/editorMediaImport.ts';
 
 test('剪辑素材按文件类型选择媒体元素和 MIME', () => {
   assert.equal(inferEditorMediaType('/tmp/clip.MOV'), 'video');

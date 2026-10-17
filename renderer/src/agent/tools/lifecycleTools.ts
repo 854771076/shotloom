@@ -1,6 +1,6 @@
 import { upsertSkill } from '@/store/skillsStore';
 import { canRequestAgentClarification, registerAgentTool } from '../core/toolRegistry';
-import type { AgentToolReceipt, JsonObject } from '../core/types';
+import type { JsonObject } from '../core/types';
 import { waitForAgentClarification } from '../runtime/runtimeInteractions';
 import { createAgentInteraction } from '../runtime/runStore';
 import type { AgentRunContinuation } from '../runtime/runStore';
@@ -40,6 +40,8 @@ export function registerLifecycleTools(): void {
       },
       additionalProperties: false,
     },
+    // 等待用户回答可以很久（交互最长 24 小时），这类耗时由用户决定，不受工具超时约束。
+    timeoutMs: 0,
     summarizeInput: (input) => String(((input.questions as JsonObject[] | undefined) || [])[0]?.question || '需要用户补充信息'),
     execute: async (input, context) => {
       const questionIds = new Set<string>();
@@ -147,12 +149,19 @@ export function registerLifecycleTools(): void {
       const verification = verifyAgentOutcome({
         project: store.project,
         outcome,
-        hasAppliedActions: context.state.get('hasAppliedActions') === true,
-        toolReceipts: context.state.get('toolReceipts') as Map<string, AgentToolReceipt> || new Map<string, AgentToolReceipt>(),
-        productionPlan: getProductionPlan(String(context.state.get('activeProductionPlanId') || '')),
+        hasAppliedActions: context.run.hasAppliedActions,
+        toolReceipts: context.run.toolReceipts,
+        productionPlan: getProductionPlan(context.run.activeProductionPlanId),
       });
       if (verification.success) context.state.set('verifiedOutcome', outcome);
-      return { success: verification.success, outcome, issues: verification.issues };
+      else context.state.set('lastOutcomeIssue', verification.issues.join('；'));
+      // issues 进历史，error 进事件与 lastActionError：界面和结论提示都只读同一个原因。
+      return {
+        success: verification.success,
+        outcome,
+        issues: verification.issues,
+        error: verification.success ? '' : (verification.issues.join('；') || '终态核验未通过'),
+      };
     },
   });
 

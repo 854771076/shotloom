@@ -16,7 +16,7 @@ export function ArtifactList({
   nodes,
   controller,
 }: {
-  refs?: AgentArtifactRefs;
+  refs?: AgentArtifactRefs | undefined;
   nodes: WorkflowNodeData[];
   controller: AgentController;
 }) {

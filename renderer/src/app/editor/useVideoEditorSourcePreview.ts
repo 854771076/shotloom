@@ -7,12 +7,12 @@ import {
   useRef,
   useState,
 } from "react";
-import { desktopApi } from "../../services/desktopApi.js";
+import { desktopApi } from "../../services/desktopApi.ts";
 import {
   activeEditorClip,
   editorClipDuration,
-} from "../../utils/videoEditorProject.mjs";
-import { editorMediaMimeType } from "../../utils/editorMediaImport.mjs";
+} from "../../utils/videoEditorProject.ts";
+import { editorMediaMimeType } from "../../utils/editorMediaImport.ts";
 import { hydrateSourceProject } from "./videoEditorModel";
 import type { VideoEditorRuntimeRef } from "./videoEditorRuntimeTypes";
 import type {
@@ -58,7 +58,7 @@ export function useVideoEditorSourcePreview({
   sourceFile: string;
   sourceUrl: string;
   sourceName: string;
-  metadata?: SourceMetadata;
+  metadata?: SourceMetadata | undefined;
   duration: number;
   time: number;
   playing: boolean;
@@ -200,14 +200,14 @@ export function useVideoEditorSourcePreview({
       return;
     }
     const index = directPreviewClips.findIndex((clip) => clip.id === clipId);
+    const current = index < 0 ? undefined : directPreviewClips[index];
     const next = directPreviewClips[index + 1];
-    if (!next) {
+    if (!current || !next) {
       setTime(duration);
       setPlaying(false);
       return;
     }
-    const currentEnd = directPreviewClips[index].timelineStart +
-      editorClipDuration(directPreviewClips[index]);
+    const currentEnd = current.timelineStart + editorClipDuration(current);
     setTime(Math.max(currentEnd, next.timelineStart));
     setPlaying(true);
   };

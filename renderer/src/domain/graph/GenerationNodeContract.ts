@@ -13,7 +13,7 @@ export interface GenerationConfigParam {
   numeric?: boolean;
   default?: unknown;
   options?: unknown[];
-  presentation?: string | { min?: number; max?: number; step?: number };
+  presentation?: string | { min?: number; max?: number; step?: number } | undefined;
 }
 
 /** 本地编排控制，不会原样发送给模型供应商。 */

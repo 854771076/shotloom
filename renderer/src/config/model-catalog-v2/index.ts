@@ -25,8 +25,9 @@ if (new Set(manifest.providers).size !== manifest.providers.length ||
   throw new Error('模型目录厂商索引与厂商文件不一致');
 }
 
-const models = manifest.providers.flatMap((provider) => {
-  const file = providerFiles[provider];
+// 上面的索引校验已经保证 manifest.providers 与 providerFiles 的键完全一致，
+// 因此这里直接遍历登记表本身，避免按 manifest 键取值时出现无法证明的 undefined。
+const models = Object.entries(providerFiles).flatMap(([provider, file]) => {
   if (file.provider !== provider || file.models.some((model) => model.provider !== provider)) {
     throw new Error(`模型目录厂商文件归属不匹配：${provider}`);
   }

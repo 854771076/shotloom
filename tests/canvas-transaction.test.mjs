@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+
 import test from 'node:test';
 
 import {
   applyCanvasTransaction,
   captureCanvasTransaction,
   filterChangedCanvasTransaction,
-} from '../renderer/src/utils/canvasTransaction.mjs';
+} from '../renderer/src/utils/canvasTransaction.ts';
+import { readSource } from './helpers/sourceContract.mjs';
 
 test('画布事务只保存受影响节点和连线并可双向恢复', () => {
   const project = {
@@ -40,14 +41,8 @@ test('画布事务只保存受影响节点和连线并可双向恢复', () => {
 });
 
 test('Agent 执行器不再为每个批次复制完整前后画布', () => {
-  const executor = readFileSync(
-    new URL('../renderer/src/services/agent/agentCanvasExecutor.ts', import.meta.url),
-    'utf8',
-  );
-  const batches = readFileSync(
-    new URL('../renderer/src/store/agentBatchStore.ts', import.meta.url),
-    'utf8',
-  );
+  const executor = readSource('renderer/src/services/agent/agentCanvasExecutor.ts');
+  const batches = readSource('renderer/src/store/agentBatchStore.ts');
   assert.doesNotMatch(executor, /const beforeNodes = JSON\.parse|afterNodes: JSON\.parse|beforeEdges: JSON\.parse|afterEdges: JSON\.parse/);
   assert.match(executor, /createTransactionJournal\(\)/);
   assert.match(executor, /recordCanvasTransactionHistory/);

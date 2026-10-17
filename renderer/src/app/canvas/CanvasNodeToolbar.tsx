@@ -12,12 +12,12 @@ import {
   type ReactFlowState,
   useStore,
 } from "@xyflow/react";
-import { desktopApi } from "../../services/desktopApi.js";
-import { store } from "../../store/projectStore.js";
-import { selectedTextOutput, textNodeContent } from "../../utils/textNodeContent.mjs";
-import { canvasNodeToolbarOffset } from "../../utils/canvasNodeChrome.mjs";
+import { desktopApi } from "../../services/desktopApi.ts";
+import { store } from "../../store/projectStore.ts";
+import { selectedTextOutput, textNodeContent } from "../../utils/textNodeContent.ts";
+import { canvasNodeToolbarOffset } from "../../utils/canvasNodeChrome.ts";
 import { IconSymbol } from "../components/IconSymbol";
-import { assetCategories } from "../constants/navigation";
+import { assetCategories } from "../../domain/asset/assetCategories";
 import { openMediaViewer } from "../store/overlayStore";
 import { selectedLocalMediaPath } from "./canvasScreenGeometry";
 import { copyTextNodeVersion, renameTextNodeVersion } from "../adapters/canvasAdapter";
@@ -29,7 +29,7 @@ export function CanvasNodeToolbar({
   dragging,
   semanticZoom,
   actions,
-  mentionInCopilot,
+  addNodeMention,
   canvasOverlayRoot,
   imageCropOpen,
   onImageCropOpen,
@@ -41,7 +41,7 @@ export function CanvasNodeToolbar({
   dragging: boolean;
   semanticZoom: number;
   actions: WorkflowNodeActions;
-  mentionInCopilot: ((nodeId: string) => void) | null;
+  addNodeMention: ((nodeId: string) => void) | null;
   canvasOverlayRoot: HTMLElement | null;
   imageCropOpen: boolean;
   onImageCropOpen: () => void;
@@ -98,7 +98,7 @@ export function CanvasNodeToolbar({
   const canUpload = Boolean(uploadLabel && !hasMediaContent);
   const isTextNode = node.type === "textGeneration";
   // 3D 导演台在详情面板里和 Agent 一起工作，节点上不再挂引用入口；@ 引用仍然可用。
-  const mentionNode = node.type === "threeDDirector" ? null : mentionInCopilot;
+  const mentionNode = node.type === "threeDDirector" ? null : addNodeMention;
   const useSubtleUploadToolbar = canUpload && !isTextNode;
   const toolbarOffset = canvasNodeToolbarOffset(semanticZoom, useSubtleUploadToolbar);
   const textOutputs = Array.isArray(node.generatedOutputs)

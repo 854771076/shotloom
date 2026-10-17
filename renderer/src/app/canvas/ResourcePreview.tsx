@@ -1,6 +1,7 @@
-import { desktopApi } from "../../services/desktopApi.js";
+import { desktopApi } from "../../services/desktopApi.ts";
 import { type IconName, IconSymbol } from "../components/IconSymbol";
-import { openMediaViewer, showToast } from "../store/overlayStore";
+import { openMediaViewer } from "../store/overlayStore";
+import { showToast } from "../../store/notificationStore";
 import type { WorkflowNodeData } from "./WorkflowCanvas";
 import { useMediaPreviewCache } from "./useMediaPreviewCache";
 

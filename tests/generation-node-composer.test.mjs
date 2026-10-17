@@ -1,14 +1,15 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import test from 'node:test';
-const source = readFileSync(new URL('../renderer/src/app/canvas/GenerationNode.tsx', import.meta.url), 'utf8');
-const styles = readFileSync(new URL('../renderer/styles/canvas.css', import.meta.url), 'utf8');
-const adapter = readFileSync(new URL('../renderer/src/app/adapters/canvasAdapter.ts', import.meta.url), 'utf8');
+import { readGenerationNodeSource } from './helpers/generationNodeSource.mjs';
+import { readSource } from './helpers/sourceContract.mjs';
+const source = readGenerationNodeSource();
+const styles = readSource('renderer/styles/canvas.css');
+const adapter = readSource('renderer/src/app/adapters/canvasAdapter.ts');
 const editorStyles = [
   'VideoEditorWorkspace.foundation.css',
   'VideoEditorWorkspace.layout.css',
   'VideoEditorWorkspace.theme.css',
-].map((name) => readFileSync(new URL(`../renderer/src/app/editor/${name}`, import.meta.url), 'utf8')).join('\n');
+].map((name) => readSource(`../renderer/src/app/editor/${name}`)).join('\n');
 test('发送按钮仅在节点运行时禁用并提供反馈', () => {
   assert.match(source, /disabled=\{busy\}/); assert.doesNotMatch(source, /modelStatus\.available/); assert.match(source, /actions\.run\(node\.id\)/);
 });
@@ -81,7 +82,8 @@ test('参考素材入口创建真实上游节点和连线，缩略图可放大�
   assert.match(source, /actions\.addReference\(node\.id(?:, slot)?\)/);
   assert.match(source, /actions\.removeIncomingEdge\(node\.id, input\.edgeId\)/);
   assert.match(source, /getGenerationInputModes\(selectedModel\)/);
-  assert.match(source, /actions\.setInputMode\(node\.id, mode\.value\)/);
+  assert.match(source, /actions\.setInputMode\(nodeId, mode\.value\)/);
+  assert.match(source, /actions\.setInputMode\(node\.id, nextMode\.value\)/);
   assert.match(source, /className="work-composer-input-preview"/);
   assert.match(source, /openMediaViewer\(\{[\s\S]*?src: url,[\s\S]*?filePath: String\(input\.filePath \|\| input\.path/);
   assert.match(source, /className="work-composer-input-remove"/);
@@ -116,7 +118,7 @@ test('生成参数收纳到分组面板且发送按钮保持在底栏', () => {
 
 test('切换模型时按新协议重编译配置且空数字不写成零', () => {
   assert.match(source, /model,[\s\S]*?config: compileGenerationNodeConfig\([\s\S]*?getModelSchema\(node\.type, model\)\.params/);
-  assert.match(source, /setConfig\(param\.key, numeric && value !== "" \? Number\(value\) : undefined\)/);
+  assert.match(source, /onConfigChange\(param\.key, numeric && value !== "" \? Number\(value\) : undefined\)/);
   assert.match(source, /min=\{numeric && Number\.isFinite\(Number\(presentation\.min\)\)/);
   assert.match(source, /max=\{numeric && Number\.isFinite\(Number\(presentation\.max\)\)/);
 });

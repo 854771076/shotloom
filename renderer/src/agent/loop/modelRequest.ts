@@ -167,7 +167,10 @@ export function buildLoopRequestBody(
         description: tool.function.description, input_schema: tool.function.parameters })), tool_choice: { type: 'auto' } } : {}),
     };
   } else {
-    payload = { model: plan.upstreamModel, messages: messages.map(({ responseItems: _responseItems, ...message }) => message), stream: true,
+    // 压缩说明的标记与折叠线索是本地历史元数据，不能跟着消息发给 provider。
+    payload = { model: plan.upstreamModel,
+      messages: messages.map(({ responseItems: _responseItems, compactionNote: _compactionNote, compactionLines: _compactionLines, ...message }) => message),
+      stream: true,
       ...(tools.length ? { tools, tool_choice: 'auto' } : {}) };
   }
   return {

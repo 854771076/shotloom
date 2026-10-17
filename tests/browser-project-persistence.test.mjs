@@ -1,34 +1,18 @@
 import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { createServer } from 'vite';
+import { createRendererEnv } from './helpers/rendererSsr.mjs';
 
-let server;
+let env;
 let desktopApi;
 const browserStorage = new Map();
 
 before(async () => {
-  const rendererRoot = fileURLToPath(new URL('../renderer', import.meta.url));
-  globalThis.localStorage = {
-    getItem: (key) => browserStorage.get(key) ?? null,
-    setItem: (key, value) => browserStorage.set(key, String(value)),
-    removeItem: (key) => browserStorage.delete(key),
-    clear: () => browserStorage.clear(),
-  };
-  server = await createServer({
-    configFile: false,
-    root: rendererRoot,
-    resolve: { alias: { '@': path.join(rendererRoot, 'src') } },
-    server: { middlewareMode: true, hmr: false },
-    appType: 'custom',
-  });
-  ({ desktopApi } = await server.ssrLoadModule('/src/services/desktopApi.js'));
+  env = await createRendererEnv({ storage: browserStorage });
+  ({ desktopApi } = await env.load('services/desktopApi'));
 });
 
 after(async () => {
-  await server?.close();
-  delete globalThis.localStorage;
+  await env?.dispose();
 });
 
 test('浏览器预览保存并重新打开画布时保留节点资源与文件夹层级', async () => {

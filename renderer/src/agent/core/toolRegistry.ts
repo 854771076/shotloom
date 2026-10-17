@@ -145,6 +145,20 @@ export function listAgentTools(context: AgentToolContext): AgentToolDefinition[]
   return visibleAgentTools(context.agentId, allAgentTools(), context);
 }
 
+/**
+ * 批量并发派发前的并行安全检查：只有当前 Agent 可见、可用，且按静态声明就是只读的工具才返回。
+ *
+ * 带 resolveEffect 的工具即使声明为只读也不算并行安全：权限分类要在解析参数之后才知道，
+ * 而并发决策必须在真正执行前就做出。未注册、被隐藏、被 isAvailable 关闭或声明了任何写副作用
+ * 的工具都返回 undefined，让调用方退回逐个串行派发。
+ */
+export function findParallelSafeAgentTool(name: string, context: AgentToolContext): AgentToolDefinition | undefined {
+  const definition = tools.get(name);
+  if (!definition || definition.effect !== 'read' || definition.resolveEffect) return undefined;
+  if (definition.isAvailable?.(context) === false) return undefined;
+  return listAgentTools(context).find((tool) => tool.id === name);
+}
+
 export function prepareAgentToolCall(name: string, rawArguments: string, context: AgentToolContext): PreparedAgentToolCall {
   // 模型只负责提出调用。所有参数必须在本地重新解析并按注册 schema 校验，
   // 校验通过后 AgentRuntime 才会调用 definition.execute。

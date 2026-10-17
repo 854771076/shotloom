@@ -100,7 +100,7 @@ export interface AgentActionResult {
   nodeId?: string;
   taskId?: string | null;
   batchId?: string;
-  error?: string;
+  error?: string | undefined;
 }
 
 export interface AgentBatchResult {

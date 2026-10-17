@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import test from 'node:test';
 
-const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
+import test from 'node:test';
+import { readGenerationNodeSource } from './helpers/generationNodeSource.mjs';
+import { readSource } from './helpers/sourceContract.mjs';
+
+const read = (path) => readSource(path);
 
 const composer = read('renderer/src/app/agent-chat/Composer.tsx');
-const generationNode = read('renderer/src/app/canvas/GenerationNode.tsx');
+const generationNode = readGenerationNodeSource();
 const ime = read('renderer/src/app/canvas/imeComposition.ts');
 
 const keydown = composer.slice(
@@ -21,7 +23,7 @@ test('中文输入法确认候选词时不会提交助手输入或生成节点',
 });
 
 test('Enter 先交给 @ 菜单，其次才提交；只有一条提交路径', () => {
-  assert.match(keydown, /mentionOptions\[mention\.index\][\s\S]*?insertMention\(mentionOptions\[mention\.index\]\)/);
+  assert.match(keydown, /const target = mentionOptions\[mention\.index\][\s\S]*?insertMention\(target\)/);
   assert.match(keydown, /event\.key === "Enter" && !event\.shiftKey[\s\S]*?submit\(\)/);
   assert.doesNotMatch(keydown, /controller\.send\(/);
   assert.match(composer, /function submit\(\)[\s\S]*?controller\.send\(\{/);

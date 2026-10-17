@@ -43,10 +43,6 @@ const splitList = (
 ) => [
   ...new Set(value.split(/[,，\n]/).map((item) => item.trim()).filter(Boolean)),
 ];
-const typeLabel = (
-  type: string,
-) => ({ image: "图片", video: "视频", audio: "音频", text: "文本" }[type] ||
-  type);
 
 export function RecipeEditorDialog({
   recipe,

@@ -1,7 +1,7 @@
 import { uid } from '@/utils/format';
-import { canvasMutationFingerprint } from '@/utils/canvasMutationFingerprint.mjs';
+import { canvasMutationFingerprint } from '@/utils/canvasMutationFingerprint.ts';
 
-export { canvasMutationFingerprint } from '@/utils/canvasMutationFingerprint.mjs';
+export { canvasMutationFingerprint } from '@/utils/canvasMutationFingerprint.ts';
 
 type MutableProject = Record<string, any>;
 type AgentStep = Record<string, any>;

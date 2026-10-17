@@ -22,7 +22,7 @@ export interface AgentDefinition {
   /** 可以派发的子 agent id 列表。 */
   dispatch: string[];
   /**
-   * 子 Agent 的职责边界说明。主 Agent 的 system prompt 由 content/prompts/system-base.md
+   * 子 Agent 的职责边界说明。主 Agent 的 system prompt 由 content/prompts/canvas-agent.md
    * 组装，因此不在此声明。
    */
   instructions?: string;

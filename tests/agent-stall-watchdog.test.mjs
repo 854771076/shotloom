@@ -6,29 +6,20 @@
  */
 import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { createServer } from 'vite';
+import { createRendererEnv } from './helpers/rendererSsr.mjs';
 
 const TICK_MS = 10_000;
 
-let server;
+let env;
 let createStallWatchdog;
 
 before(async () => {
-  const rendererRoot = fileURLToPath(new URL('../renderer', import.meta.url));
-  server = await createServer({
-    configFile: false,
-    root: rendererRoot,
-    resolve: { alias: { '@': path.join(rendererRoot, 'src') } },
-    server: { middlewareMode: true, hmr: false },
-    appType: 'custom',
-  });
-  ({ createStallWatchdog } = await server.ssrLoadModule('/src/agent/loop/stallWatchdog.ts'));
+  env = await createRendererEnv();
+  ({ createStallWatchdog } = await env.load('agent/loop/stallWatchdog'));
 });
 
 after(async () => {
-  await server?.close();
+  await env?.dispose();
 });
 
 /**

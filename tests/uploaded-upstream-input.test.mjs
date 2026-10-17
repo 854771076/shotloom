@@ -1,20 +1,18 @@
 import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
-import { createServer } from 'vite';
+import { createRendererEnv } from './helpers/rendererSsr.mjs';
 
-let server;
+let env;
 let generationUpstreamReadiness;
 let buildGenerationPayload;
 
 before(async () => {
-  server = await createServer({ server: { middlewareMode: true }, appType: 'custom' });
-  ({ generationUpstreamReadiness, buildGenerationPayload } = await server.ssrLoadModule(
-    '/src/utils/generationPayload.js',
-  ));
+  env = await createRendererEnv();
+  ({ generationUpstreamReadiness, buildGenerationPayload } = await env.load('domain/graph/generationPayload'));
 });
 
 after(async () => {
-  await server?.close();
+  await env?.dispose();
 });
 
 function fixture(uploadedFile, inputRole = 'auto') {

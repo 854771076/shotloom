@@ -426,8 +426,36 @@
   transform: scale(0.94);
 }
 
-.send[data-stop] {
-  background: var(--brand);
+.stop {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  color: var(--slk-label-secondary);
+  background: transparent;
+  transition:
+    color var(--slk-dur-fast) var(--slk-ease),
+    background-color var(--slk-dur-fast) var(--slk-ease);
+}
+
+.stop > svg {
+  width: var(--icon-md);
+  height: var(--icon-md);
+}
+
+@media (hover: hover) {
+  .stop:hover {
+    color: var(--slk-label-primary);
+    background: var(--slk-hover-wash);
+  }
+}
+
+.stop:active {
+  transform: scale(0.94);
 }
 
 .send:disabled {

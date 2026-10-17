@@ -4,9 +4,11 @@
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { readFileSync } from 'node:fs';
 
-const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
+import { readGenerationNodeSource } from './helpers/generationNodeSource.mjs';
+import { readSource } from './helpers/sourceContract.mjs';
+
+const read = (path) => readSource(path);
 const chatDir = '../renderer/src/app/agent-chat/';
 
 const panel = read(`${chatDir}AgentChatPanel.tsx`);
@@ -14,9 +16,9 @@ const composer = read(`${chatDir}Composer.tsx`);
 const transcript = read(`${chatDir}Transcript.tsx`);
 const presentation = read(`${chatDir}agentPresentation.ts`);
 const textPanel = read(`${chatDir}TextAgentPanel.tsx`);
-const adapter = read('../renderer/src/app/adapters/copilotAdapter.ts');
+const adapter = read('../renderer/src/app/adapters/agentChatAdapter.ts');
 const mediaViewer = read('../renderer/src/app/components/MediaViewer.tsx');
-const generationNode = read('../renderer/src/app/canvas/GenerationNode.tsx');
+const generationNode = readGenerationNodeSource();
 const creationView = read('../renderer/src/app/views/CreationView.tsx');
 const editorWorkspace = read('../renderer/src/app/editor/VideoEditorWorkspace.tsx');
 const overlayStore = read('../renderer/src/app/store/overlayStore.ts');
@@ -35,10 +37,13 @@ test('面板按 Agent 决定文案，不再用布尔开关猜作用域', () => {
 });
 
 test('Skill 选择器只消费面板所属 Agent 的定义', () => {
-  assert.match(composer, /selectAgentSkills\(\s*agentDefinition\(agentId\)/);
+  // 界面调用 Agent 声明的解析入口，运行时选择器共用同一份结果。
+  assert.match(composer, /availableAgentSkills\(agentId\)/);
+  assert.match(read('../renderer/src/agent/tools/catalogTools.ts'),
+    /selectAgentSkills\(agentDefinition\(agentId\)/);
   assert.doesNotMatch(composer, /agentId = editorMode|editorMode \? EDITOR_AGENT_ID : CANVAS_AGENT_ID/);
   assert.match(textPanel, /<AgentChatPanel\s+agentId=\{TEXT_AGENT_ID\}/);
-  assert.match(textPanel, /copilotData\("text", nodeId\)/);
+  assert.match(textPanel, /agentPanelData\("text", nodeId\)/);
   // 文本面板没有画布节点，@ 引用入口不该带着空的画布节点列表出现。
   assert.match(textPanel, /nodes=\{\[\]\}/);
   assert.match(textPanel, /newConversation: \(\) => newTextConversation\(nodeId\)/);

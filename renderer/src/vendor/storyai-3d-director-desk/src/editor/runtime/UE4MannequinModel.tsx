@@ -23,10 +23,10 @@ import {
 import { applyUE4RestPoseAndRig, captureUE4RestPose } from "./ue4Mannequin/ue4MannequinPoseApplication";
 
 interface UE4MannequinModelProps {
-  bodyType?: CharacterBodyType;
-  color?: string;
-  onLabelAnchorYChange?: (anchorY: number) => void;
-  rigState?: CharacterRigState;
+  bodyType?: CharacterBodyType | undefined;
+  color?: string | undefined;
+  onLabelAnchorYChange?: ((anchorY: number) => void) | undefined;
+  rigState?: CharacterRigState | undefined;
 }
 
 interface LoadedGLTF {

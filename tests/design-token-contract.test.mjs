@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { readSource } from './helpers/sourceContract.mjs';
 
 const root = new URL('..', import.meta.url).pathname;
 
@@ -19,7 +20,7 @@ function collectCss(dir) {
   return out;
 }
 
-const read = (rel) => readFileSync(join(root, rel), 'utf8');
+const read = (rel) => readSource(rel);
 const lines = [];
 for (const file of collectCss(join(root, 'renderer'))) {
   const rel = relative(root, file).replaceAll('\\', '/');

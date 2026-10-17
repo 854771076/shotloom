@@ -1,4 +1,4 @@
-import { normalizeVideoEditorProject } from "../../utils/videoEditorProject.mjs";
+import { normalizeVideoEditorProject } from "../../utils/videoEditorProject.ts";
 import type {
   VideoEditorProject,
   VideoEditorTransform,

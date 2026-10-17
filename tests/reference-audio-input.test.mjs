@@ -1,8 +1,8 @@
 import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
-import { createServer } from 'vite';
+import { createRendererEnv } from './helpers/rendererSsr.mjs';
 
-let server;
+let env;
 let generationUpstreamReadiness;
 let buildGenerationPayload;
 let resolveAgentInputRole;
@@ -10,15 +10,13 @@ let getGenerationInputModes;
 let reconcileGenerationInputEdges;
 
 before(async () => {
-  server = await createServer({ server: { middlewareMode: true, hmr: false }, appType: 'custom' });
-  ({ generationUpstreamReadiness, buildGenerationPayload } = await server.ssrLoadModule(
-    '/src/utils/generationPayload.js',
+  env = await createRendererEnv();
+  ({ generationUpstreamReadiness, buildGenerationPayload } = await env.load(
+    'domain/graph/generationPayload',
   ));
-  ({ resolveAgentInputRole } = await server.ssrLoadModule('/src/services/agentInputRole.ts'));
-  ({ getGenerationInputModes } = await server.ssrLoadModule('/src/domain/catalog/ModelCatalog.ts'));
-  ({ reconcileGenerationInputEdges } = await server.ssrLoadModule(
-    '/src/domain/graph/GenerationInputContract.ts',
-  ));
+  ({ resolveAgentInputRole } = await env.load('services/agentInputRole'));
+  ({ getGenerationInputModes } = await env.load('domain/catalog/ModelCatalog'));
+  ({ reconcileGenerationInputEdges } = await env.load('domain/graph/GenerationInputContract'));
 });
 
 test('音频节点和音频资源连线自动使用 referenceAudio', () => {
@@ -85,7 +83,7 @@ test('切换到单首帧模式优先使用显式首帧并暂存第二个上游�
 });
 
 after(async () => {
-  await server?.close();
+  await env?.dispose();
 });
 
 function seedanceProject({ includeImage = true, audio = {} } = {}) {

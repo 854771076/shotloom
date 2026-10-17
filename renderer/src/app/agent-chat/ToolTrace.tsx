@@ -51,9 +51,9 @@ export function ToolTrace({
   controller,
 }: {
   tools: AgentToolCall[];
-  subagents?: AgentSubagentView[];
-  typing?: boolean;
-  waitingForAnswer?: boolean;
+  subagents?: AgentSubagentView[] | undefined;
+  typing?: boolean | undefined;
+  waitingForAnswer?: boolean | undefined;
   controller: AgentController;
 }) {
   const hasPending = tools.some((tool) => tool.pending);
@@ -161,40 +161,103 @@ export function ToolTrace({
   );
 }
 
+const hasArgs = (args: Record<string, unknown> | undefined) =>
+  !!args && Object.keys(args).length > 0;
+
+// 参数只在展开时序列化一次；解析异常的回执不能让整条轨迹崩掉。
+const formatArgs = (args: Record<string, unknown>) => {
+  try {
+    return JSON.stringify(args, null, 2);
+  } catch {
+    return "";
+  }
+};
+
+const formatDuration = (startedAt?: string, endedAt?: string) => {
+  if (!startedAt || !endedAt) return "";
+  const ms = Date.parse(endedAt) - Date.parse(startedAt);
+  if (!Number.isFinite(ms) || ms < 0) return "";
+  if (ms < 10_000) return `${(ms / 1000).toFixed(1)}s`;
+  if (ms < 60_000) return `${Math.round(ms / 1000)}s`;
+  const total = Math.round(ms / 1000);
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+};
+
+/**
+ * 摘要行是一等公民：状态 + 标题 + 入参摘要 + 耗时一眼可读，超长部分截断；
+ * 完整参数与产出收进步骤自己的展开体，按需挂载。待确认行已有可编辑的参数
+ * 编辑器，不再叠加一个只读展开体。
+ */
 function StepLine({ tool, controller }: { tool: AgentToolCall; controller: AgentController }) {
   const status = tool.pending ? "pending" : tool.status || "success";
   const previews = (tool.previews || []).filter((item) => item.path);
+  const [expanded, setExpanded] = useState(false);
+  const argsText = hasArgs(tool.args) ? formatArgs(tool.args as Record<string, unknown>) : "";
+  const duration =
+    status === "success" || status === "error" ? formatDuration(tool.startedAt, tool.endedAt) : "";
+  const expandable = !tool.pending && (!!argsText || !!tool.output || !!previews.length);
+  const tooltip = `${statusLabel[status] || status} ${toolTitle(tool)} ${tool.summary || ""}`;
+  const rowContent = (
+    <>
+      <IconSymbol name={toolIcon(tool)} className={styles.stepIcon} />
+      <span className={styles.stepState}>{statusLabel[status] || status}</span>
+      <span className={styles.stepDetail}>
+        <span className={status === "running" ? `${styles.stepTitle} ${styles.shimmer}` : styles.stepTitle}>
+          {toolTitle(tool)}
+        </span>
+        {tool.summary && <span className={styles.stepSummary}>{tool.summary}</span>}
+      </span>
+      {!!duration && <span className={styles.stepDuration}>{duration}</span>}
+      {expandable && <IconSymbol name="chevron-right" className={styles.stepChevron} />}
+    </>
+  );
   return (
     <li
       className={styles.step}
       data-status={status}
+      data-open={expanded || undefined}
     >
-      <span
-        className={styles.stepLine}
-        title={`${statusLabel[status] || status} ${toolTitle(tool)} ${tool.summary || ""}`}
-      >
-        <IconSymbol name={toolIcon(tool)} className={styles.stepIcon} />
-        <span className={styles.stepState}>{statusLabel[status] || status}</span>
-        <span className={styles.stepDetail}>
-          <span className={styles.stepTitle}>{toolTitle(tool)}</span>
-          {tool.summary && <span className={styles.stepSummary}>{tool.summary}</span>}
+      {expandable ? (
+        <button
+          type="button"
+          className={styles.stepLine}
+          title={tooltip}
+          aria-expanded={expanded}
+          onClick={() => setExpanded((value) => !value)}
+        >
+          {rowContent}
+        </button>
+      ) : (
+        <span className={styles.stepLine} title={tooltip}>
+          {rowContent}
         </span>
-      </span>
-      {(tool.output || previews.length) && (
-        <span className={styles.stepOutput}>
-          {!!tool.output && <span className={styles.outputText}>{tool.output}</span>}
-          {!!previews.length && (
-            <span className={styles.previewRow}>
-              {previews.map((preview) => (
-                <PreviewImage
-                  key={preview.path}
-                  path={preview.path}
-                  alt={`${toolTitle(tool)} ${preview.label}`}
-                />
-              ))}
-            </span>
+      )}
+      {expanded && (
+        <div className={styles.stepBody}>
+          {!!argsText && (
+            <div className={styles.ioSection}>
+              <small className={styles.ioLabel}>参数</small>
+              <pre className={styles.ioCode}>{argsText}</pre>
+            </div>
           )}
-        </span>
+          {(!!tool.output || !!previews.length) && (
+            <div className={styles.ioSection}>
+              <small className={styles.ioLabel}>结果</small>
+              {!!tool.output && <p className={styles.ioText}>{tool.output}</p>}
+              {!!previews.length && (
+                <span className={styles.previewRow}>
+                  {previews.map((preview) => (
+                    <PreviewImage
+                      key={preview.path}
+                      path={preview.path}
+                      alt={`${toolTitle(tool)} ${preview.label}`}
+                    />
+                  ))}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
       )}
       {tool.pending && tool.interactionId && (
         <PendingDecision tool={tool} controller={controller} />

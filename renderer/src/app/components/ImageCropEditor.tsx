@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
 import { type ReactFlowState, useStore } from "@xyflow/react";
-import { inlineCropToolbarPosition } from "../../utils/inlineCropToolbar.mjs";
+import { inlineCropToolbarPosition } from "../../utils/inlineCropToolbar.ts";
 
 export type ImageCropRect = { x: number; y: number; width: number; height: number };
 type CropHandle = "move" | "nw" | "ne" | "sw" | "se";

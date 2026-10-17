@@ -1,5 +1,5 @@
-import { canRedoCanvas, canUndoCanvas } from "../../../store/canvasHistoryStore.js";
-import { getAvailableModelIdsByType } from "../../../store/settingsStore.js";
+import { canRedoCanvas, canUndoCanvas } from "../../../store/canvasHistoryStore.ts";
+import { getAvailableModelIdsByType } from "../../../store/settingsStore.ts";
 import type { WorkflowNodeData } from "../../canvas/WorkflowCanvas";
 
 const canvasViewNodeCache = new Map<string, { signature: string; node: WorkflowNodeData }>();

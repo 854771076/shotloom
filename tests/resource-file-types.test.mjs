@@ -4,7 +4,7 @@ import test from 'node:test';
 import {
   RESOURCE_FILE_EXTENSIONS,
   resourceFileDialogFilters,
-} from '../renderer/src/utils/resourceFileTypes.mjs';
+} from '../renderer/src/utils/resourceFileTypes.ts';
 
 test('resource picker exposes a dedicated native dialog filter for every generation type', () => {
   for (const resourceType of ['image', 'video', 'audio', 'text']) {

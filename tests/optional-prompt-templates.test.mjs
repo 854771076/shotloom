@@ -1,18 +1,20 @@
 import assert from 'node:assert/strict';
 import test, { before, after } from 'node:test';
-import { createServer } from 'vite';
+import { createRendererEnv } from './helpers/rendererSsr.mjs';
 
-let server;
+let env;
 let registry;
 let recipesStore;
 let skills;
+let createAgentRunFacts;
 
 before(async () => {
-  server = await createServer({ server: { middlewareMode: true, hmr: false }, appType: 'custom' });
-  registry = await server.ssrLoadModule('/src/agent/core/toolRegistry.ts');
-  ({ recipesStore } = await server.ssrLoadModule('/src/store/recipesStore.js'));
-  skills = await server.ssrLoadModule('/src/services/builtInSkills.js');
-  const { registerCatalogTools } = await server.ssrLoadModule('/src/agent/tools/catalogTools.ts');
+  env = await createRendererEnv();
+  registry = await env.load('agent/core/toolRegistry');
+  ({ recipesStore } = await env.load('store/recipesStore'));
+  skills = await env.load('services/builtInSkills');
+  ({ createAgentRunFacts } = await env.load('agent/core/runFacts'));
+  const { registerCatalogTools } = await env.load('agent/tools/catalogTools');
   registerCatalogTools();
   recipesStore.recipes = [
     { id: 'image-reference', generationType: 'image', enabled: true, systemPrompt: 'Compose around the subject.' },
@@ -20,14 +22,14 @@ before(async () => {
     { id: 'disabled-reference', generationType: 'image', enabled: false },
   ];
 });
-after(async () => { await server?.close(); });
+after(async () => { await env?.dispose(); });
 
 test('templates are accessible without a loaded Skill, but disabled and missing records are rejected', async () => {
   const events = [];
   const context = {
     loadedSkillIds: new Set(), signal: new AbortController().signal,
     agentId: 'canvas-primary',
-    capabilities: { nodeExecution: false }, state: new Map(), emit: (event) => events.push(event),
+    capabilities: { nodeExecution: false }, run: createAgentRunFacts(), state: new Map(), emit: (event) => events.push(event),
   };
   const list = registry.prepareAgentToolCall('list_recipes', '{"generationType":"image"}', context);
   const result = await list.definition.execute(list.input, context);

@@ -3,7 +3,7 @@ import stickerActionUrl from "../../assets/stickers/action.svg?no-inline";
 import stickerHeartUrl from "../../assets/stickers/heart.svg?no-inline";
 import stickerStarUrl from "../../assets/stickers/star.svg?no-inline";
 import type { VideoEditorAsset, VideoEditorProject } from "./videoEditorTypes";
-import { videoEditorEffectKeys, videoEditorTransitionKeys } from "../../utils/videoEditorEffects.mjs";
+import { videoEditorEffectKeys, videoEditorTransitionKeys } from "../../utils/videoEditorEffects.ts";
 
 export const tools: Array<{ id: string; label: string; icon: IconName }> = [
   { id: "media", label: "素材", icon: "film" },

@@ -77,7 +77,12 @@ function DetailMaterial() {
 
 export function Segment({ color, length, name, position, radius, rotation, scale = [1, 1, 1] }: SegmentProps) {
   return (
-    <mesh name={name} position={position} rotation={rotation} scale={scale}>
+    <mesh
+      position={position}
+      scale={scale}
+      {...(name === undefined ? {} : { name })}
+      {...(rotation === undefined ? {} : { rotation })}
+    >
       <capsuleGeometry args={[radius, length, 12, 22]} />
       <HumanoidMaterial color={color} />
     </mesh>

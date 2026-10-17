@@ -45,7 +45,7 @@ export function MediaThumb({
   /** 无法显示画面时的替代内容（如文本产物正文）。 */
   fallback?: ReactNode;
   /** 覆盖默认点击行为，用于非媒体产物定位到画布节点。 */
-  onActivate?: () => void;
+  onActivate?: (() => void) | undefined;
 }) {
   const previewable = kind === "image" || kind === "video";
   const preview = useMediaPreviewCache({

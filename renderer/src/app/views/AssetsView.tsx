@@ -4,7 +4,7 @@ import { IconSymbol } from "../components/IconSymbol";
 import { MaterialGrid, type MaterialItem } from "../components/MaterialGrid";
 import { ProjectScopeHeader } from "../components/ProjectScopeHeader";
 import { useAppStore } from "../store/appStore";
-import { assetCategories } from "../constants/navigation";
+import { assetCategories, defaultAssetCategory } from "../../domain/asset/assetCategories";
 
 export interface AssetsController {
   preview: (item: MaterialItem, src: string, kind: "image" | "video") => void;
@@ -51,7 +51,7 @@ export function AssetsView({
   const categoryInfo =
     assetCategories.find((item) =>
       item.id === category || item.aliases.includes(category)
-    ) || assetCategories[0];
+    ) || defaultAssetCategory;
   const setKeyword = (value: string) =>
     useAppStore.setState({ assetKeyword: value });
   const filter = (items: MaterialItem[]) =>

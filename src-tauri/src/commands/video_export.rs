@@ -3,7 +3,12 @@ use ab_glyph::{point, Font, FontArc, PxScale, ScaleFont};
 use image::{DynamicImage, Rgba, RgbaImage};
 use serde::Deserialize;
 use serde_json::{json, Value};
-use std::{fs, path::{Path, PathBuf}, process::Command};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    process::Command,
+    sync::atomic::AtomicBool,
+};
 
 fn default_playback_speed() -> f64 {
     1.0
@@ -165,9 +170,15 @@ fn default_text_color() -> String {
     "#ffffff".into()
 }
 
+/// 时间线长度与 FFmpeg 变速必须取同一个速度值：`-t duration`、`setpts` 和 `atempo` 一旦
+/// 各自解释 `speed`，导出的画面长度就和时间线对不上。0.5–2 同时是产品允许的速度范围。
+fn editor_clip_speed(clip: &VideoEditorClip) -> f64 {
+    clip.speed.clamp(0.5, 2.0)
+}
+
 fn editor_clip_duration(clip: &VideoEditorClip) -> f64 {
     if clip.clip_type == "video" || clip.clip_type == "audio" {
-        (clip.trim_end - clip.trim_start).max(0.0) / clip.speed.clamp(0.5, 2.0)
+        (clip.trim_end - clip.trim_start).max(0.0) / editor_clip_speed(clip)
     } else {
         clip.duration.max(0.0)
     }
@@ -376,6 +387,7 @@ fn visual_scale_filter(width: u32, height: u32, fit: &str) -> String {
 fn export_video_editor_project(
     target: String,
     project: VideoEditorProject,
+    cancelled: &AtomicBool,
 ) -> Result<Value, String> {
     validate_video_editor_project(&project)?;
     let target = PathBuf::from(target);
@@ -528,7 +540,9 @@ fn export_video_editor_project(
                 let source_filter = if clip.clip_type == "video" {
                     let mut value = format!(
                         "trim=start={:.6}:end={:.6},setpts=(PTS-STARTPTS)/{:.6}",
-                        clip.trim_start, clip.trim_end, clip.speed
+                        clip.trim_start,
+                        clip.trim_end,
+                        editor_clip_speed(clip)
                     );
                     if let Some(transition) = transition_clips
                         .iter()
@@ -639,7 +653,10 @@ fn export_video_editor_project(
                     let delay = (clip.timeline_start * 1000.0).round().max(0.0) as u64;
                     filters.push(format!(
                         "[{input}:a]atrim=start={:.6}:end={:.6},asetpts=PTS-STARTPTS,atempo={:.6},volume={:.5},adelay={delay}:all=1[audio{audio_index}]",
-                        clip.trim_start, clip.trim_end, clip.speed, clip.volume.clamp(0.0, 2.0)
+                        clip.trim_start,
+                        clip.trim_end,
+                        editor_clip_speed(clip),
+                        clip.volume.clamp(0.0, 2.0)
                     ));
                     audio_labels.push(format!("[audio{audio_index}]"));
                     audio_index += 1;
@@ -662,8 +679,8 @@ fn export_video_editor_project(
     } else {
         command.args(["-map", "[outa]", "-c:a", "aac", "-b:a", "192k"]);
     }
-    let output = command
-        .args(["-t"])
+    command
+        .arg("-t")
         .arg(format!("{duration:.6}"))
         .args([
             "-c:v",
@@ -677,24 +694,18 @@ fn export_video_editor_project(
             "-movflags",
             "+faststart",
         ])
-        .arg(&temp)
-        .output()
-        .map_err(|error| format!("无法启动 FFmpeg：{error}"))?;
+        .arg(&temp);
+    let run = super::media_tasks::run_ffmpeg(&mut command, cancelled)?;
     for path in text_files {
         let _ = fs::remove_file(path);
     }
-    if !output.status.success() {
+    if run.cancelled {
         let _ = fs::remove_file(&temp);
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        let detail = stderr
-            .chars()
-            .rev()
-            .take(4000)
-            .collect::<String>()
-            .chars()
-            .rev()
-            .collect::<String>();
-        return Err(format!("多轨视频导出失败：{}", detail.trim()));
+        return Err("多轨视频导出已取消".into());
+    }
+    if !run.ok {
+        let _ = fs::remove_file(&temp);
+        return Err(format!("多轨视频导出失败：{}", run.stderr.trim()));
     }
     if target.exists() {
         fs::remove_file(&target).map_err(|error| format!("无法替换导出文件：{error}"))?;
@@ -720,12 +731,19 @@ fn export_video_editor_project(
 
 #[tauri::command]
 pub async fn file_export_video_project(
+    state: tauri::State<'_, super::media_tasks::MediaTaskState>,
+    request_id: String,
     target: String,
     project: VideoEditorProject,
 ) -> Result<Value, String> {
-    tauri::async_runtime::spawn_blocking(move || export_video_editor_project(target, project))
-        .await
-        .map_err(|error| format!("多轨视频导出任务异常：{error}"))?
+    let cancelled = state.begin(&request_id);
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        export_video_editor_project(target, project, &cancelled)
+    })
+    .await
+    .map_err(|error| format!("多轨视频导出任务异常：{error}"))?;
+    state.finish(&request_id);
+    result
 }
 
 #[cfg(test)]
@@ -748,8 +766,12 @@ mod video_edit_tests {
                 "transform": { "x": 0, "y": 0, "width": 1248, "height": 704, "angle": 0, "opacity": 1 }
             }]}]
         })).unwrap();
-        let result =
-            export_video_editor_project(target.to_string_lossy().into_owned(), project).unwrap();
+        let result = export_video_editor_project(
+            target.to_string_lossy().into_owned(),
+            project,
+            &AtomicBool::new(false),
+        )
+        .unwrap();
         assert_eq!(result["engine"], "direct-mp4-copy");
         assert_eq!(fs::read(&target).unwrap(), b"shotloom-mp4-passthrough");
         let _ = fs::remove_dir_all(root);
@@ -795,7 +817,12 @@ mod video_edit_tests {
                 "transform": { "x": 0, "y": 0, "width": 320, "height": 180, "angle": 0, "opacity": 1 }
             }]}]
         })).unwrap();
-        export_video_editor_project(target.to_string_lossy().into_owned(), project).unwrap();
+        export_video_editor_project(
+            target.to_string_lossy().into_owned(),
+            project,
+            &AtomicBool::new(false),
+        )
+        .unwrap();
         let extracted = Command::new(&ffmpeg)
             .args([
                 "-hide_banner",
@@ -817,6 +844,24 @@ mod video_edit_tests {
         assert!(top_left[2] > 150, "top-left pixel was {top_left:?}");
         assert!(top_left[0] < 80, "top-left pixel was {top_left:?}");
         let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn timeline_and_ffmpeg_speed_read_the_same_clamped_value() {
+        let fast: VideoEditorClip = serde_json::from_value(json!({
+            "id": "v1", "type": "video", "assetId": "a", "timelineStart": 0,
+            "trimStart": 0, "trimEnd": 8, "speed": 4
+        }))
+        .unwrap();
+        assert_eq!(editor_clip_speed(&fast), 2.0);
+        assert_eq!(editor_clip_duration(&fast), 4.0);
+        let slow: VideoEditorClip = serde_json::from_value(json!({
+            "id": "v2", "type": "video", "assetId": "a", "timelineStart": 0,
+            "trimStart": 2, "trimEnd": 6, "speed": 0.1
+        }))
+        .unwrap();
+        assert_eq!(editor_clip_speed(&slow), 0.5);
+        assert_eq!(editor_clip_duration(&slow), 8.0);
     }
 
     #[test]
@@ -879,7 +924,12 @@ mod video_edit_tests {
                 }]}]
             }))
             .unwrap();
-            export_video_editor_project(target.to_string_lossy().into_owned(), project).unwrap();
+            export_video_editor_project(
+            target.to_string_lossy().into_owned(),
+            project,
+            &AtomicBool::new(false),
+        )
+        .unwrap();
             target
         };
         let frame_of = |target: &std::path::Path, name: &str| -> image::RgbImage {
@@ -972,8 +1022,12 @@ mod video_edit_tests {
                 { "type": "effect", "clips": [{ "id": "fx1", "type": "effect", "timelineStart": 0, "duration": 2.5, "effectKey": "vignette" }]}
             ]
         })).unwrap();
-        let result =
-            export_video_editor_project(target.to_string_lossy().into_owned(), project).unwrap();
+        let result = export_video_editor_project(
+            target.to_string_lossy().into_owned(),
+            project,
+            &AtomicBool::new(false),
+        )
+        .unwrap();
         assert!(target.is_file());
         assert!(fs::metadata(&target).unwrap().len() > 2_000);
         assert_eq!(result["engine"], "rust-ffmpeg-v2");

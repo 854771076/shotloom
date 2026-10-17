@@ -1,5 +1,5 @@
 import { useEffect, useState, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
-import { editorClipDuration } from "../../utils/videoEditorProject.mjs";
+import { editorClipDuration } from "../../utils/videoEditorProject.ts";
 import { IconSymbol } from "../components/IconSymbol";
 import { EDITOR_ASSET_DRAG_TYPE, trackMeta } from "./videoEditorCatalog";
 import { formatEditorTime } from "./videoEditorFormat";
@@ -49,7 +49,7 @@ export function VideoEditorTimeline({
   selectedId: string;
   viewport: { left: number; width: number };
   runtimeMediaUrls: Record<string, string>;
-  primaryVideoAssetId?: string;
+  primaryVideoAssetId?: string | undefined;
   playbackUrl: string;
   sourceThumbnail: string;
   onSplit: () => void;

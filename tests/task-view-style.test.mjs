@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+
 import test from 'node:test';
-const view = readFileSync(new URL('../renderer/src/app/views/TasksView.tsx', import.meta.url), 'utf8');
-const styles = readFileSync(new URL('../renderer/styles.css', import.meta.url), 'utf8');
-const migrationStyles = readFileSync(new URL('../renderer/styles/project-materials.css', import.meta.url), 'utf8');
+import { readSource } from './helpers/sourceContract.mjs';
+const view = readSource('renderer/src/app/views/TasksView.tsx');
+const migrationStyles = readSource('renderer/styles/project-materials.css');
 test('项目任务使用平面信息行且不混入助手运行中心', () => {
   assert.doesNotMatch(view, /task-list-head/);
   assert.match(view, /task-record-meta/);
@@ -17,6 +17,6 @@ test('项目任务使用平面信息行且不混入助手运行中心', () => {
   assert.doesNotMatch(view, /助手运行中心/);
 });
 test('任务操作默认收起并在悬停或键盘聚焦时出现', () => {
-  assert.match(styles, /\.task-record-actions[\s\S]*?opacity:\s*0/);
-  assert.match(styles, /\.task-record:hover \.task-record-actions[\s\S]*?\.task-record:focus-within \.task-record-actions/);
+  assert.match(migrationStyles, /\.task-record-actions[\s\S]*?opacity:\s*0/);
+  assert.match(migrationStyles, /\.task-record:hover \.task-record-actions[\s\S]*?\.task-record:focus-within \.task-record-actions/);
 });

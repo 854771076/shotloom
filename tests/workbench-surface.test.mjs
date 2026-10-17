@@ -3,17 +3,18 @@
  * 这里固定住三件事：挂载点只有一处、浮层定位相对内容区、层级不再靠应用级 z-index 逃逸。
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import test from 'node:test';
 
-const read = (relative) => readFileSync(new URL(relative, import.meta.url), 'utf8');
+import test from 'node:test';
+import { readSource } from './helpers/sourceContract.mjs';
+
+const read = (relative) => readSource(relative);
 
 /** 取一条不含嵌套的 CSS 规则原文，避免懒匹配跨规则。 */
 const rule = (styles, selector) => styles.match(new RegExp(`^${selector} \\{[^}]*\\}`, 'm'))?.[0] || '';
 
 const shell = read('../renderer/src/app/AppShell.tsx');
 const store = read('../renderer/src/app/layout/workbenchSurface.ts');
-const shellStyles = read('../renderer/styles.css');
+const shellStyles = read('../renderer/styles/app-shell.css');
 const editorSource = read('../renderer/src/app/editor/VideoEditorWorkspace.tsx');
 const editorLayout = read('../renderer/src/app/editor/VideoEditorWorkspace.layout.css');
 const editorFoundation = read('../renderer/src/app/editor/VideoEditorWorkspace.foundation.css');

@@ -3,8 +3,7 @@ import { recipesStore } from '@/store/recipesStore';
 import { getAvailableAgentModelCatalog } from '@/store/settingsStore';
 import { registerAgentTool } from '../core/toolRegistry';
 import type { JsonObject } from '../core/types';
-import type { AgentToolContext } from '../core/types';
-import { compactAgentModelCatalog } from '@/utils/agentModelCatalog.mjs';
+import { compactAgentModelCatalog } from '@/utils/agentModelCatalog.ts';
 import { agentDefinition } from '../agents/definitions.ts';
 import { selectAgentSkills } from '../core/visibility.ts';
 
@@ -76,11 +75,10 @@ export function registerCatalogTools(): void {
     effect: 'read',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     summarizeInput: () => '完整能力快照',
-    execute: (_input, context) => {
+    execute: () => {
       const types = getAvailableAgentModelCatalog() as unknown as JsonObject[];
       const catalog = compactAgentModelCatalog(types);
       const snapshotId = `catalog-${Date.now()}`;
-      context.state.set('modelCatalogSnapshotId', snapshotId);
       return {
         snapshotId,
         nodeContract: {
@@ -108,7 +106,7 @@ export function registerCatalogTools(): void {
       },
       additionalProperties: false,
     },
-    execute: (input, context) => {
+    execute: (input) => {
       return {
         recipes: availableRecipes()
           .filter((recipe) => !input.generationType || recipe.generationType === input.generationType)

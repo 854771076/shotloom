@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+
 import test from 'node:test';
 
 import {
   assertSkillId,
   buildSkillDocuments,
 } from '../renderer/src/agent/loop/skillDocuments.ts';
+import { readSource } from './helpers/sourceContract.mjs';
 
 test('Skill 说明只装配启用项并携带用途、完整正文且无需模板范围', () => {
   const result = buildSkillDocuments([{
@@ -47,11 +48,16 @@ test('Skill ID 契约拒绝旧式冒号、下划线和路径字符', () => {
 });
 
 test('助手选择 Skill 后直接在输入框写入可见的 slash 指令', () => {
-  const composer = readFileSync(new URL('../renderer/src/app/agent-chat/Composer.tsx', import.meta.url), 'utf8');
+  const composer = readSource('renderer/src/app/agent-chat/Composer.tsx');
   // Skill 前缀是用户可见、可编辑的文本，不是隐藏的附件字段。
   assert.match(composer, /setText\(stripped \? `\/\$\{item\.id\} \$\{stripped\}` : `\/\$\{item\.id\} `\)/);
   assert.match(composer, /const prefix = skillId \? `\/\$\{skillId\}` : ""/);
   assert.match(composer, /const \[skillId, setSkillId\] = useState<string \| null>\(null\)/);
-  assert.match(composer, /skill\.enabled !== false/);
+  assert.match(composer, /availableAgentSkills\(agentId\)/);
+  // 禁用 Skill 的过滤在解析入口里，界面不再自己维护一份。
+  assert.match(
+    readSource('renderer/src/agent/tools/catalogTools.ts'),
+    /skill\.enabled !== false/,
+  );
   assert.doesNotMatch(composer, /selectedSkillId|<Dropdown/);
 });

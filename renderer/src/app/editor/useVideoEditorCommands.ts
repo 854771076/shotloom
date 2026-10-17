@@ -11,7 +11,7 @@ import {
   removeEditorClip,
   updateEditorClip,
   updateEditorTrack,
-} from "../../utils/videoEditorProject.mjs";
+} from "../../utils/videoEditorProject.ts";
 import { constrainTransformToCanvas } from "./videoEditorModel";
 import { effects, textPresets, transitions } from "./videoEditorCatalog";
 import { formatEditorTime } from "./videoEditorFormat";
@@ -33,7 +33,6 @@ export function useVideoEditorCommands({
   setSelectedId,
   time,
   duration,
-  videoClips,
   runtimeRef,
   runtimeMutationRef,
   createStudioProject,
@@ -48,7 +47,6 @@ export function useVideoEditorCommands({
   setSelectedId: Dispatch<SetStateAction<string>>;
   time: number;
   duration: number;
-  videoClips: VideoEditorClip[];
   runtimeRef: VideoEditorRuntimeRef;
   runtimeMutationRef: MutableRefObject<boolean>;
   createStudioProject: (project: VideoEditorProject) => unknown;
@@ -292,6 +290,7 @@ export function useVideoEditorCommands({
   };
 
   const addText = (preset = textPresets[0]) => {
+    if (!preset) return;
     const canvasWidth = projectRef.current.settings.width;
     const canvasHeight = projectRef.current.settings.height;
     const textWidth = Math.min(1200, canvasWidth * .76);
@@ -349,19 +348,20 @@ export function useVideoEditorCommands({
         const clips = track.clips
           .filter((clip) => clip.type === "video")
           .sort((left, right) => left.timelineStart - right.timelineStart);
-        return clips.slice(1).map((to, index) => ({
-          from: clips[index],
-          to,
-          gap: to.timelineStart - (clips[index].timelineStart + editorClipDuration(clips[index])),
-        }));
+        return clips.slice(1).flatMap((to, index) => {
+          const from = clips[index];
+          if (!from) return [];
+          return [{ from, to, gap: to.timelineStart - (from.timelineStart + editorClipDuration(from)) }];
+        });
       })
       .filter(({ gap }) => Math.abs(gap) <= .05);
     if (!candidates.length) {
       setToolNotice("转场需要同一视频轨上首尾相接的两段视频；请先把片段放到同一轨道并贴紧接缝。");
       return;
     }
-    const selectedPair = candidates.find(({ from, to }) => from.id === selectedId || to.id === selectedId);
-    const { from, to } = selectedPair || candidates[0];
+    const pair = candidates.find(({ from, to }) => from.id === selectedId || to.id === selectedId) || candidates[0];
+    if (!pair) return;
+    const { from, to } = pair;
     const transitionDuration = Math.min(.6, editorClipDuration(from), editorClipDuration(to));
     const added = addClip(
       "transition",

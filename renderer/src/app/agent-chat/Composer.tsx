@@ -10,12 +10,10 @@ import {
 } from "react";
 import { IconSymbol } from "../components/IconSymbol";
 import { ProviderBrandIcon } from "../components/ProviderBrandIcon";
-import { desktopApi } from "../../services/desktopApi.js";
-import { saveAppSettings, settingsStore } from "../../store/settingsStore.js";
-import { skillsStore } from "../../store/skillsStore.js";
-import { nodeChatAttachmentKey } from "../../services/nodeChatAttachment.mjs";
-import { agentDefinition } from "../../agent/agents/definitions";
-import { selectAgentSkills } from "../../agent/core/visibility";
+import { desktopApi } from "../../services/desktopApi.ts";
+import { saveAppSettings, settingsStore } from "../../store/settingsStore.ts";
+import { nodeChatAttachmentKey } from "../../services/nodeChatAttachment.ts";
+import { availableAgentSkills } from "../../agent/tools/catalogTools";
 import { isImeKeyEvent } from "../canvas/imeComposition";
 import { ReferenceCard } from "./ReferenceCard";
 import { agentPresentation } from "./agentPresentation";
@@ -50,28 +48,23 @@ export function Composer(props: ComposerProps) {
   const seatRef = useRef<HTMLDivElement | null>(null);
   const autoSkill = useRef(false);
 
-  // Skill 选择器和运行时共用同一份 Agent 定义，选择结果只来自这个面板服务的 Agent。
+  // 选择器与运行时都调用 availableAgentSkills，界面不再自己拼可见性解析参数。
   const skills = useMemo(
-    () =>
-      selectAgentSkills(
-        agentDefinition(agentId),
-        (skillsStore.skills as Array<{ id: string; name?: string; enabled?: boolean }>).filter(
-          (skill) => skill.enabled !== false,
-        ),
-      ),
+    () => availableAgentSkills(agentId),
     [props.domainRevision, agentId],
   );
   const skill = useMemo(() => skills.find((item) => item.id === skillId) || null, [skills, skillId]);
 
   useEffect(() => {
     // 当前 Agent 只有一个可选 Skill 时默认选中它，用户仍可手动改选。
-    if (skills.length !== 1) {
+    const only = skills.length === 1 ? skills[0] : null;
+    if (!only) {
       autoSkill.current = false;
       return;
     }
     if (!autoSkill.current) {
       autoSkill.current = true;
-      setSkillId(skills[0].id);
+      setSkillId(only.id);
     }
   }, [skills]);
 
@@ -100,13 +93,12 @@ export function Composer(props: ComposerProps) {
 
   const addNodeMentionById = useCallback(
     (nodeId: string) => {
-      if (busy) return;
       const found = props.mentionable.find((node) => node.id === nodeId);
       if (!found) return;
       addMention(found);
       focusInput();
     },
-    [addMention, busy, focusInput, props.mentionable],
+    [addMention, focusInput, props.mentionable],
   );
 
   useImperativeHandle(props.forwardedRef, () => ({ addNodeMentionById }), [addNodeMentionById]);
@@ -168,7 +160,8 @@ export function Composer(props: ComposerProps) {
       setMention(null);
       return;
     }
-    setMention({ query: match[2], start: before.length - match[2].length - 1, index: 0 });
+    const query = match[2] ?? "";
+    setMention({ query, start: before.length - query.length - 1, index: 0 });
   }
 
   function insertMention(node: MentionableNode) {
@@ -182,7 +175,6 @@ export function Composer(props: ComposerProps) {
   }
 
   async function pickFile() {
-    if (busy) return;
     const file = await desktopApi.file.pickResource?.();
     if (!file) return;
     const key = file.path || file.filePath || file.name || file.fileName;
@@ -194,7 +186,7 @@ export function Composer(props: ComposerProps) {
   }
 
   function submit() {
-    if (busy || !textModels.length) return;
+    if (!textModels.length) return;
     const requested = text.trim();
     if (!requested && !attachments.length && !mentions.length) return;
     const prefix = skillId ? `/${skillId}` : "";
@@ -233,10 +225,13 @@ export function Composer(props: ComposerProps) {
       );
       return;
     }
-    if (mention && event.key === "Enter" && mentionOptions[mention.index]) {
-      event.preventDefault();
-      insertMention(mentionOptions[mention.index]);
-      return;
+    if (mention && event.key === "Enter") {
+      const target = mentionOptions[mention.index];
+      if (target) {
+        event.preventDefault();
+        insertMention(target);
+        return;
+      }
     }
     if (event.key === "Escape") {
       if (mention) setMention(null);
@@ -283,12 +278,9 @@ export function Composer(props: ComposerProps) {
             className={styles.input}
             value={text}
             rows={1}
-            readOnly={busy}
             disabled={disabled}
             spellCheck={false}
-            placeholder={
-              busy ? "Agent 正在处理，完成后可继续输入…" : presentation.placeholder
-            }
+            placeholder={busy ? "正在处理，可继续补充指令…" : presentation.placeholder}
             aria-label="给 Agent 的消息"
             onChange={(event) => {
               const value = event.target.value;
@@ -331,7 +323,7 @@ export function Composer(props: ComposerProps) {
               className={styles.add}
               title="添加文件"
               aria-label="添加文件"
-              disabled={busy || disabled}
+              disabled={disabled}
               onClick={() => void pickFile()}
             >
               <IconSymbol name="plus" />
@@ -346,7 +338,7 @@ export function Composer(props: ComposerProps) {
               }
               icon="puzzle"
               active={Boolean(skill)}
-              disabled={busy || disabled}
+              disabled={disabled}
               onToggle={() => setMenu(menu === "skill" ? null : "skill")}
             >
               <MenuRow
@@ -402,7 +394,7 @@ export function Composer(props: ComposerProps) {
                   <ProviderBrandIcon icon={activeModel?.iconId || "custom"} />
                 </span>
               }
-              disabled={busy || disabled}
+              disabled={disabled}
               onToggle={() => setMenu(menu === "model" ? null : "model")}
             >
               {textModels.map((item) => (
@@ -430,7 +422,7 @@ export function Composer(props: ComposerProps) {
               hint="Agent 模式"
               icon={shellMode === "ask" ? "hand" : "shield"}
               tone={shellMode === "full" ? "accent" : undefined}
-              disabled={busy || disabled}
+              disabled={disabled}
               onToggle={() => setMenu(menu === "mode" ? null : "mode")}
             >
               <MenuRow
@@ -456,16 +448,26 @@ export function Composer(props: ComposerProps) {
             </SelectorChip>
           </div>
 
+          {busy && (
+            <button
+              type="button"
+              className={styles.stop}
+              title="停止 Agent"
+              aria-label="停止 Agent"
+              onClick={controller.cancel}
+            >
+              <IconSymbol name="stop" />
+            </button>
+          )}
           <button
             type="button"
             className={styles.send}
-            data-stop={busy || undefined}
             disabled={disabled}
-            title={busy ? "停止 Agent" : "发送（Enter）"}
-            aria-label={busy ? "停止 Agent" : "发送"}
-            onClick={() => (busy ? controller.cancel() : submit())}
+            title="发送（Enter）"
+            aria-label="发送"
+            onClick={submit}
           >
-            <IconSymbol name={busy ? "stop" : "arrow-up"} />
+            <IconSymbol name="arrow-up" />
           </button>
         </div>
       </div>
@@ -493,7 +495,7 @@ function SelectorChip({
   icon?: string;
   leading?: React.ReactNode;
   active?: boolean;
-  tone?: "accent";
+  tone?: "accent" | undefined;
   disabled?: boolean;
   onToggle: () => void;
   children: React.ReactNode;

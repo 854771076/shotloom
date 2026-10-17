@@ -18,7 +18,7 @@
   border: 0;
   border-radius: 999px;
   color: var(--slk-label-inverted);
-  background: rgb(0 0 0 / 55%);
+  background: var(--overlay-control);
   opacity: 0;
   transition: opacity var(--slk-dur-fast) var(--slk-ease);
 }
@@ -35,7 +35,7 @@
   }
 
   .remove:hover {
-    background: rgb(0 0 0 / 75%);
+    background: var(--overlay-control-hover);
   }
 }
 

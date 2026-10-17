@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { desktopApi } from "../../services/desktopApi.js";
+import { desktopApi } from "../../services/desktopApi.ts";
 
 export function WindowControls() {
   const [isMaximized, setIsMaximized] = useState(false);

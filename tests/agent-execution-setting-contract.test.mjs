@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+
 import test from 'node:test';
-const loopRunner = readFileSync(new URL('../renderer/src/agent/loop/runLoopAgent.ts', import.meta.url), 'utf8');
-const settings = readFileSync(new URL('../renderer/src/app/views/SettingsPanel.tsx', import.meta.url), 'utf8');
-const settingsStore = readFileSync(new URL('../renderer/src/store/settingsStore.js', import.meta.url), 'utf8');
-const canvasTools = readFileSync(new URL('../renderer/src/agent/tools/canvasTools.ts', import.meta.url), 'utf8');
-const policy = readFileSync(new URL('../renderer/src/agent/core/policyEngine.ts', import.meta.url), 'utf8');
-const composer = readFileSync(new URL('../renderer/src/app/agent-chat/Composer.tsx', import.meta.url), 'utf8');
+import { readSource } from './helpers/sourceContract.mjs';
+const loopRunner = readSource('renderer/src/agent/loop/runLoopAgent.ts');
+const settings = readSource('renderer/src/app/views/SettingsPanel.tsx');
+const settingsStore = readSource('renderer/src/store/settingsStore.ts');
+const canvasTools = readSource('renderer/src/agent/tools/canvasTools.ts');
+const policy = readSource('renderer/src/agent/core/policyEngine.ts');
+const composer = readSource('renderer/src/app/agent-chat/Composer.tsx');
 test('Agent 节点运行能力只由用户设置和权限策略控制', () => {
   assert.match(settingsStore, /agentCanRunNodes:\s*false/);
   assert.match(loopRunner, /nodeExecution:\s*settingsStore\.agentCanRunNodes === true/);

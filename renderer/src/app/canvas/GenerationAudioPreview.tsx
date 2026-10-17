@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
-import { desktopApi } from "../../services/desktopApi.js";
+import { desktopApi } from "../../services/desktopApi.ts";
 import { IconSymbol } from "../components/IconSymbol";
-import { showToast } from "../store/overlayStore";
+import { showToast } from "../../store/notificationStore";
 
 const WAVEFORM_BARS = [
   20, 38, 64, 42, 76, 48, 30, 58, 82, 46, 68, 34, 72, 52, 88, 40,

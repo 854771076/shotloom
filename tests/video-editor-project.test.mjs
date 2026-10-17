@@ -18,7 +18,7 @@ import {
   updateEditorClip,
   updateEditorTrack,
   videoEditorDuration,
-} from '../renderer/src/utils/videoEditorProject.mjs';
+} from '../renderer/src/utils/videoEditorProject.ts';
 
 test('切分导出仅包含选中的源视频片段', () => {
   const source = { sourceFile: '/project/source.mp4', sourceName: 'source.mp4', duration: 8, width: 1280, height: 720 };

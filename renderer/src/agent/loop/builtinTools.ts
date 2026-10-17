@@ -53,7 +53,6 @@ export function createLoopBuiltins(host: LoopBuiltinHost): LoopBuiltin[] {
             source: skill?.builtIn ? 'built-in' : 'user', createdAt: new Date().toISOString(),
           });
         }
-        host.context.state.set('activeSkillId', skillId);
         return { success: true, skillId, content };
       },
     });

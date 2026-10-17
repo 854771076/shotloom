@@ -6,7 +6,7 @@ import {
   isAspectRatioParam,
   modelTypeLabel,
   optionLabel,
-} from '../renderer/src/utils/modelPresentation.js';
+} from '../renderer/src/utils/modelPresentation.ts';
 
 test('模型类型使用面向用户的中文名称', () => {
   assert.equal(modelTypeLabel('textGeneration'), '文本生成');

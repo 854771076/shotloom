@@ -5,11 +5,9 @@
  */
 import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { createServer } from 'vite';
+import { createRendererEnv } from './helpers/rendererSsr.mjs';
 
-let server;
+let env;
 let projectStore;
 let desktopApi;
 let store;
@@ -17,35 +15,14 @@ let store;
 const storage = new Map();
 
 before(async () => {
-  globalThis.localStorage = {
-    getItem: (key) => storage.get(key) ?? null,
-    setItem: (key, value) => storage.set(key, String(value)),
-    removeItem: (key) => storage.delete(key),
-    clear: () => storage.clear(),
-  };
-  globalThis.window = {
-    setTimeout: () => 0,
-    clearTimeout: () => {},
-    setInterval: () => 0,
-    clearInterval: () => {},
-  };
-  const rendererRoot = fileURLToPath(new URL('../renderer', import.meta.url));
-  server = await createServer({
-    configFile: false,
-    root: rendererRoot,
-    resolve: { alias: { '@': path.join(rendererRoot, 'src') } },
-    server: { middlewareMode: true, hmr: false },
-    appType: 'custom',
-  });
-  ({ desktopApi } = await server.ssrLoadModule('/src/services/desktopApi.js'));
-  projectStore = await server.ssrLoadModule('/src/store/projectStore.js');
+  env = await createRendererEnv({ storage, withWindow: true });
+  ({ desktopApi } = await env.load('services/desktopApi'));
+  projectStore = await env.load('store/projectStore');
   store = projectStore.store;
 });
 
 after(async () => {
-  await server?.close();
-  delete globalThis.localStorage;
-  delete globalThis.window;
+  await env?.dispose();
 });
 
 test('createNewProject 成功时写入全新的 projectDir/filePath 并切换项目身份', async () => {

@@ -45,6 +45,34 @@ Shotloom 的 Agent 以模型为决策主体。不要在应用代码中用关键�
 
 保持分层清晰，但不要为了分层创建只有几行转发逻辑的文件或函数。优先让一个模块完整拥有一项职责。
 
+## 状态引擎
+
+`renderer/src/store/domainReactivity.ts` 与 zustand 各自只服务一类状态，新增第三种引擎必须先改这份契约：
+
+- 领域与持久状态（工程、节点、任务、设置、Skill、模板、素材库）只用 domainReactivity：状态对象就地可变，改动合并成一次 revision 通知，界面用 `useSyncExternalStore(subscribeDomain, getDomainRevision)` 订阅。画布写入量密集，改成不可变快照会付出无收益的复制成本。
+- 界面状态（窗口、浮层、会话运行态）只用 zustand，并且只允许出现在 `app/` 与 `vendor/`。`store/`、`services/`、`agent/`、`domain/` 里出现 zustand 依赖即视为把领域状态搬进界面引擎。
+- 唯一登记例外：`store/notificationStore.ts`。提示条必须能被数据层触发，所以它住在 store 层，但仍然是界面状态。
+- `app/store/` 不得引入 domainReactivity；`store/` 下的纯函数模块（节点、边、步骤等图数据访问器）不携带引擎，只读写 projectStore 的同一份可变对象。
+- 以上边界由 `scripts/verify-module-discipline.mjs` 检查（`npm run check:layers`）。新增例外必须在该脚本的集合里显式登记并说明理由。
+
+## Agent 画布写入路径
+
+Agent 对画布的写入只有一条路径，三层各自拥有完整职责，不得再插入注册表、handler 分发层或只有转发动作的中间文件：
+
+- `agent/tools/canvasTools.ts`：工具入口、输入 schema 与批次归一化。
+- `services/agent/agentCanvasExecutor.ts`：批次事务——项目围栏、跨批次持久 tempId 映射、journal 与画布历史、预检、布局与批次回执。
+- `services/agent/agentActionHandlers.ts`：单个动作的唯一落点，按 `switch (action.type)` 显式列出契约类型，未知类型返回可恢复回执。
+
+`ActionHandlerContext` 只暴露项目本体与引用解析（`project`/`tempIdMap`/`resolveNode`/`resolveNodeId`/`defaultNodePosition`）。动作实现不得接收宽松的 `Record<string, any>` 上下文，也不得自己解析 tempId 或语义别名——那会绕过执行器的跨批次映射。
+
+`connect_nodes` 与 `create_gen_node.inputLinks` 必须共用同一个输入边写入函数：角色由 `validateAgentInputRole` 解析，能力与槽位由模型目录决定，最后落到 `addCanvasEdge({ kind: 'typed-input', data: { inputRole, inputSlot, required } })`。两个入口写出不同的边结构就是缺陷。
+
+## Agent 对外接口与运行状态
+
+- Agent 的可见性解析、执行策略、运行事实与模型循环（`agent/core/visibility`、`core/policyEngine`、`core/runFacts`、`core/toolIdentity`、`agent/loop/`）是引擎内部实现。界面只消费声明入口：`agents/definitions`、`core/toolRegistry` 的展示元数据、`core/skillAssignments`、`runtime/` 与 `tools/` 导出的解析函数。界面自己拼 `selectAgentSkills(agentDefinition(id), enabled)` 会复制一层调用约定并产生与运行时不同的结果，输入框选择器必须调用 `availableAgentSkills(agentId)`。
+- 唯一的登记例外：`app/adapters/agentSession.ts` 驱动 `agent/loop/runLoopAgent`，它是 app 与运行引擎之间的会话边界单元。
+- Agent 的运行状态只有一份归属：`runtime/runStore` 保存真实运行与会话事实，`app/adapters/agentSession.ts` 持有面板运行态（忙闲、活跃请求、待投递队列、steering）。适配层与界面组件不得再各自留一份"现在忙不忙"之类的模块级单例。
+
 ## Agent 定义与工具可见性
 
 `renderer/src/agent/agents/definitions.ts` 是每个 Agent 的工具、Skill、副作用上限和可派发子 Agent 的唯一来源。会话记录用 `agentId` 表明归属，运行时不得再从 `editorNodeId`、工具名前缀或界面作用域反推 Agent 身份。
@@ -147,6 +175,12 @@ Shotloom 的 Agent 以模型为决策主体。不要在应用代码中用关键�
 - 只有一个输入模式时不显示无意义的模式下拉；有两个及以上模式时才在设置面板展示模式切换。
 - 新模型增加大量参数时，应由设置面板内部滚动承载，不能恢复底栏横向堆叠，也不能让弹层被参数容器裁切。
 
+## 生成节点模块边界
+
+- `app/canvas/generationNodeState.ts` 是节点派生值的唯一来源：输出选择、活动媒体、模型目录、参数、输入模式和文本正文都在这里算一次，媒体体、输入面板和参数面板只消费同一份结果，不得各自重算。
+- `GenerationNode.tsx` 只做组装和节点名称标签；`GenerationNodePreview.tsx` 拥有媒体与播放状态；`GenerationNodeImageOverlays.tsx` 拥有裁剪和标注；`GenerationNodeComposer.tsx` 拥有输入面板交互；`GenerationSettingsPanel.tsx` 只按目录 presentation 渲染控件。
+- 界面契约测试读取这组模块的拼接源码（`tests/helpers/generationNodeSource.mjs`），拆分文件时不要改成只读单个文件，也不要把同一个契约复制到各文件的测试里。
+
 ## 画布资源下载规则
 
 - 下载一个本地资源时必须直接导出原始文件，保留文件名和扩展名，不得为单文件生成 ZIP 资源包。
@@ -158,9 +192,34 @@ Shotloom 的 Agent 以模型为决策主体。不要在应用代码中用关键�
 - 引用节点的入口统一放在 React Flow `NodeToolbar` 选中工具栏中，仅当节点被选中时显示，并使用“加入对话”语义文案而不是孤立 `@`。工具栏属于画布内部屏幕空间操作层，不随节点语义缩放改变控件尺寸。
 - 选中媒体节点时，工具栏应根据真实本地输出展示“存为资产”；视频节点还可展示“音频分离”。两者必须调用真实素材库和 FFmpeg 能力，不得只渲染无行为按钮。音频分离成功后创建普通音频节点并登记项目素材；无音轨时明确报错。
 
+## 样式分层与色阶
+
+- 全局样式按界面区域分文件（`renderer/styles/<area>.css`），`renderer/src/main.tsx` 的导入顺序就是层叠顺序：调整先后等于改优先级。`tokens.css` 必须最先导入，新增区域样式表要同时在这里登记——写了不导入等于写死样式。
+- `renderer/styles.css` 只保留 reset、滚动条与焦点环这一层基础语言，不得出现组件选择器，也不得定义自定义属性。组件样式属于区域文件或组件自己的 `*.module.css`。
+- 颜色只从 `renderer/styles/tokens.css` 的具名令牌出发。组件规则里不得再手写 hex、`rgb()/rgba()`、`hsl()`：同一角色的灰底、遮罩、可拖拽细条、半透明浮层和强调色底/描边各有唯一档位，界面层在 `.dark` 里必须换向，否则暗色主题会出现脏白底和看不见描边。
+- 具体色值只允许写在自定义属性声明上（`tokens.css` 与厂商主题层）。压在图片/视频上的 `--overlay-*` 不做深色镜像：它属于素材不属于界面。
+- `renderer/src/vendor/` 是上游第三方样式，保持原样、不参与色阶规则，由 3D 导演台宿主适配层隔离。
+- 以上边界由 `scripts/verify-styles.mjs`（`npm run check:styles`）机器检查，它同时拒绝没有真实定义的 `var()` 引用。
+
+## Vendored 第三方应用
+
+`renderer/src/vendor/storyai-3d-director-desk/` 保留上游源码，作为一个独立的 iframe 应用运行（入口 `renderer/director-desk.html`）。它与产品之间唯一的通道是那份私有 postMessage 协议，产品侧唯一的拥有者是 `renderer/src/app/adapters/directorDeskBridge.ts`。
+
+- 产品代码不得 import `vendor/` 下的任何模块：源码级依赖会让上游更新变成一次产品内重构，也会让上游的 zustand store 变成界面可达的状态源。
+- 协议消息名（`storyai:director-desk-*`）和 iframe 入口地址只允许写在宿主适配层里。画布组件消费类型化回调（`onReady`、`onProjectChanged`、`onCaptures`……），不得自己比较字符串。
+- 来源校验属于协议：宿主只接受同源且确实来自当前导演台窗口的消息，其他 iframe 或扩展发来的同名消息不算回执。
+- 导演台的输入（会话、全景图）与回执（工程变更、截图、连线移除）都在适配层一次构造和整形完毕；上游协议变更时只改这一个文件。
+- 以上边界由 `scripts/verify-module-discipline.mjs`（`npm run check:layers`）检查：分层表里没有通往 `vendor` 的许可，产品文件出现契约字符串即视为违规。
+
 ## 实现与重构要求
 
 - 不保留旧逻辑兼容层；确定新契约后删除旧字段、旧分支和旧测试。
+- 目录只按职责存在，不再设 `composables/`、`types/` 这类按语法形态分装的杂物层：应用生命周期逻辑属于 `app/`（关闭确认守卫就在 `app/windowCloseGuard.ts`），类型与常量跟着使用它的模块走，没有消费者的导出就删掉。环境声明集中在 `renderer/src/env.d.ts`。
+- `scripts/verify-module-discipline.mjs` 的分层表就是目录清单：未登记的顶层目录和源根目录里的游离源文件都会被拒绝，新增目录必须在这里说明它拥有什么职责。
+- 内部 import 说明符必须解析到真实源文件。JS→TS 迁移不得留下 `./x.js` 后缀残留：TypeScript 能把它解析到 `x.ts`，Vite 与 Tauri 运行时却直接 404；`scripts/verify-module-discipline.mjs` 会拒绝无法解析的说明符。
+- 互相引用（同一强连通分量）的模块只能在函数调用时读取对方的导出绑定，不得在模块作用域快照一份（`const store = rawStore as X`）：求值顺序只取决于入口，浏览器、SSR 与生产构建各不相同，读早了就是 `Cannot access 'x' before initialization` 白屏，而各从不同入口进来的单测看不见它。该边界由 `scripts/verify-module-discipline.mjs`（`npm run check:layers`）检查；需要类型视图时在回调参数上显式标注，或给被依赖模块的导出补类型。`tests/app-boot.test.mjs` 只负责入口模块图能求值。
+- `renderer/src` 只允许 `.ts/.tsx`，`tsconfig.json` 保持 `allowJs: false`：`include` 只覆盖有类型模块，混进来的 `.js` 能构建、能运行，却永远不会被 `tsc` 检查过一眼，等于重开一个无类型死角。
+- 测试的共享装配只有一份：读产品源码走 `tests/helpers/sourceContract.mjs`（仓库根相对路径 + 缓存），在渲染进程源码上跑真实模块图走 `tests/helpers/rendererSsr.mjs`。测试文件自己拼 `readFileSync(new URL(...))` 或起 `createServer()` 会被 `scripts/verify-test-architecture.mjs`（`npm run check:tests`）拒绝。用例之间的工具注册表清空由 `beforeEach`/`afterEach` 钩子负责，断言抛异常时钩子照样执行；权限与结论回合一类契约测试必须消费循环自己派生的事件出口，不得在测试里替它接线。
 - 注释解释设计边界和原因，不复述代码表面行为。
 - 减少无意义的小函数和嵌套三元表达式，优先使用清晰的顺序逻辑。
 - 测试应验证权限、安全、事实和持久化边界，不要通过测试固化模型本应负责的启发式判断。

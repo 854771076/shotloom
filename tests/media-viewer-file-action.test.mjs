@@ -1,13 +1,14 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+
 import test from 'node:test';
-const viewer = readFileSync(new URL('../renderer/src/app/components/MediaViewer.tsx', import.meta.url), 'utf8');
-const styles = readFileSync(new URL('../renderer/styles/media-overlays.css', import.meta.url), 'utf8');
-const api = readFileSync(new URL('../renderer/src/services/tauriApi.js', import.meta.url), 'utf8');
-const overlay = readFileSync(new URL('../renderer/src/app/store/overlayStore.ts', import.meta.url), 'utf8');
+import { readSource } from './helpers/sourceContract.mjs';
+const viewer = readSource('renderer/src/app/components/MediaViewer.tsx');
+const styles = readSource('renderer/styles/media-overlays.css');
+const api = readSource('renderer/src/services/tauriApi.ts');
+const overlay = readSource('renderer/src/app/store/overlayStore.ts');
 test('放大预览的文件夹按钮在系统文件夹中定位原图', () => {
   assert.match(viewer, /在 Finder 中打开/); assert.match(viewer, /desktopApi\.file\.showItemInFolder/);
-  assert.match(api, /file_show_item_in_folder/); assert.match(api, /showItemInFolder: \(path\) => command\('file:show-item-in-folder', path\)/);
+  assert.match(api, /file_show_item_in_folder/); assert.match(api, /showItemInFolder: \(path: string\) => command\('file:show-item-in-folder', path\)/);
 });
 
 test('媒体详情使用顶部缩放、独立关闭和底部原文件操作', () => {

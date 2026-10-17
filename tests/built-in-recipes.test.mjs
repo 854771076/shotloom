@@ -6,7 +6,7 @@ import {
   builtInRecipes,
   withBuiltInRecipes,
   withoutBuiltInRecipes,
-} from '../renderer/src/services/builtInRecipes.js';
+} from '../renderer/src/services/builtInRecipes.ts';
 
 test('内置 Recipe 使用单一提示词策略结构', () => {
   assert.equal(builtInRecipes.length, 50);

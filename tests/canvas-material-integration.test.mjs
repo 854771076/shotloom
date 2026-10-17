@@ -1,16 +1,16 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { readSource } from './helpers/sourceContract.mjs';
 
-const navigation = readFileSync(new URL('../renderer/src/app/constants/navigation.ts', import.meta.url), 'utf8');
-const sidebar = readFileSync(new URL('../renderer/src/app/layout/SideBar.tsx', import.meta.url), 'utf8');
-const bottomBar = readFileSync(new URL('../renderer/src/app/canvas/BottomModeBar.tsx', import.meta.url), 'utf8');
-const creation = readFileSync(new URL('../renderer/src/app/views/CreationView.tsx', import.meta.url), 'utf8');
-const workbench = readFileSync(new URL('../renderer/src/app/ReactWorkbench.tsx', import.meta.url), 'utf8');
-const libraryAdapter = readFileSync(new URL('../renderer/src/app/adapters/resourceLibraryAdapter.ts', import.meta.url), 'utf8');
-const materialGrid = readFileSync(new URL('../renderer/src/app/components/MaterialGrid.tsx', import.meta.url), 'utf8');
+const navigation = readSource('renderer/src/app/constants/navigation.ts');
+const sidebar = readSource('renderer/src/app/layout/SideBar.tsx');
+const bottomBar = readSource('renderer/src/app/canvas/BottomModeBar.tsx');
+const creation = readSource('renderer/src/app/views/CreationView.tsx');
+const workbench = readSource('renderer/src/app/ReactWorkbench.tsx');
+const libraryAdapter = readSource('renderer/src/app/adapters/resourceLibraryAdapter.ts');
+const materialGrid = readSource('renderer/src/app/components/MaterialGrid.tsx');
 const styles = ['project-materials.css', 'creation-view.css']
-  .map((name) => readFileSync(new URL(`../renderer/styles/${name}`, import.meta.url), 'utf8'))
+  .map((name) => readSource(`../renderer/styles/${name}`))
   .join('\n');
 
 test('素材入口从左侧导航收敛到画布底部', () => {
@@ -32,7 +32,7 @@ test('画布素材入口统一项目、全局和文件并支持搜索与导入',
   assert.match(creation, /Date\.parse[\s\S]*?assetSort === "oldest"/);
   assert.match(creation, /assetFiltersActive[\s\S]*?清除筛选/);
   assert.match(creation, /canvas-material-empty-icon[\s\S]*?这里还没有资产/);
-  assert.match(creation, /canvas-asset-popover-layer[\s\S]*?right: copilotVisible \? copilotWidth : 0/);
+  assert.match(creation, /canvas-asset-popover-layer[\s\S]*?right: agentPanelVisible \? agentPanelWidth : 0/);
   assert.match(creation, /if \(picker\)[\s\S]*?setPicker\(false\)/);
   assert.doesNotMatch(creation, /<h3>资产中心<\/h3>/);
   assert.doesNotMatch(creation, /<span>类型<\/span>|<span>分类<\/span>|<span>排序<\/span>/);

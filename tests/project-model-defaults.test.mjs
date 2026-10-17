@@ -3,7 +3,7 @@ import test from 'node:test';
 import {
   projectDefaultModelKey,
   resolveProjectDefaultModel,
-} from '../renderer/src/utils/projectModelDefaults.mjs';
+} from '../renderer/src/utils/projectModelDefaults.ts';
 
 test('项目按文本、图片、视频分别解析默认模型', () => {
   const settings = {

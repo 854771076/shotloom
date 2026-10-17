@@ -15,7 +15,7 @@ export interface AgentInputRoleValidation {
  * 不因当前模型能力上限拒绝连线。模型上限在执行阶段由 InputResolver 处理。
  */
 export function resolveAgentInputRole(
-  project: AgentProject,
+  _project: AgentProject,
   source: AgentNode | null | undefined,
   target: AgentNode | null | undefined,
   _requestedRole: AgentInputRole | 'auto' = 'auto',

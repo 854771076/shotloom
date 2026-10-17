@@ -7,6 +7,13 @@ import {
   type WorkflowNodeData,
   type WorkflowNodeRenderer,
 } from "./WorkflowCanvas";
+import {
+  directorDeskFrameSrc,
+  sendDirectorDeskPanorama,
+  sendDirectorDeskSession,
+  subscribeDirectorDesk,
+  type DirectorDeskPanorama,
+} from "../adapters/directorDeskBridge";
 import "./ThreeDDirectorNode.css";
 
 type IncomingImage = { edgeId: string; nodeId: string; name: string; url: string };
@@ -17,8 +24,14 @@ function readDirectorProject(node: WorkflowNodeData) {
   return project && typeof project === "object" && !Array.isArray(project) ? project : null;
 }
 
+// 导演台一次只容纳一张全景图，所以取当前输入里的最后一条连线。
+function toPanorama(image: IncomingImage | undefined): DirectorDeskPanorama | null {
+  if (!image) return null;
+  return { edgeId: image.edgeId, sourceNodeId: image.nodeId, name: image.name, url: image.url };
+}
+
 export const ThreeDDirectorNode: WorkflowNodeRenderer = memo(
-  ({ node, selected, resizing, inputRevision, actions, semanticZoom = 1 }) => {
+  ({ node, selected, resizing, inputRevision, actions }) => {
     const labelRoot = useContext(CanvasNodeLabelRootContext);
     const surface = useWorkbenchSurfaceRoot();
     const [incomingImages, setIncomingImages] = useState<IncomingImage[]>([]);
@@ -26,37 +39,19 @@ export const ThreeDDirectorNode: WorkflowNodeRenderer = memo(
     const [detailOpen, setDetailOpen] = useState(false);
     const detailIframeRef = useRef<HTMLIFrameElement>(null);
 
-    const postToDirectorFrames = useCallback((message: unknown) => {
-      detailIframeRef.current?.contentWindow?.postMessage(message, window.location.origin);
-    }, []);
+    const getFrame = useCallback(() => detailIframeRef.current, []);
 
     const sendSession = useCallback(() => {
-      postToDirectorFrames({
-        type: "storyai:director-desk-session",
-        payload: {
-          instanceId: node.id,
-          theme: "light",
-          project: readDirectorProject(node),
-        },
+      sendDirectorDeskSession(detailIframeRef.current, {
+        instanceId: node.id,
+        theme: "light",
+        project: readDirectorProject(node),
       });
-    }, [node, postToDirectorFrames]);
+    }, [node]);
 
     const sendPanorama = useCallback(() => {
-      const image = incomingImages.at(-1);
-      if (!image) {
-        postToDirectorFrames({ type: "storyai:director-desk-panorama-clear" });
-        return;
-      }
-      postToDirectorFrames({
-        type: "storyai:director-desk-panorama",
-        payload: {
-          edgeId: image.edgeId,
-          sourceNodeId: image.nodeId,
-          imageUrl: image.url,
-          fileName: image.name,
-        },
-      });
-    }, [incomingImages, postToDirectorFrames]);
+      sendDirectorDeskPanorama(detailIframeRef.current, toPanorama(incomingImages.at(-1)));
+    }, [incomingImages]);
 
     useEffect(() => {
       void actions.getDirectorIncomingImages(node.id).then(setIncomingImages);
@@ -86,69 +81,33 @@ export const ThreeDDirectorNode: WorkflowNodeRenderer = memo(
     }, [incomingImages, sendPanorama]);
 
     useEffect(() => {
-      const handleMessage = (event: MessageEvent) => {
-        if (
-          event.origin !== window.location.origin ||
-          event.source !== detailIframeRef.current?.contentWindow
-        )
-          return;
-        const message = event.data as { type?: string; payload?: Record<string, unknown> };
-        if (message.type === "storyai:director-desk-ready") {
+      const unsubscribe = subscribeDirectorDesk(getFrame, {
+        onReady: () => {
           sendSession();
           sendPanorama();
-          return;
-        }
-        if (message.type === "storyai:director-desk-interaction") {
-          actions.select(node.id);
-          return;
-        }
-        if (message.type === "storyai:director-desk-exit-interaction") {
+        },
+        onInteraction: () => actions.select(node.id),
+        onExitInteraction: () => {
           setInteracting(false);
           setDetailOpen(false);
-          return;
-        }
-        // 详情窗口没有自己的标题栏，导演台顶栏的 × 是唯一的关闭入口。
-        if (message.type === "storyai:director-desk-close") {
-          setInteracting(false);
-          setDetailOpen(false);
-          return;
-        }
-        if (message.type === "storyai:director-desk-delete-node") {
-          actions.delete(node.id);
-          return;
-        }
-        if (message.type === "storyai:director-desk-panorama-removed") {
-          const edgeId = String(message.payload?.edgeId || "");
+        },
+        onDeleteNode: () => actions.delete(node.id),
+        onPanoramaRemoved: (edgeId) => {
           if (edgeId) actions.removeDirectorIncomingEdge(node.id, edgeId);
-          return;
-        }
-        if (message.type === "storyai:director-desk-project-changed") {
-          const project = message.payload?.project;
-          if (project && typeof project === "object" && !Array.isArray(project)) {
-            actions.update(node.id, {
-              directorData: { project },
-              updatedAt: new Date().toISOString(),
-            });
+        },
+        onProjectChanged: (project) =>
+          actions.update(node.id, {
+            directorData: { project },
+            updatedAt: new Date().toISOString(),
+          }),
+        onCaptures: (captures) => {
+          for (const capture of captures) {
+            void actions.exportDirectorAsset(node.id, capture.dataUrl, capture.fileName, "image");
           }
-          return;
-        }
-        if (message.type === "storyai:director-desk-captures-sent") {
-          const captures = Array.isArray(message.payload?.captures) ? message.payload.captures : [];
-          captures.forEach((capture, index) => {
-            if (!capture || typeof capture !== "object") return;
-            const value = capture as { dataUrl?: unknown; fileName?: unknown };
-            if (typeof value.dataUrl !== "string" || !value.dataUrl) return;
-            const fileName =
-              typeof value.fileName === "string" && value.fileName
-                ? value.fileName
-                : `director-desk-capture-${index + 1}.png`;
-            void actions.exportDirectorAsset(node.id, value.dataUrl, fileName, "image");
-          });
-        }
-      };
-      window.addEventListener("message", handleMessage);
-      return () => window.removeEventListener("message", handleMessage);
-    }, [actions, node.id, sendPanorama, sendSession]);
+        },
+      });
+      return unsubscribe;
+    }, [actions, getFrame, node.id, sendPanorama, sendSession]);
 
     return (
       <>
@@ -227,7 +186,7 @@ export const ThreeDDirectorNode: WorkflowNodeRenderer = memo(
             <iframe
               ref={detailIframeRef}
               // 详情窗口使用独立布局；embedded=canvas 会触发导演台的缩略嵌入样式。
-              src={`./director-desk.html?instanceId=${encodeURIComponent(node.id)}&theme=light`}
+              src={directorDeskFrameSrc(node.id, "light")}
               title="3D 导演台详情"
               className="director-detail-frame"
               onLoad={() => { sendSession(); sendPanorama(); }}

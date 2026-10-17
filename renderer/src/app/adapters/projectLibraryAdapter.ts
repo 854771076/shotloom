@@ -1,4 +1,4 @@
-import { desktopApi } from "../../services/desktopApi.js";
+import { desktopApi } from "../../services/desktopApi.ts";
 import {
   cloneRecentProject,
   createNewProject,
@@ -12,10 +12,10 @@ import {
   showProjectInFolder,
   store,
   trashRecentProject,
-} from "../../store/projectStore.js";
-import { settingsStore } from "../../store/settingsStore.js";
-import { hasActiveGenerationTasks } from "../../store/taskStore.js";
-import { showToast } from "../store/overlayStore";
+} from "../../store/projectStore.ts";
+import { settingsStore } from "../../store/settingsStore.ts";
+import { hasActiveGenerationTasks } from "../../store/taskStore.ts";
+import { showToast } from "../../store/notificationStore";
 import type {
   LibraryEntry,
   ProjectFolderEntry,
@@ -122,12 +122,12 @@ export const projectLibraryController: ProjectsController = {
       store.projectDir,
       result.oldDir,
       result.newDir,
-    );
+    ) as string | null;
     store.filePath = replacePathPrefix(
       store.filePath,
       result.oldDir,
       result.newDir,
-    );
+    ) as string | null;
     for (const key of ["library", "series"]) {
       const boundary = store.project[key];
       if (!boundary) continue;

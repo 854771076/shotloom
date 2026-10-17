@@ -5,10 +5,10 @@ import { UE4MannequinModel } from "./UE4MannequinModel";
 import type { CharacterBodyType } from "./mannequin/bodyTypes";
 
 interface CharacterModelProps {
-  bodyType?: CharacterBodyType;
-  color?: string;
-  onLabelAnchorYChange?: (anchorY: number) => void;
-  rigState?: CharacterRigState;
+  bodyType?: CharacterBodyType | undefined;
+  color?: string | undefined;
+  onLabelAnchorYChange?: ((anchorY: number) => void) | undefined;
+  rigState?: CharacterRigState | undefined;
 }
 
 class CharacterModelBoundary extends Component<
@@ -20,13 +20,13 @@ class CharacterModelBoundary extends Component<
     hasError: boolean;
   }
 > {
-  state = { hasError: false };
+  override state = { hasError: false };
 
   static getDerivedStateFromError() {
     return { hasError: true };
   }
 
-  render() {
+  override render() {
     return this.state.hasError ? this.props.fallback : this.props.children;
   }
 }

@@ -203,7 +203,7 @@
   overflow-wrap: anywhere;
   transform-origin: center;
   background: transparent !important;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, .42);
+  text-shadow: var(--overlay-cast-text);
   pointer-events: auto;
   cursor: move;
   touch-action: none;
@@ -419,7 +419,7 @@
 .ov-clip-trim.is-start { left: 0; }
 .ov-clip-trim.is-end { right: 0; }
 .ov-clip:hover .ov-clip-trim, .ov-clip.selected .ov-clip-trim { opacity: 1; }
-.ov-clip-trim:hover { background: rgba(255, 255, 255, .28); }
+.ov-clip-trim:hover { background: var(--overlay-fill-strong); }
 .ov-clip i,
 .ov-clip small { position: relative; z-index: 2; }
 .ov-clip i { font-weight: 500; }
@@ -435,7 +435,7 @@
   position: absolute;
   inset: 0;
   z-index: 1;
-  background: linear-gradient(90deg, rgba(5, 17, 26, .42), transparent 34%, rgba(5, 17, 26, .14));
+  background: linear-gradient(90deg, var(--overlay-shade-mid), transparent 34%, var(--overlay-shade-faint));
   pointer-events: none;
 }
 .ov-clip-media {
@@ -467,7 +467,7 @@
 }
 @keyframes ov-clip-frame-loading { to { background-position: -240% 0; } }
 .ov-clip.has-media small { color: var(--muted); }
-.ov-clip.has-thumbnail small { color: rgba(255, 255, 255, .8); }
+.ov-clip.has-thumbnail small { color: var(--overlay-ink-muted); }
 .ov-playhead { top: 20px; }
 @media (max-width: 1180px) {
   .ov-stage { grid-template-columns: 40px 220px minmax(400px, 1fr) 250px; gap: 4px; }

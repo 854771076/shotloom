@@ -8,7 +8,6 @@ import {
   useRef,
 } from "react";
 import {
-  MIN_DURATION,
   addEditorTrack,
   editorClipDuration,
   findEditorClip,
@@ -16,7 +15,7 @@ import {
   snapEditorClipStart,
   trimEditorClip,
   updateEditorClip,
-} from "../../utils/videoEditorProject.mjs";
+} from "../../utils/videoEditorProject.ts";
 import { constrainTransformToCanvas, resizeEditorTransform, type TransformCorner } from "./videoEditorModel";
 import type { VideoEditorRuntimeRef } from "./videoEditorRuntimeTypes";
 import type {

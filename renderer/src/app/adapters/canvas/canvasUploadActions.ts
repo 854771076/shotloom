@@ -2,10 +2,10 @@ import {
   copyFileIntoProjectAssets,
   inferFileResourceType,
   registerImportedMaterial,
-} from "../../../store/assetStore.js";
-import { addNode } from "../../../store/nodeStore.js";
-import { store, touchProject } from "../../../store/projectStore.js";
-import { showToast } from "../../store/overlayStore";
+} from "../../../store/assetStore.ts";
+import { addNode } from "../../../store/nodeStore.ts";
+import { store, touchProject } from "../../../store/projectStore.ts";
+import { showToast } from "../../../store/notificationStore";
 
 export async function createUploadedNode(rawFile: any, position = { x: 120, y: 90 }) {
   const file: any = await copyFileIntoProjectAssets(rawFile);

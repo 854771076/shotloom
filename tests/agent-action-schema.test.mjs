@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+
 import test from 'node:test';
 
 import { classifyAgentToolResult, validateToolInput } from '../renderer/src/agent/core/toolRegistry.ts';
@@ -8,19 +8,17 @@ import {
   flattenAgentActionSchema,
   normalizeAgentAction,
 } from '../renderer/src/agent/tools/agentProtocol.ts';
-import { IncrementalActionsParser } from '../renderer/src/utils/chatCompletionStream.mjs';
-import { MODEL_AGENT_CANVAS_ACTION_TYPES } from '../renderer/src/utils/agentCanvasActionTypes.mjs';
+import { IncrementalActionsParser } from '../renderer/src/utils/chatCompletionStream.ts';
+import { MODEL_AGENT_CANVAS_ACTION_TYPES } from '../renderer/src/utils/agentCanvasActionTypes.ts';
 import {
   compileGenerationNodeConfig,
   generationNodeConfig,
   generationOutputSpec,
 } from '../renderer/src/domain/graph/GenerationNodeContract.ts';
 import { validateGraphMutations } from '../renderer/src/domain/graph/GraphValidator.ts';
+import { readSource } from './helpers/sourceContract.mjs';
 
-const contract = JSON.parse(readFileSync(
-  new URL('../renderer/src/config/agent-action-contract.json', import.meta.url),
-  'utf8',
-));
+const contract = JSON.parse(readSource('renderer/src/config/agent-action-contract.json'));
 
 test('模型可见 action schema 只在工具边界约束动作类型', () => {
   const schema = buildAgentActionSchema(contract, {
