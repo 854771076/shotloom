@@ -37,6 +37,7 @@ test('Skill 由 Agent 定义解析后交给 loop 的 skill 工具按需加载', 
 
 test('Skill 路由仍要求完整语义，不恢复关键词猜测', () => {
   assert.match(prompt, /不得按孤立关键词路由/);
+  assert.match(prompt, /角色版、角色三视图、角色转面.*必须加载 `character-board` Skill/);
   assert.equal(existsSync(new URL('../renderer/src/utils/skillRouting.mjs', import.meta.url)), false);
   assert.equal(existsSync(new URL('../renderer/src/agent/runtime/skillRoutingDecision.ts', import.meta.url)), false);
 });

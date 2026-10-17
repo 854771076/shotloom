@@ -70,6 +70,9 @@ const paths = {
   search: '<path d="m21 21-4.3-4.3"/><circle cx="11" cy="11" r="8"/>',
   scissors:
     '<circle cx="6" cy="7" r="3"/><circle cx="6" cy="17" r="3"/><path d="m8.7 8.5 11.3 6.5"/><path d="m8.7 15.5 4.6-2.6"/>',
+  square: '<rect x="4" y="4" width="16" height="16" rx="1"/>',
+  circle: '<circle cx="12" cy="12" r="8"/>',
+  minus: '<path d="M4 12h16"/>',
   shapes:
     '<circle cx="8" cy="7" r="3"/><path d="M15 4h5v6h-5z"/><path d="m7 14-4 7h8z"/><path d="m18 14 4 7h-8z"/>',
   shuffle:

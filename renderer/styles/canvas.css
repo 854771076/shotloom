@@ -158,6 +158,101 @@
   margin-left: -1px;
   opacity: .55;
 }
+.canvas-image-annotation-editor {
+  position: absolute;
+  z-index: 18;
+  overflow: visible;
+  pointer-events: auto;
+}
+.canvas-image-annotation-editor .screenshots { position: absolute; inset: 0; width: 100% !important; height: 100% !important; background: transparent; }
+.canvas-image-annotation-editor .screenshots-canvas { position: absolute; inset: 0; width: 100% !important; height: 100% !important; transform: none !important; }
+.canvas-image-annotation-editor .screenshots-canvas-image { opacity: 1 !important; }
+.canvas-image-annotation-editor .screenshots-canvas-border-top,
+.canvas-image-annotation-editor .screenshots-canvas-border-right,
+.canvas-image-annotation-editor .screenshots-canvas-border-bottom,
+.canvas-image-annotation-editor .screenshots-canvas-border-left,
+.canvas-image-annotation-editor .screenshots-canvas-point-top,
+.canvas-image-annotation-editor .screenshots-canvas-point-top-right,
+.canvas-image-annotation-editor .screenshots-canvas-point-right,
+.canvas-image-annotation-editor .screenshots-canvas-point-right-bottom,
+.canvas-image-annotation-editor .screenshots-canvas-point-bottom,
+.canvas-image-annotation-editor .screenshots-canvas-point-bottom-left,
+.canvas-image-annotation-editor .screenshots-canvas-point-left,
+.canvas-image-annotation-editor .screenshots-canvas-point-left-top { display: none !important; }
+.canvas-image-annotation-editor .screenshots-operations {
+  top: -112px;
+  left: 50%;
+  z-index: 4;
+  transform: translateX(-50%) !important;
+  transform-origin: top center;
+  scale: 1;
+}
+.canvas-image-annotation-editor .screenshots-operations-buttons {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 8px;
+  background: rgba(255, 255, 255, .98);
+  border: 1px solid rgba(31, 41, 55, .1);
+  border-radius: 18px;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, .14);
+}
+.canvas-image-annotation-editor .screenshots-button {
+  width: 42px;
+  height: 42px;
+  margin: 0 2px;
+  font-size: 24px;
+  line-height: 42px;
+  border-radius: 11px;
+}
+.canvas-image-annotation-editor .screenshots-operations-divider {
+  height: 32px;
+  margin: 0 7px;
+}
+body .screenshots-option-container {
+  min-height: 44px;
+  padding: 5px 8px;
+  border: 1px solid rgba(31, 41, 55, .14);
+  border-radius: 9px;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, .14);
+}
+body .screenshots-option .screenshots-button {
+  width: 38px;
+  height: 38px;
+  margin: 0 3px;
+  line-height: 38px;
+}
+body .screenshots-option .screenshots-size-item,
+body .screenshots-option .screenshots-color-item {
+  width: 34px;
+  height: 34px;
+  margin: 0 4px;
+}
+body.annotation-editor-open .screenshots-option {
+  z-index: 240 !important;
+  pointer-events: auto;
+  visibility: visible !important;
+  position: fixed !important;
+  transform: none !important;
+}
+body.annotation-editor-open .screenshots-option-arrow {
+  top: 100%;
+  bottom: auto;
+  border-top-color: #fff;
+  border-bottom-color: transparent;
+  transform: translate(-50%, -1px);
+}
+body.annotation-editor-open .screenshots-textarea {
+  z-index: 260 !important;
+  pointer-events: auto !important;
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  min-width: 120px;
+  min-height: 32px;
+  padding: 4px 6px;
+  background: rgba(255, 255, 255, .82);
+  caret-color: currentColor;
+}
 .canvas-node-asset-scope-menu {
   position: absolute;
   width: 220px;

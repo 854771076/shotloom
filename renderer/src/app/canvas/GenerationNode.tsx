@@ -24,6 +24,7 @@ import { settingsStore } from "../../store/settingsStore.js";
 import { getImageStylePreset, IMAGE_STYLE_PRESETS } from "../../utils/imageStylePresets.mjs";
 import { IconSymbol } from "../components/IconSymbol";
 import { ImageCropEditor } from "../components/ImageCropEditor";
+import { ImageAnnotationEditor, ImageAnnotationOverlay, type ImageAnnotation } from "../components/ImageAnnotationEditor";
 import { ProviderBrandIcon } from "../components/ProviderBrandIcon";
 import { CameraControlPanel } from "./CameraControlPanel";
 import { DEFAULT_CAMERA_CONFIG, normalizeCameraConfig } from "../../utils/cameraConfig.js";
@@ -231,6 +232,9 @@ export const GenerationNode: WorkflowNodeRenderer = memo(({
   actions,
   imageCropOpen = false,
   onImageCropClose,
+  imageAnnotationOpen = false,
+  onImageAnnotationClose,
+  semanticZoom = 1,
 }) => {
   const [openMenu, setOpenMenu] = useState("");
   const videoPreviewRef = useRef<HTMLVideoElement>(null);
@@ -239,6 +243,7 @@ export const GenerationNode: WorkflowNodeRenderer = memo(({
   const [videoPlaying, setVideoPlaying] = useState(false);
   const [videoMuted, setVideoMuted] = useState(false);
   const [imageSize, setImageSize] = useState({ width: 1, height: 1 });
+  const annotationAnchorRef = useRef<HTMLDivElement>(null);
   const labelRoot = useContext(CanvasNodeLabelRootContext);
   const overlayRoot = useContext(CanvasOverlayRootContext);
   const previewZoom = useContext(CanvasPreviewZoomContext);
@@ -267,11 +272,16 @@ export const GenerationNode: WorkflowNodeRenderer = memo(({
     selectedOutput?.fileName || uploaded?.name || node.title ||
       (activeKind === "video" ? "video.mp4" : "image.png"),
   );
+  const annotatedPreviewPath = String((node as Record<string, unknown>).annotationImagePath || "");
+  const annotatedPreviewUrl = String((node as Record<string, unknown>).annotationImageUrl || "");
+  const previewItem = annotatedPreviewPath || annotatedPreviewUrl
+    ? { ...(active || {}), filePath: annotatedPreviewPath, previewUrl: annotatedPreviewUrl }
+    : active;
   const {
     url: previewUrl,
     retryBuffered: retryBufferedPreview,
     buffered: bufferedPreview,
-  } = useGenerationLocalPreview(active, activeKind, previewZoom);
+  } = useGenerationLocalPreview(previewItem, activeKind, previewZoom);
   const kind = node.type.replace("Generation", "");
   const meta = getTypeMeta(node.type);
   const busy = ["running", "queued"].includes(String(node.status));
@@ -428,6 +438,7 @@ export const GenerationNode: WorkflowNodeRenderer = memo(({
       <div className="work-visual-block">
         <div className={`work-node work-node-${kind}${selected ? " selected" : ""}`}>
           <div
+            ref={annotationAnchorRef}
             className={`work-preview ${
               node.type === "videoGeneration" ? "wide" : "square"
             } ${kind}`}
@@ -567,6 +578,37 @@ export const GenerationNode: WorkflowNodeRenderer = memo(({
                 onCancel={() => onImageCropClose?.()}
                 onConfirm={(rect) => actions.cropImage(node.id, rect)}
                 onSplit={(rows, cols, selected, rect) => actions.splitImageGrid(node.id, rows, cols, selected, rect)}
+              />
+            )}
+            {activeKind === "image" && previewUrl && !imageAnnotationOpen && Array.isArray(node.annotationData) && (
+              <ImageAnnotationOverlay annotations={node.annotationData as ImageAnnotation[]} />
+            )}
+            {imageAnnotationOpen && activeKind === "image" && previewUrl && (
+              <ImageAnnotationEditor
+                imageUrl={previewUrl}
+                imageWidth={imageSize.width}
+                imageHeight={imageSize.height}
+                semanticZoom={semanticZoom}
+                root={overlayRoot}
+                anchorRef={annotationAnchorRef}
+                onCancel={() => onImageAnnotationClose?.()}
+                onSave={async ({ blob }) => {
+                  const dataUrl = await new Promise<string>((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(String(reader.result || ""));
+                    reader.onerror = () => reject(reader.error || new Error("标注图片读取失败"));
+                    reader.readAsDataURL(blob);
+                  });
+                  const preferredName = `${String(node.title || "image").replace(/[\\/:*?"<>|]/g, "_")}-annotated.png`;
+                  const saved = await desktopApi.file.saveDataUrlToProject(dataUrl, preferredName);
+                  actions.update(node.id, {
+                    annotationData: [],
+                    annotationImagePath: String(saved?.filePath || saved?.path || ""),
+                    annotationImageUrl: dataUrl,
+                    updatedAt: new Date().toISOString(),
+                  });
+                  onImageAnnotationClose?.();
+                }}
               />
             )}
             {activeKind === "video" && previewUrl && (

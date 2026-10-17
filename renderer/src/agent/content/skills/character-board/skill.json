@@ -1,0 +1,18 @@
+{
+  "id": "character-board",
+  "category": "video",
+  "version": 1,
+  "triggers": {
+    "keywords": [
+      "角色版",
+      "角色三视图",
+      "角色转面",
+      "人物三视图",
+      "角色设定图",
+      "角色设定版",
+      "人物设定图",
+      "角色模卡",
+      "character sheet"
+    ]
+  }
+}

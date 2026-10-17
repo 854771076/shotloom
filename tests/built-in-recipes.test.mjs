@@ -44,20 +44,17 @@ test('长篇来源使用原作分析和影视剧本改编两个独立 Recipe', (
   assert.match(screenplay?.systemPrompt || '', /不得冒充原作事实/);
 });
 
-test('角色板采用电影开发式总板并保持跨区域身份一致', () => {
+test('角色板保留左侧正脸大特写并保持三视图身份一致', () => {
   const byId = new Map(builtInRecipes.map((recipe) => [recipe.id, recipe]));
   for (const recipeId of ['video-character-turnaround', 'drama-character-turnaround']) {
     const recipe = byId.get(recipeId);
     const prompt = recipe?.systemPrompt || '';
-    assert.equal(recipe?.version, 3);
-    assert.match(prompt, /主立像/);
-    assert.match(prompt, /正面、3\/4、侧面、背面/);
-    assert.match(prompt, /头部角度研究/);
-    assert.match(prompt, /核心剧情情绪/);
-    assert.match(prompt, /服装.*配件/);
-    assert.match(prompt, /充足留白/);
-    assert.match(prompt, /不对称/);
-    assert.match(prompt, /不要默认.*真人/);
+    assert.equal(recipe?.version, 5);
+    assert.match(prompt, /左侧最大正脸人像特写/);
+    assert.match(prompt, /右侧正面\/侧面\/背面全身视图/);
+    assert.match(prompt, /背景使用干净的浅灰|背景干净纯色/);
+    assert.match(prompt, /三视图同尺度、脚底对齐/);
+    assert.match(prompt, /不加入额外头部角度、表情头像/);
   }
 });
 
@@ -104,7 +101,8 @@ test('剧本生视频使用独立的中文元素图和 Seedance 2.0 提示词协
   const video = byId.get('script-seedance-shot');
   assert.equal(image?.generationType, 'image');
   assert.match(image?.systemPrompt || '', /中文自然语言/);
-  assert.match(image?.systemPrompt || '', /横向 16:9 电影开发总板/);
+  assert.match(image?.systemPrompt || '', /横向 16:9 简洁角色开发板/);
+  assert.match(image?.systemPrompt || '', /左侧放置最大的人脸正面/);
   assert.match(image?.systemPrompt || '', /不模仿在世艺术家/);
   assert.equal(video?.generationType, 'video');
   assert.match(video?.systemPrompt || '', /摄像机 → 主体 → 空间 → 音频/);

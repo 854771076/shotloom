@@ -4,6 +4,7 @@ import {
   testRecipe,
 } from "../../services/recipeTestService";
 import { IconSymbol } from "../components/IconSymbol";
+import { configurableSkillAgents } from "../../agent/core/skillAssignments";
 
 type CatalogRecord = Record<string, unknown>;
 export interface RecipeDraft extends CatalogRecord {
@@ -27,6 +28,7 @@ export interface SkillDraft extends CatalogRecord {
   builtIn?: boolean;
   triggers: { keywords: string[] };
   instructions: string;
+  agentIds?: string[];
 }
 type TestResult = {
   prompt: string;
@@ -440,6 +442,29 @@ export function SkillEditorDialog({
             />
             <small>这些词只作为 Router 理解用途的目录元数据，不触发代码路由。</small>
           </label>
+          <fieldset className="recipe-field skill-agent-field">
+            <legend>可用 Agent</legend>
+            <small>只控制这个 Skill 是否进入对应 Agent 的上下文，不改变 Agent 的工具权限。</small>
+            <div className="skill-agent-options">
+              {configurableSkillAgents.map((agent) => {
+                const checked = (draft.agentIds || []).includes(agent.id);
+                return (
+                  <label key={agent.id}>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => patch({
+                        agentIds: checked
+                          ? (draft.agentIds || []).filter((id) => id !== agent.id)
+                          : [...(draft.agentIds || []), agent.id],
+                      })}
+                    />
+                    {agent.label}
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
           <label className="recipe-field skill-instruction-field">
             <span>
               技能指令 <em>{draft.instructions.length} 字</em>

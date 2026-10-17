@@ -136,6 +136,8 @@ export type WorkflowNodeRenderer = ComponentType<{
   semanticZoom?: number;
   imageCropOpen?: boolean;
   onImageCropClose?: () => void;
+  imageAnnotationOpen?: boolean;
+  onImageAnnotationClose?: () => void;
 }>;
 export interface WorkflowCanvasController {
   moveNodes: (
@@ -164,6 +166,7 @@ export const MentionContext = createContext<((nodeId: string) => void) | null>(n
 export const CanvasOverlayRootContext = createContext<HTMLElement | null>(null);
 export const CanvasNodeLabelRootContext = createContext<HTMLElement | null>(null);
 export const CanvasPreviewZoomContext = createContext(1);
+const CanvasFocusNodesContext = createContext<((nodeIds: string[]) => void) | null>(null);
 
 // Tauri on macOS is backed by WKWebView. Its CSS zoom implementation has
 // differed from Chromium in nested layout and form controls, so use the
@@ -390,8 +393,10 @@ function CanvasNode({ data, selected, dragging }: NodeProps<FlowNode>) {
   const item = data.node;
   const [resizing, setResizing] = useState(false);
   const [imageCropOpen, setImageCropOpen] = useState(false);
-  useEffect(() => { if (!selected) setImageCropOpen(false); }, [selected]);
+  const [imageAnnotationOpen, setImageAnnotationOpen] = useState(false);
+  useEffect(() => { if (!selected) { setImageCropOpen(false); setImageAnnotationOpen(false); } }, [selected]);
   const canvasOverlayRoot = useContext(CanvasOverlayRootContext);
+  const focusCanvasNodes = useContext(CanvasFocusNodesContext);
   const [labelRoot, setLabelRoot] = useState<HTMLElement | null>(null);
   const Renderer = registry[item.type] || FallbackNode;
   const resizable =
@@ -415,6 +420,11 @@ function CanvasNode({ data, selected, dragging }: NodeProps<FlowNode>) {
         canvasOverlayRoot={canvasOverlayRoot}
         imageCropOpen={imageCropOpen}
         onImageCropOpen={() => setImageCropOpen(true)}
+        imageAnnotationOpen={imageAnnotationOpen}
+        onImageAnnotationOpen={() => {
+          focusCanvasNodes?.([item.id]);
+          setImageAnnotationOpen(true);
+        }}
       />
       {selected && resizable && (
         <NodeResizer
@@ -472,6 +482,8 @@ function CanvasNode({ data, selected, dragging }: NodeProps<FlowNode>) {
           semanticZoom={semanticZoom}
           imageCropOpen={imageCropOpen}
           onImageCropClose={() => setImageCropOpen(false)}
+          imageAnnotationOpen={imageAnnotationOpen}
+          onImageAnnotationClose={() => setImageAnnotationOpen(false)}
         />
       </CanvasNodeSemanticContent>
       </CanvasNodeLabelRootContext.Provider>
@@ -563,6 +575,7 @@ export function WorkflowCanvas({
   const [liveViewport, setLiveViewport] = useState({ ...viewport, zoom: initialZoom });
   const draggingNodeIds = useRef(new Set<string>());
   const movementEndTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const viewportAnimationFrame = useRef<number | null>(null);
   const canvasRoot = useRef<HTMLElement>(null);
   const [canvasOverlayRoot, setCanvasOverlayRoot] = useState<HTMLElement | null>(null);
   const menuLayer = useRef<CanvasMenuLayerHandle>(null);
@@ -722,6 +735,7 @@ export function WorkflowCanvas({
   useEffect(
     () => () => {
       if (movementEndTimer.current) clearTimeout(movementEndTimer.current);
+      if (viewportAnimationFrame.current !== null) cancelAnimationFrame(viewportAnimationFrame.current);
     },
     [],
   );
@@ -814,12 +828,44 @@ export function WorkflowCanvas({
       };
     }, { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity });
     const viewport = canvasRoot.current.getBoundingClientRect();
-    const zoom = semanticZoomRef.current;
+    const contentWidth = Math.max(1, bounds.maxX - bounds.minX);
+    const contentHeight = Math.max(1, bounds.maxY - bounds.minY);
+    const singleNodeFocus = targets.length === 1;
+    const zoom = Math.min(
+      MAX_CANVAS_ZOOM,
+      Math.max(
+        singleNodeFocus ? 0.78 : MIN_CANVAS_ZOOM,
+        Math.min(
+          (viewport.width * (singleNodeFocus ? 0.82 : 0.68)) / contentWidth,
+          (viewport.height * (singleNodeFocus ? 0.72 : 0.68)) / contentHeight,
+        ),
+      ),
+    );
     const x = screenPixel(viewport.width / 2 - (bounds.minX + bounds.maxX) / 2 * zoom);
     const y = screenPixel(viewport.height / 2 - (bounds.minY + bounds.maxY) / 2 * zoom);
-    setLiveViewport({ x, y, zoom });
-    void instance.setViewport({ x, y, zoom: 1 }, { duration: 240 });
-    controller.saveViewport({ x: Math.round(x), y: Math.round(y), zoom });
+    if (viewportAnimationFrame.current !== null) cancelAnimationFrame(viewportAnimationFrame.current);
+    const fromZoom = semanticZoomRef.current;
+    const fromViewport = instance.getViewport();
+    const startedAt = performance.now();
+    const duration = 360;
+    const animate = (now: number) => {
+      const progress = Math.min(1, (now - startedAt) / duration);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const currentZoom = fromZoom + (zoom - fromZoom) * eased;
+      const currentX = fromViewport.x + (x - fromViewport.x) * eased;
+      const currentY = fromViewport.y + (y - fromViewport.y) * eased;
+      semanticZoomRef.current = currentZoom;
+      setSemanticZoom(currentZoom);
+      setLiveViewport({ x: currentX, y: currentY, zoom: currentZoom });
+      void instance.setViewport({ x: currentX, y: currentY, zoom: 1 });
+      if (progress < 1) {
+        viewportAnimationFrame.current = requestAnimationFrame(animate);
+      } else {
+        viewportAnimationFrame.current = null;
+        controller.saveViewport({ x: Math.round(x), y: Math.round(y), zoom });
+      }
+    };
+    viewportAnimationFrame.current = requestAnimationFrame(animate);
   }, [controller, instance, visible]);
   useEffect(() => {
     controller.registerFitView?.(instance ? fitCanvasView : null);
@@ -872,6 +918,7 @@ export function WorkflowCanvas({
         <MentionContext.Provider value={mentionInCopilot || null}>
         <CanvasPreviewZoomContext.Provider value={previewZoom}>
         <CanvasOverlayRootContext.Provider value={canvasOverlayRoot}>
+        <CanvasFocusNodesContext.Provider value={focusCanvasNodes}>
         <section
           ref={bindCanvasRoot}
           onDragOver={onArtifactDragOver}
@@ -885,6 +932,12 @@ export function WorkflowCanvas({
             }
           }}
           onWheelCapture={(event) => {
+            // Trackpad pinch gestures arrive as ctrlKey wheel events. They
+            // must not change the semantic canvas zoom.
+            if (event.ctrlKey) {
+              event.preventDefault();
+              return;
+            }
             const target = event.target as Element;
             if (
               target.closest(
@@ -1079,6 +1132,7 @@ export function WorkflowCanvas({
           </div>
           {overlay}
         </section>
+        </CanvasFocusNodesContext.Provider>
         </CanvasOverlayRootContext.Provider>
         </CanvasPreviewZoomContext.Provider>
         </MentionContext.Provider>

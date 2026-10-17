@@ -1,7 +1,7 @@
 {
   "id": "video-production",
   "category": "video",
-  "version": 11,
+  "version": 12,
   "triggers": {
     "keywords": [
       "视频制作",

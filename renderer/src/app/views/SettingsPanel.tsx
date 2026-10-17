@@ -9,6 +9,7 @@ import {
 import { type IconName, IconSymbol } from "../components/IconSymbol";
 import { ProviderBrandIcon } from "../components/ProviderBrandIcon";
 import type { ProviderModelRow } from "../../domain/provider/ModelAvailability";
+import { skillAgentLabels } from "../../agent/core/skillAssignments";
 
 export interface SettingsModel {
   id: string;
@@ -40,6 +41,7 @@ export interface CatalogItem {
   category?: string;
   tags?: string[];
   type?: string;
+  agentIds?: string[];
 }
 export interface SettingsData {
   projectRootDir: string;
@@ -412,7 +414,7 @@ export function SettingsPanel(
         <div>
           <strong>{kind === "skills" ? "让 Agent 按任务选择方法" : "需要时，给提示词一点参考"}</strong>
           <p>{kind === "skills"
-            ? "启用的技能供 Agent 自动选择。你也可以在对话中指定技能，普通任务直接描述需求即可。"
+            ? "启用的技能供有权限的 Agent 按任务选择；标签会显示每个技能实际可用的 Agent。你也可以在对话中指定技能。"
             : "模板保存常用风格、结构和写作方法。Agent 可以按需参考、调整或组合，也可以直接编写提示词。"}</p>
         </div>
         <span>{kind === "skills" ? "按需使用" : "可选参考"}</span>
@@ -467,6 +469,14 @@ export function SettingsPanel(
               <span>v{item.version || 1}</span>
               {item.category && <span>{item.category}</span>}
             </div>
+            {kind === "skills" && (
+              <div className="settings-skill-agents" aria-label="可使用此技能的 Agent">
+                {skillAgentLabels(item.id, item.agentIds).map((agent) => (
+                  <span key={agent}>{agent}</span>
+                ))}
+                {!skillAgentLabels(item.id, item.agentIds).length && <span>未分配 Agent</span>}
+              </div>
+            )}
             <p>{item.description || "暂无说明"}</p>
             <small>{item.id}</small>
           </div>

@@ -20,6 +20,7 @@ export interface StoredSkill {
   workflow?: string;
   enabled?: boolean;
   builtIn?: boolean;
+  agentIds?: string[];
 }
 
 interface StoredRecipe {

@@ -42,6 +42,16 @@ export function visibleAgentTools(
 
 /** Skill 可见性：`'*'` 表示所有已启用 Skill，否则只暴露白名单内的 Skill。 */
 export function selectAgentSkills(agent: AgentDefinition, enabled: StoredSkill[]): StoredSkill[] {
+  const hasAssignments = enabled.some((skill) => Array.isArray(skill.agentIds) && skill.agentIds.length > 0);
+  // Settings may assign custom Skills only among the user-facing primary Agents.
+  // Subagents remain fail-closed to the explicit definitions.ts whitelist.
+  if (agent.role === 'primary' && hasAssignments) {
+    return enabled.filter((skill) => {
+      if (Array.isArray(skill.agentIds) && skill.agentIds.length) return skill.agentIds.includes(agent.id);
+      if (agent.skills.includes('*')) return true;
+      return agent.skills.includes(skill.id);
+    });
+  }
   if (agent.skills.includes('*')) return enabled;
   const allowed = new Set(agent.skills);
   return enabled.filter((skill) => allowed.has(skill.id));

@@ -6,6 +6,7 @@ const toolbar = readFileSync(new URL('../renderer/src/app/canvas/CanvasNodeToolb
 const workflowCanvas = readFileSync(new URL('../renderer/src/app/canvas/WorkflowCanvas.tsx', import.meta.url), 'utf8');
 const canvas = toolbar + workflowCanvas;
 const cropEditor = readFileSync(new URL('../renderer/src/app/components/ImageCropEditor.tsx', import.meta.url), 'utf8');
+const annotationEditor = readFileSync(new URL('../renderer/src/app/components/ImageAnnotationEditor.tsx', import.meta.url), 'utf8');
 const generation = readFileSync(new URL('../renderer/src/app/canvas/GenerationNode.tsx', import.meta.url), 'utf8');
 const basicNodes = readFileSync(new URL('../renderer/src/app/canvas/CanvasNodes.tsx', import.meta.url), 'utf8');
 const director = readFileSync(new URL('../renderer/src/app/canvas/ThreeDDirectorNode.tsx', import.meta.url), 'utf8');
@@ -30,7 +31,7 @@ test('画布节点外框与选中操作工具栏保持职责分离', () => {
 });
 
 test('加入对话只在节点选中工具栏中显示', () => {
-  assert.match(canvas, /<NodeToolbar[\s\S]*?canvas-node-selection-toolbar--hidden[\s\S]*?isVisible=\{selected\}[\s\S]*?offset=\{toolbarOffset\}[\s\S]*?>[\s\S]*?加入对话[\s\S]*?<\/NodeToolbar>/);
+  assert.match(canvas, /<NodeToolbar[\s\S]*?canvas-node-selection-toolbar--hidden[\s\S]*?isVisible=\{selected && !imageAnnotationOpen\}[\s\S]*?offset=\{toolbarOffset\}[\s\S]*?>[\s\S]*?加入对话[\s\S]*?<\/NodeToolbar>/);
   assert.match(canvas, /mentionNode\(node\.id\)/);
   // 3D 导演台节点不挂引用入口，工具栏整体不渲染，而不是留下一个空壳。
   assert.match(toolbar, /node\.type === "threeDDirector" \? null : mentionInCopilot/);
@@ -103,6 +104,19 @@ test('本地图片节点提供原图裁剪并创建保留来源连线的新节�
   assert.match(imageRust, /fn crop_image[\s\S]*?apply_orientation[\s\S]*?crop_imm[\s\S]*?ImageFormat::Png/);
   assert.match(styles, /\.canvas-image-crop-layer \{/);
   assert.match(styles, /\.canvas-image-crop-toolbar \{[^}]*z-index:\s*120/);
+});
+
+test('本地图片节点使用 react-screenshots 完成标注并保存合成图片', () => {
+  assert.match(toolbar, /title="标注图片"[\s\S]*?onImageAnnotationOpen\(\)/);
+  assert.match(workflowCanvas, /imageAnnotationOpen=\{imageAnnotationOpen\}[\s\S]*?onImageAnnotationOpen/);
+  assert.match(generation, /ImageAnnotationEditor[\s\S]*?imageUrl=\{previewUrl\}[\s\S]*?saveDataUrlToProject/);
+  assert.match(annotationEditor, /react-screenshots\/lib\/Screenshots\/ScreenshotsCanvas/);
+  assert.match(annotationEditor, /operation_text_title: "标注"/);
+  assert.match(annotationEditor, /operation_mosaic_title: "马赛克"/);
+  assert.match(generation, /saveDataUrlToProject/);
+  assert.match(generation, /annotationImagePath/);
+  assert.match(styles, /\.canvas-image-annotation-editor \.screenshots \{/);
+  assert.match(annotationEditor, /ScreenshotsContext\.Provider/);
 });
 
 test('空媒体节点从顶部工具栏上传且节点内部只保留占位图标', () => {

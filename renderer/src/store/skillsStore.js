@@ -40,6 +40,7 @@ export function createSkillDraft() {
     version: 1,
     triggers: { keywords: [] },
     instructions: '输入这个技能的领域行为、边界和执行说明。',
+    agentIds: ['canvas-primary'],
     enabled: true,
     updatedAt: new Date().toISOString(),
   };
@@ -66,6 +67,7 @@ export async function upsertSkill(input) {
     instructions: String(input.instructions || '').trim(),
     contracts: Array.isArray(input.contracts) ? input.contracts.map(String) : undefined,
     workflow: typeof input.workflow === 'string' ? input.workflow : undefined,
+    agentIds: Array.isArray(input.agentIds) ? [...new Set(input.agentIds.map(String).filter(Boolean))] : undefined,
     enabled: input.enabled !== false,
     builtIn: existing?.builtIn === true,
     updatedAt: new Date().toISOString(),

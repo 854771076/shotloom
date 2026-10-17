@@ -272,7 +272,7 @@ test('视频画面可拖动节点且拖动期间保持播放', () => {
 test('拖动节点时隐藏上下浮层并在松手后由 React Flow 状态恢复', () => {
   assert.match(canvas, /function CanvasNode\(\{ data, selected, dragging \}/);
   assert.match(canvas, /nodeChromeHidden \? " canvas-node-selection-toolbar--hidden"/);
-  assert.match(canvas, /isVisible=\{selected\}/);
+  assert.match(canvas, /isVisible=\{selected && !imageAnnotationOpen\}/);
   assert.doesNotMatch(canvas, /className="canvas-node-label-anchor"[\s\S]*?visibility: nodeChromeHidden/);
   assert.doesNotMatch(canvas, /<Renderer[\s\S]*?dragging=\{dragging\}/);
   assert.match(node, /labelRoot && createPortal\(nodeLabel/);
@@ -370,6 +370,7 @@ test('画布缩放使用最终布局尺寸并保持 React Flow 视口为 1x', ()
   assert.match(canvas, /defaultViewport=\{\{ x: viewport\.x, y: viewport\.y, zoom: 1 \}\}/);
   assert.match(canvas, /minZoom=\{1\}[\s\S]*?maxZoom=\{1\}/);
   assert.match(canvas, /zoomOnScroll=\{false\}[\s\S]*?zoomOnPinch=\{false\}/);
+  assert.match(canvas, /onWheelCapture=\{\(event\) => \{[\s\S]*?if \(event\.ctrlKey\)[\s\S]*?event\.preventDefault\(\);[\s\S]*?return;/);
 });
 test('节点文字、图标和错误态共享语义尺寸并沿同一缩放轨道', () => {
   assert.match(styles, /--canvas-node-title-size: 12px/);

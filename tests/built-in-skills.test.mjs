@@ -9,6 +9,7 @@ import {
 
 const skillsRoot = new URL('../renderer/src/agent/content/skills/', import.meta.url);
 const expectedIds = [
+  'character-board',
   'ecommerce-product',
   'general',
   'h3-video-prompt',
@@ -23,6 +24,7 @@ const expectedIds = [
   'video-production',
 ];
 const expectedNames = {
+  'character-board': '角色板与三视图',
   'ecommerce-product': '商品视觉工坊',
   general: '基础任务助手',
   'h3-video-prompt': 'MiniMax H3 多段式提示词',
@@ -147,9 +149,9 @@ test('h3-video-prompt 使用能力驱动的基础与全参考多段式契约', (
   assert.match(body, /完成前评估/);
 });
 
-test('video-production v10 从来源成熟度动态推进并采用合规的人脸策略', () => {
+test('video-production v12 只负责视频制作编排并把内容细节交给专项 Skill', () => {
   const { manifest, body } = parseSkill('video-production');
-  assert.equal(manifest.version, 11);
+  assert.equal(manifest.version, 12);
   for (const recipeId of [
     'narrative-source-analysis', 'screenplay-adaptation',
     'video-character-design', 'video-character-turnaround', 'video-storyboard-grid',
@@ -157,31 +159,37 @@ test('video-production v10 从来源成熟度动态推进并采用合规的人�
   ]) {
     assert.ok(body.includes(recipeId), `video-production 缺少 ${recipeId}`);
   }
-  assert.match(body, /内部提取跨镜视觉实体并合并别名/);
-  assert.match(body, /小说\/长篇章节/);
+  assert.match(body, /`character-board`/);
+  assert.match(body, /不承载所有写作、视觉设计、音频设计和模型参数细节/);
+  assert.match(body, /只负责选择顺序、建立依赖、写入画布和核验结果/);
+  assert.match(body, /归并跨镜视觉实体和别名/);
   assert.match(body, /不把小说直接当分镜/);
-  assert.match(body, /纸人.*纸扎人.*纸扎人队列/);
-  assert.match(body, /非人角色、怪物、拟人道具、群体角色/);
-  assert.match(body, /电影级角色设计板/);
-  assert.match(body, /不要把它当成所有视觉约束的通用替代品/);
-  assert.match(body, /规划模式下关键帧尚无真实输出/);
-  assert.match(body, /不要按固定数量连接/);
-  assert.match(body, /超写实真人摄影质感/);
-  assert.match(body, /画面闪烁和时序抖动/);
-  assert.match(body, /不能被这段模板真人化/);
-  assert.match(body, /不得通过模糊、马赛克、遮挡、拆分五官再重建等方式规避人脸审核/);
-  assert.match(body, /不为这份判断额外创建表格节点/);
-  assert.match(body, /不能冒充角色板/);
-  assert.match(body, /不得把独立生成描述为“提取”/);
-  assert.match(body, /没有待剪辑时间线|不存在的时间线/);
-  assert.match(body, /plan_canvas.*完整.*可执行画布/s);
-  assert.match(body, /说明.*代替.*节点/);
-  assert.match(body, /六格动作序列/);
-  assert.match(body, /默认不做十二格/);
+  assert.match(body, /专项内容由对应 Skill 负责/);
+  assert.match(body, /plan_canvas.*真实节点、输入边和完整配置/s);
+  assert.match(body, /plan_and_execute.*等待真实输出成功后再继续下游/s);
+  assert.match(body, /不创建预处理节点/);
+  assert.match(body, /plan_canvas.*真实节点、输入边和完整配置/s);
+  assert.match(body, /文字说明不能代替节点/);
+  assert.match(body, /专项 Skill 未覆盖时/);
+  assert.match(body, /专项 Skill 负责内容质量，本 Skill 负责流程完整性和事实核验/);
+  assert.doesNotMatch(body, /超写实真人摄影质感/);
+  assert.doesNotMatch(body, /不加入额外头部角度/);
   assert.doesNotMatch(body, /apply_colored_pencil/);
-  assert.match(body, /内部适配由运行时自动完成/);
+  assert.match(body, /视频输入的内部适配由运行时完成/);
   assert.match(body, /canvas_layout_nodes/);
   assert.match(body, /canvas_start_generation/);
+});
+
+test('character-board 固定四区域并禁止默认扩展', () => {
+  const { manifest, body } = parseSkill('character-board');
+  assert.equal(manifest.version, 1);
+  assert.match(body, /固定版式/);
+  assert.match(body, /只保留这四个主要区域/);
+  assert.match(body, /角色设定版.*character sheet.*四区域版式/);
+  assert.match(body, /参考图明确展示的版式优先/);
+  assert.match(body, /不要加入额外头部角度、表情头像、服装配件拆解、装备特写、色卡/);
+  assert.match(body, /明确写出“扩展角色板”/);
+  assert.match(body, /脸型、五官、体型、发型、服装和固定识别点一致/);
 });
 
 test('short-drama v8 支持小说改编并从当前内容成熟度继续', () => {
@@ -227,7 +235,7 @@ test('script-to-video v2 使用两轮 Prompt Draft 确认和细粒度画布工�
 
 test('视频类 Skill 根据镜头风险选择直接参考而不是固定一根线', () => {
   const expectedVersions = {
-    'video-production': 11,
+    'video-production': 12,
     'script-to-video': 3,
     'short-drama': 9,
     'talking-head': 5,
@@ -247,7 +255,7 @@ test('视频类 Skill 等待图片完成但不规划内部预处理节点', () =
   for (const id of ['keyframe-video', 'talking-head', 'video-ad', 'video-production', 'script-to-video']) {
     const { body } = parseSkill(id);
     assert.doesNotMatch(body, /apply_colored_pencil/, `${id} 不应暴露内部彩铅动作`);
-    assert.match(body, /内部.*运行时自动完成|内部输入适配由运行时自动完成/, `${id} 缺少内部适配说明`);
+    assert.match(body, /内部.*运行时自动完成|视频输入的内部适配由运行时完成/, `${id} 缺少内部适配说明`);
     assert.match(body, /等待|完成/, `${id} 缺少上游图片终态约束`);
   }
 });

@@ -1,5 +1,7 @@
 import ecommerceProduct from '../agent/content/skills/ecommerce-product/SKILL.md?raw';
 import ecommerceProductManifest from '../agent/content/skills/ecommerce-product/skill.json';
+import characterBoard from '../agent/content/skills/character-board/SKILL.md?raw';
+import characterBoardManifest from '../agent/content/skills/character-board/skill.json';
 import general from '../agent/content/skills/general/SKILL.md?raw';
 import generalManifest from '../agent/content/skills/general/skill.json';
 import h3VideoPrompt from '../agent/content/skills/h3-video-prompt/SKILL.md?raw';
@@ -73,6 +75,7 @@ function parseBuiltInSkill(content, manifest) {
 }
 
 export const builtInSkills = [
+  parseBuiltInSkill(characterBoard, characterBoardManifest),
   parseBuiltInSkill(ecommerceProduct, ecommerceProductManifest),
   parseBuiltInSkill(general, generalManifest),
   parseBuiltInSkill(h3VideoPrompt, h3VideoPromptManifest),

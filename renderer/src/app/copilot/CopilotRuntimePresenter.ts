@@ -328,8 +328,8 @@ export class CopilotRuntimePresenter {
         name: String(event.name || event.skillId || 'Skill'),
         kind: 'skill',
         status: 'success',
-        title: '加载技能',
-        summary: String(event.name || event.skillId || 'Skill'),
+        title: '使用 Skill',
+        summary: `${String(event.skillId || 'skill')} · ${String(event.name || event.skillId || 'Skill')}`,
         ...this.rowIdentity(event),
       });
       this.changed();

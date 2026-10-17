@@ -33,6 +33,8 @@ export function CanvasNodeToolbar({
   canvasOverlayRoot,
   imageCropOpen,
   onImageCropOpen,
+  imageAnnotationOpen,
+  onImageAnnotationOpen,
 }: {
   node: WorkflowNodeData;
   selected: boolean;
@@ -43,6 +45,8 @@ export function CanvasNodeToolbar({
   canvasOverlayRoot: HTMLElement | null;
   imageCropOpen: boolean;
   onImageCropOpen: () => void;
+  imageAnnotationOpen: boolean;
+  onImageAnnotationOpen: () => void;
 }) {
   const [assetScopeMenuOpen, setAssetScopeMenuOpen] = useState(false);
   const [assetCategory, setAssetCategory] = useState("");
@@ -208,13 +212,13 @@ export function CanvasNodeToolbar({
   }
 
   const hasToolbar = isTextNode || canUpload || mentionNode ||
-    canSaveToAssets || isLocalVideo;
+    canSaveToAssets || isLocalVideo || isLocalImage;
   return (
     <>
       {hasToolbar && (
         <NodeToolbar
           className={`canvas-node-selection-toolbar${useSubtleUploadToolbar ? " canvas-node-selection-toolbar--subtle" : ""}${nodeChromeHidden ? " canvas-node-selection-toolbar--hidden" : ""} nodrag nopan`}
-          isVisible={selected}
+          isVisible={selected && !imageAnnotationOpen}
           position={Position.Top}
           offset={toolbarOffset}
         >
@@ -299,6 +303,21 @@ export function CanvasNodeToolbar({
             >
               <IconSymbol name="crop" />
               <span>裁剪</span>
+            </button>
+          )}
+          {isLocalImage && (
+            <button
+              type="button"
+              title="标注图片"
+              aria-pressed={imageAnnotationOpen}
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.stopPropagation();
+                onImageAnnotationOpen();
+              }}
+            >
+              <IconSymbol name="pencil" />
+              <span>标注</span>
             </button>
           )}
           {canSaveToAssets && (

@@ -23,5 +23,7 @@ test('输入器只暴露用户审批偏好，不暴露内部执行模式', () =>
   assert.match(composer, /saveAppSettings\(\{ agentShellApproval: "(ask|full)" \}\)/);
   assert.doesNotMatch(composer, />协作<\/button>|>自主<\/button>|executionMode=\{|plan_review/);
   assert.match(settings, /允许 Agent 运行节点/);
+  assert.match(settings, /可使用此技能的 Agent/);
+  assert.match(settings, /skillAgentLabels/);
   assert.doesNotMatch(settings, /助手步骤确认|自动执行生成/);
 });
