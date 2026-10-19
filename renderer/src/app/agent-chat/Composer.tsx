@@ -15,11 +15,24 @@ import { saveAppSettings, settingsStore } from "../../store/settingsStore.ts";
 import { nodeChatAttachmentKey } from "../../services/nodeChatAttachment.ts";
 import { availableAgentSkills } from "../../agent/tools/catalogTools";
 import { isImeKeyEvent } from "../canvas/imeComposition";
+import { showToast } from "../../store/notificationStore";
+import { useGoalPlanStore } from "../store/goalPlanStore";
 import { ReferenceCard } from "./ReferenceCard";
+import { GoalBar } from "./GoalBar";
+import { PlanChip } from "./PlanChip";
 import { agentPresentation } from "./agentPresentation";
 import { fileReference, nodeReference } from "./mediaReference";
-import type { AgentController, AgentPanelHandle, MentionableNode } from "./contracts";
+import {
+  matchSlashCommands,
+  parseSlashCommand,
+  type SlashCommandItem,
+} from "./slashCommands";
+import type { AgentController, AgentGoalView, AgentPanelHandle, MentionableNode } from "./contracts";
 import styles from "./Composer.module.css";
+
+type PaletteEntry =
+  | { kind: "command"; key: string; item: SlashCommandItem }
+  | { kind: "skill"; key: string; item: { id: string; name?: string | undefined } };
 
 const MAX_INPUT_LINES = 8;
 
@@ -29,6 +42,10 @@ interface ComposerProps {
   activeConversationId: string;
   textModel: string;
   textModels: Array<{ id: string; label: string; iconId: string }>;
+  /** 项目级长期目标与计划模式：面板只读这一份，改写一律走 controller 的 CAS 动词。 */
+  goal: AgentGoalView | null;
+  planMode: boolean;
+  goalArmed: boolean;
   controller: AgentController;
   mentionable: MentionableNode[];
   domainRevision: number;
@@ -36,9 +53,20 @@ interface ComposerProps {
 }
 
 export function Composer(props: ComposerProps) {
-  const { agentId, busy, activeConversationId, textModel, textModels, controller } = props;
+  const { agentId, busy, activeConversationId, textModel, textModels, goal, planMode, goalArmed, controller } = props;
   const presentation = agentPresentation(agentId);
-  const [text, setText] = useState("");
+  // 输入草稿与 '/' 候选面板是纯界面态，落在按面板分片的 zustand store 上；goal/plan 的真实状态
+  // 永远保存在 store.project，本组件不在这里写它们。画布/剪辑/文本三个面板可能同时挂载，草稿绝不能跨面板串。
+  const panelKey = `${agentId}:${activeConversationId}`;
+  const text = useGoalPlanStore((s) => s.panels[panelKey]?.draft ?? "");
+  const slash = useGoalPlanStore((s) => s.panels[panelKey]?.slash ?? null);
+  const writeDraft = useGoalPlanStore((s) => s.setDraft);
+  const writeSlash = useGoalPlanStore((s) => s.setSlash);
+  const setText = useCallback((value: string) => writeDraft(panelKey, value), [writeDraft, panelKey]);
+  const setSlash = useCallback(
+    (next: { query: string; index: number } | null) => writeSlash(panelKey, next),
+    [writeSlash, panelKey],
+  );
   const [attachments, setAttachments] = useState<Record<string, unknown>[]>([]);
   const [mentions, setMentions] = useState<MentionableNode[]>([]);
   const [mention, setMention] = useState<{ query: string; start: number; index: number } | null>(null);
@@ -54,6 +82,22 @@ export function Composer(props: ComposerProps) {
     [props.domainRevision, agentId],
   );
   const skill = useMemo(() => skills.find((item) => item.id === skillId) || null, [skills, skillId]);
+
+  // '/' 候选：命令（goal/plan）永远排在技能前面，让用户先看到工作流开关，再看到技能。
+  const paletteEntries = useMemo<PaletteEntry[]>(() => {
+    if (!slash) return [];
+    const query = slash.query.toLowerCase();
+    const commands: PaletteEntry[] = matchSlashCommands(slash.query).map((item) => ({
+      kind: "command",
+      key: `command:${item.id}`,
+      item,
+    }));
+    const skillItems: PaletteEntry[] = skills
+      .filter((item) => !query || `${item.id} ${item.name || ""}`.toLowerCase().includes(query))
+      .slice(0, 8)
+      .map((item) => ({ kind: "skill", key: `skill:${item.id}`, item: { id: item.id, name: item.name } }));
+    return [...commands, ...skillItems];
+  }, [slash, skills]);
 
   useEffect(() => {
     // 当前 Agent 只有一个可选 Skill 时默认选中它，用户仍可手动改选。
@@ -174,6 +218,29 @@ export function Composer(props: ComposerProps) {
     focusInput();
   }
 
+  // 菜单只在整段输入是一个 `/token`（尚未输入空格）时出现；一旦补上空格或选中技能就收起。
+  function trackSlash(value: string) {
+    const match = value.match(/^\/([^\s]*)$/);
+    if (!match) {
+      setSlash(null);
+      return;
+    }
+    setSlash({ query: match[1] ?? "", index: 0 });
+  }
+
+  function selectPaletteEntry(entry: PaletteEntry) {
+    // 选中候选只把词填入输入框：命令的参数由用户补全后再回车执行，技能沿用 `/id ` 前缀。
+    if (entry.kind === "command") {
+      setText(`/${entry.item.id} `);
+    } else {
+      setSkillId(entry.item.id);
+      setText(`/${entry.item.id} `);
+    }
+    setSlash(null);
+    setMention(null);
+    focusInput();
+  }
+
   async function pickFile() {
     const file = await desktopApi.file.pickResource?.();
     if (!file) return;
@@ -185,15 +252,8 @@ export function Composer(props: ComposerProps) {
     );
   }
 
-  function submit() {
+  function sendToRuntime(body: string) {
     if (!textModels.length) return;
-    const requested = text.trim();
-    if (!requested && !attachments.length && !mentions.length) return;
-    const prefix = skillId ? `/${skillId}` : "";
-    const body =
-      prefix && requested !== prefix && !requested.startsWith(`${prefix} `)
-        ? `${prefix} ${requested}`
-        : requested;
     const accepted = controller.send({
       text: body,
       model: textModel,
@@ -206,11 +266,45 @@ export function Composer(props: ComposerProps) {
     });
     if (!accepted) return;
     setText("");
+    setSlash(null);
     setAttachments([]);
     setMentions([]);
     setMention(null);
     setSkillId(null);
     setMenu(null);
+  }
+
+  function submit() {
+    if (!textModels.length) return;
+    const requested = text.trim();
+    // 命令优先于一切：/goal 创建或恢复目标会启动续行，/plan <正文> 会发送本轮请求。
+    if (requested.startsWith("/")) {
+      const command = parseSlashCommand(requested);
+      if (command) {
+        // goal 状态变更随时可执行；plan 开关与本轮请求必须等当前运行结束，否则会打断正在跑的回合。
+        if (controller.isCommandRunBusy(command)) {
+          showToast("请等待当前任务结束后再切换计划模式");
+          return;
+        }
+        const { deliverText, error } = controller.runCommand(command, { conversationId: activeConversationId, model: textModel });
+        setText("");
+        setSlash(null);
+        setMention(null);
+        setMenu(null);
+        // 状态变更成功不再往会话里回显：目标条与计划徽标才是它们的可见处。
+        if (error) showToast(error);
+        // 唯一例外：/plan <正文> 进入计划模式后，把正文当作本轮真实请求照常发出。
+        if (deliverText) sendToRuntime(deliverText);
+        return;
+      }
+    }
+    if (!requested && !attachments.length && !mentions.length) return;
+    const prefix = skillId ? `/${skillId}` : "";
+    const body =
+      prefix && requested !== prefix && !requested.startsWith(`${prefix} `)
+        ? `${prefix} ${requested}`
+        : requested;
+    sendToRuntime(body);
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
@@ -233,8 +327,31 @@ export function Composer(props: ComposerProps) {
         return;
       }
     }
+    if (slash && paletteEntries.length && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+      event.preventDefault();
+      const step = event.key === "ArrowDown" ? 1 : -1;
+      const len = paletteEntries.length;
+      setSlash({ query: slash.query, index: (slash.index + step + len) % len });
+      return;
+    }
+    // 命令已完整输入（/goal、/plan、/goal pause…）时交给回车执行；只有在挑选候选词时才用回车选中。
+    if (
+      slash &&
+      paletteEntries.length &&
+      event.key === "Enter" &&
+      !event.shiftKey &&
+      !parseSlashCommand(text.trim())
+    ) {
+      const target = paletteEntries[Math.min(slash.index, paletteEntries.length - 1)];
+      if (target) {
+        event.preventDefault();
+        selectPaletteEntry(target);
+        return;
+      }
+    }
     if (event.key === "Escape") {
       if (mention) setMention(null);
+      else if (slash) setSlash(null);
       else if (menu) setMenu(null);
       return;
     }
@@ -247,6 +364,12 @@ export function Composer(props: ComposerProps) {
   const disabled = !textModels.length;
   const activeModel = textModels.find((item) => item.id === textModel);
   const shellMode = settingsStore.agentShellApproval === "ask" ? "ask" : "full";
+  // 计划模式改变的是"这一轮该写什么"，输入提示跟着换，用户才知道接下来是拿方案而不是拿成片。
+  const placeholder = planMode
+    ? "描述本轮任务：Agent 会先只做调研并产出计划，待你确认后再执行"
+    : busy
+      ? "正在处理，可继续补充指令…"
+      : presentation.placeholder;
 
   return (
     <div className={styles.seat} ref={seatRef}>
@@ -259,6 +382,14 @@ export function Composer(props: ComposerProps) {
           </span>
         </div>
       )}
+      <GoalBar
+        goal={goal}
+        armed={goalArmed}
+        busy={busy}
+        conversationId={activeConversationId}
+        model={textModel}
+        controller={controller}
+      />
       <div className={styles.card} data-menu={menu || undefined} data-disabled={disabled || undefined}>
         {!!references.length && (
           <div className={styles.rail}>
@@ -280,7 +411,7 @@ export function Composer(props: ComposerProps) {
             rows={1}
             disabled={disabled}
             spellCheck={false}
-            placeholder={busy ? "正在处理，可继续补充指令…" : presentation.placeholder}
+            placeholder={placeholder}
             aria-label="给 Agent 的消息"
             onChange={(event) => {
               const value = event.target.value;
@@ -290,6 +421,7 @@ export function Composer(props: ComposerProps) {
               );
               setSkillId(picked?.id || null);
               trackMention(value, event.target.selectionStart ?? value.length);
+              trackSlash(value);
             }}
             onKeyDown={onKeyDown}
           />
@@ -310,6 +442,26 @@ export function Composer(props: ComposerProps) {
                   <strong title={node.title}>{node.title}</strong>
                   <span>@{node.alias}</span>
                   <em>{node.typeLabel}</em>
+                </button>
+              ))}
+            </div>
+          )}
+          {slash && paletteEntries.length > 0 && (
+            <div className={styles.mentionMenu} role="listbox" aria-label="选择命令或技能">
+              {paletteEntries.map((entry, index) => (
+                <button
+                  key={entry.key}
+                  type="button"
+                  role="option"
+                  aria-selected={index === slash.index}
+                  data-active={index === slash.index || undefined}
+                  onPointerDown={(event) => {
+                    event.preventDefault();
+                    selectPaletteEntry(entry);
+                  }}
+                >
+                  <strong>{entry.kind === "command" ? entry.item.name : entry.item.name || entry.item.id}</strong>
+                  <span>{entry.kind === "command" ? entry.item.usage : `/${entry.item.id}`}</span>
                 </button>
               ))}
             </div>
@@ -348,12 +500,13 @@ export function Composer(props: ComposerProps) {
                 onClick={() => {
                   if (skillId) {
                     const prefix = `/${skillId}`;
-                    setText((value) => {
-                      const current = value.trimStart();
-                      if (current === prefix) return "";
-                      if (current.startsWith(`${prefix} `)) return current.slice(prefix.length).trimStart();
-                      return value;
-                    });
+                    const current = text.trimStart();
+                    const next = current === prefix
+                      ? ""
+                      : current.startsWith(`${prefix} `)
+                        ? current.slice(prefix.length).trimStart()
+                        : text;
+                    setText(next);
                   }
                   setSkillId(null);
                   setMenu(null);
@@ -446,6 +599,14 @@ export function Composer(props: ComposerProps) {
                 }}
               />
             </SelectorChip>
+
+            <PlanChip
+              active={planMode}
+              busy={busy}
+              conversationId={activeConversationId}
+              model={textModel}
+              controller={controller}
+            />
           </div>
 
           {busy && (

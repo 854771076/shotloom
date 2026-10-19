@@ -5,11 +5,11 @@
   margin-bottom: 2px;
 }
 
-/* 折叠时是一行 26px 的安静披露条：三级灰、图标 + 标题 + 计数，
-   悬停时图标淡出换成箭头。展开才列出每一步。 */
+/* 折叠时是一行 26px 的安静披露条：三级灰、类别图标 + 活动摘要（进行中再补一句当前任务）。
+   展开才列出每一步。 */
 .head {
   display: grid;
-  grid-template-columns: 16px minmax(0, 1fr) auto auto 16px;
+  grid-template-columns: var(--icon-sm) minmax(0, 1fr) auto var(--icon-sm);
   align-items: center;
   gap: 6px;
   width: 100%;
@@ -51,7 +51,7 @@
   white-space: nowrap;
 }
 
-/* 折叠状态下也要能一眼看到这一步的产出，否则整条 trace 只是"已运行"。 */
+/* 进行中在类别后面补一句当前任务，让用户知道它在处理什么而不是猜。 */
 .headDetail {
   flex: 0 1 auto;
   min-width: 0;
@@ -61,11 +61,10 @@
   white-space: nowrap;
 }
 
-.headCount {
-  color: var(--slk-label-caption);
-  font-family: var(--font-mono);
-  font-size: var(--text-caption-11);
-  font-variant-numeric: tabular-nums;
+.headDetail::before {
+  content: "·";
+  margin-right: 6px;
+  opacity: 0.5;
 }
 
 .headChevron {
@@ -78,8 +77,8 @@
 
 .stop {
   position: relative;
-  width: 16px;
-  height: 16px;
+  width: var(--icon-sm);
+  height: var(--icon-sm);
   border-radius: 50%;
   box-shadow: inset 0 0 0 1.5px currentColor;
   color: var(--slk-label-tertiary);
@@ -131,8 +130,9 @@
 
 .stepLine {
   display: grid;
-  /* 耗时与箭头各占一列，箭头列恒为 --icon-xs 宽：hover 出现时不抖布局。 */
-  grid-template-columns: 14px auto minmax(0, 1fr) auto var(--icon-xs);
+  /* 状态词只属于需要行动的行（待确认/进行/失败），完成态一行就是"标题 · 摘要"。
+     耗时不在行尾占列——它属于展开后的细节，行尾只留一个恒宽的箭头列。 */
+  grid-template-columns: var(--icon-xs) minmax(0, 1fr) var(--icon-xs);
   align-items: baseline;
   gap: 6px;
   width: 100%;
@@ -198,12 +198,12 @@
 }
 
 /* 耗时与箭头是摘要行的固定尾部：耗时不截断，箭头悬停才现形。 */
-.stepDuration {
+.stepMeta {
   color: var(--slk-label-caption);
   font-family: var(--font-mono);
   font-size: var(--text-caption-11);
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+  line-height: 16px;
 }
 
 .stepChevron {

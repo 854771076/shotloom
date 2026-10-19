@@ -2,7 +2,7 @@
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
-  gap: 22px;
+  gap: 16px;
   min-height: 0;
   padding: 20px 20px 24px;
   overflow-y: auto;
@@ -147,8 +147,30 @@
 .assistantRow {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   min-width: 0;
+}
+
+/* 应用自己写入的一行事实：轮次边界是两条细线夹一句小字，状态是一行弱化文字。
+   它们都不参与气泡、轨迹、计划与产物的结构。 */
+.notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 18px;
+  color: var(--slk-label-caption);
+  font-size: var(--text-caption-11);
+  line-height: 16px;
+}
+
+.notice[data-notice="divider"] > i {
+  flex: 1 1 auto;
+  height: 0.5px;
+  background-color: var(--slk-border-l1);
+}
+
+.notice[data-notice="status"] {
+  color: var(--slk-label-tertiary);
 }
 
 .loading {

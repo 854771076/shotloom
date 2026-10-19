@@ -4,6 +4,7 @@ import { agentToolIcon, agentToolTitle } from "../../agent/core/toolRegistry";
 import { useMediaPreviewCache } from "../canvas/useMediaPreviewCache";
 import { IconSymbol } from "../components/IconSymbol";
 import type { AgentController, AgentSubagentView, AgentToolCall } from "./contracts";
+import { headIcon, liveTitle, processTitle, summarizeProcess } from "./processActivity";
 import { traceGroups } from "./traceTimeline";
 import styles from "./ToolTrace.module.css";
 
@@ -18,7 +19,6 @@ const kindIcon: Record<string, string> = {
 const statusLabel: Record<string, string> = {
   pending: "等待确认",
   running: "正在运行",
-  success: "已运行",
   error: "运行失败",
 };
 
@@ -57,33 +57,20 @@ export function ToolTrace({
   controller: AgentController;
 }) {
   const hasPending = tools.some((tool) => tool.pending);
+  const failed = tools.some((tool) => tool.status === "error");
   const [open, setOpen] = useState(false);
-  useEffect(() => setOpen(hasPending), [hasPending]);
+  // 待确认和出错的这一组默认展开：用户要看见的是"卡在哪一步、坏在哪一步"，
+  // 而不是在折叠行上多读一句状态。其余一律默认收起。
+  useEffect(() => setOpen(hasPending || failed), [hasPending, failed]);
   const knownSubagents = subagents || [];
   if ((!tools.length && !knownSubagents.length) || waitingForAnswer) return null;
 
-  const active =
-    [...tools].reverse().find((tool) => tool.pending || tool.status === "running") ||
-    tools[tools.length - 1];
-  const settled = tools.filter((tool) => tool.status === "success" || tool.status === "error").length;
-  const failed = tools.some((tool) => tool.status === "error");
-  const activeSubagent = knownSubagents.find(
-    (subagent) => subagent.id && subagent.id === active?.agentSessionId,
-  );
-  // 父 Agent 第一步就派发时，本轮还没有任何步骤，只能用最近一次子任务代表"谁在执行"。
-  const onlySubagent = tools.length ? undefined : knownSubagents[knownSubagents.length - 1];
-  const owner = activeSubagent || onlySubagent;
-  const headlineDetail = hasPending || (failed && !typing) || !active
-    ? ""
-    : active.output || active.summary || "";
-  let headline = "处理步骤";
-  if (hasPending) headline = "等待确认";
-  else if (failed && !typing) headline = "执行过程有错误";
-  else if (active) headline = `${owner ? `${subagentName(owner)} · ` : ""}${toolTitle(active)}`;
-  else if (onlySubagent) {
-    const status = onlySubagent.status || "running";
-    headline = `${subagentName(onlySubagent)} · ${subagentLabel[status] || status}`;
-  }
+  // 头部说的是"这一组做了什么"，不是"最后一步是什么"：类别计数、现在时进行中、
+  // 收尾时最多三类。失败的说法属于消息级的失败块，不在这里重复一次。
+  const summary = summarizeProcess(tools, knownSubagents);
+  const settled = !typing && !hasPending;
+  const headline = settled ? processTitle(summary) : liveTitle(summary);
+  const headlineDetail = settled ? "" : summary.runningDetail;
 
   return (
     <section
@@ -98,16 +85,11 @@ export function ToolTrace({
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
       >
-        <IconSymbol name={active ? toolIcon(active) : "workflow"} className={styles.headIcon} />
+        <IconSymbol name={headIcon(summary)} className={styles.headIcon} />
         <span className={styles.headLabel}>
           <span className={styles.headTitle}>{headline}</span>
           {headlineDetail && <span className={styles.headDetail}>{headlineDetail}</span>}
         </span>
-        {!!tools.length && (
-          <span className={styles.headCount}>
-            {settled}/{tools.length}
-          </span>
-        )}
         {typing && (
           <span
             className={styles.stop}
@@ -164,6 +146,13 @@ export function ToolTrace({
 const hasArgs = (args: Record<string, unknown> | undefined) =>
   !!args && Object.keys(args).length > 0;
 
+// 结果的首行是失败行的可读摘要；整段回执留在展开体里。
+const firstLine = (text: string | undefined) =>
+  String(text || "")
+    .split("\n")
+    .map((line) => line.trim())
+    .find(Boolean) || "";
+
 // 参数只在展开时序列化一次；解析异常的回执不能让整条轨迹崩掉。
 const formatArgs = (args: Record<string, unknown>) => {
   try {
@@ -184,9 +173,9 @@ const formatDuration = (startedAt?: string, endedAt?: string) => {
 };
 
 /**
- * 摘要行是一等公民：状态 + 标题 + 入参摘要 + 耗时一眼可读，超长部分截断；
- * 完整参数与产出收进步骤自己的展开体，按需挂载。待确认行已有可编辑的参数
- * 编辑器，不再叠加一个只读展开体。
+ * 摘要行是一等公民：状态 + 标题 + 入参摘要一眼可读，超长部分截断——参考实现的行尾不留
+ * 一列耗时数字，15 行 "0.0s" 只会把列表压成一片灰。耗时收进步骤自己的展开体。
+ * 完整参数与产出同样在展开体里；待确认行已有可编辑的参数编辑器，不再叠加只读展开体。
  */
 function StepLine({ tool, controller }: { tool: AgentToolCall; controller: AgentController }) {
   const status = tool.pending ? "pending" : tool.status || "success";
@@ -196,18 +185,24 @@ function StepLine({ tool, controller }: { tool: AgentToolCall; controller: Agent
   const duration =
     status === "success" || status === "error" ? formatDuration(tool.startedAt, tool.endedAt) : "";
   const expandable = !tool.pending && (!!argsText || !!tool.output || !!previews.length);
-  const tooltip = `${statusLabel[status] || status} ${toolTitle(tool)} ${tool.summary || ""}`;
+  // 完成态不需要状态词：一行本身就是"做了某件事"。只有需要用户行动的三种状态才说话。
+  const stateText = statusLabel[status] || "";
+  // 失败行把结果的第一行原样顶上摘要位：坏在哪句话，收起时就能看见。
+  const summaryText =
+    status === "error" ? firstLine(tool.output) || tool.summary || "" : tool.summary || "";
+  const tooltip = `${stateText ? `${stateText} ` : ""}${toolTitle(tool)} ${summaryText}${duration ? ` · 耗时 ${duration}` : ""}`;
   const rowContent = (
     <>
       <IconSymbol name={toolIcon(tool)} className={styles.stepIcon} />
-      <span className={styles.stepState}>{statusLabel[status] || status}</span>
       <span className={styles.stepDetail}>
+        {!!stateText && <span className={styles.stepState}>{stateText}</span>}
         <span className={status === "running" ? `${styles.stepTitle} ${styles.shimmer}` : styles.stepTitle}>
           {toolTitle(tool)}
         </span>
-        {tool.summary && <span className={styles.stepSummary}>{tool.summary}</span>}
+        {!!summaryText && (
+          <span className={styles.stepSummary}>{summaryText}</span>
+        )}
       </span>
-      {!!duration && <span className={styles.stepDuration}>{duration}</span>}
       {expandable && <IconSymbol name="chevron-right" className={styles.stepChevron} />}
     </>
   );
@@ -234,6 +229,7 @@ function StepLine({ tool, controller }: { tool: AgentToolCall; controller: Agent
       )}
       {expanded && (
         <div className={styles.stepBody}>
+          {!!duration && <small className={styles.stepMeta}>耗时 {duration}</small>}
           {!!argsText && (
             <div className={styles.ioSection}>
               <small className={styles.ioLabel}>参数</small>

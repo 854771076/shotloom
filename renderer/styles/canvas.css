@@ -209,18 +209,31 @@
   border-radius: var(--radius-xl);
   box-shadow: var(--canvas-shadow-dropdown);
 }
+/* 第三方图标字体的字形比产品的线性图标粗一档，按字号缩放才会等比变细。
+ * 取 --icon-md 与画布节点选中工具栏的图标同一档，整条操作条才和画布其它浮层一致。 */
 .canvas-image-annotation-editor .screenshots-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: var(--canvas-toolbar-action);
   height: var(--canvas-toolbar-action);
   margin: 0;
-  font-size: var(--text-title-20);
-  line-height: var(--canvas-toolbar-action);
+  font-size: var(--icon-md);
   border-radius: var(--radius-md);
+}
+/* 图标字体按 em 刻字，行高必须由字形自身决定，否则 40px 的行盒会把字形顶出居中位。 */
+.canvas-image-annotation-editor .screenshots-button > span {
+  line-height: 1;
 }
 .canvas-image-annotation-editor .screenshots-operations-divider {
   width: var(--toolbar-divider-width);
   height: 20px;
   margin: 0 4px;
+}
+/* “生成新节点”用的是产品图标而不是第三方图标字体（它没有向上箭头这一枚字形）。 */
+.canvas-image-annotation-editor .canvas-annotation-node-button svg {
+  width: var(--icon-md);
+  height: var(--icon-md);
 }
 body .screenshots-option-container {
   min-height: 44px;

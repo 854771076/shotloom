@@ -1,0 +1,119 @@
+/* 目标条与输入卡片共用停靠区的宽度节奏：卡片本身满宽，靠 .seat 的 12px 内边距留白。 */
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  margin-bottom: 6px;
+  padding: 4px 5px 4px 12px;
+  border: 0;
+  border-radius: var(--slk-radius-lg);
+  background: var(--slk-bg-raised);
+  box-shadow: var(--slk-elevation-panel);
+  --slk-stroke-color: var(--slk-border-l1);
+}
+
+.bar[data-tone="blocked"] {
+  --slk-stroke-color: color-mix(in srgb, var(--slk-state-warn) 45%, transparent);
+}
+
+.glyph {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  flex: 0 0 auto;
+  color: var(--slk-label-tertiary);
+}
+
+.label {
+  flex: 0 0 auto;
+  color: var(--slk-label-primary);
+  font-size: var(--text-body-13);
+  font-weight: 500;
+  line-height: 24px;
+}
+
+/* 目标描述是这条卡片里最长的一段文字，永远单行截断，全文在 title 上。 */
+.objective {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--slk-label-secondary);
+  font-size: var(--text-body-13);
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.error {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--slk-state-error);
+  font-size: var(--text-body-12);
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rounds {
+  flex: 0 0 auto;
+  color: var(--slk-label-caption);
+  font-family: var(--font-mono);
+  font-size: var(--text-caption-11);
+  font-variant-numeric: tabular-nums;
+}
+
+.actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 2px;
+}
+
+.icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  color: var(--slk-label-tertiary);
+  background: transparent;
+  transition:
+    color var(--slk-dur-fast) var(--slk-ease),
+    background-color var(--slk-dur-fast) var(--slk-ease);
+}
+
+.icon > svg {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+}
+
+@media (hover: hover) {
+  .icon:hover:not(:disabled) {
+    color: var(--slk-label-secondary);
+    background: var(--slk-hover-wash);
+  }
+}
+
+.icon:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.editor {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 26px;
+  padding: 0 2px;
+  border: 0;
+  border-radius: 0;
+  color: var(--slk-label-primary);
+  background: transparent;
+  font: 400 var(--text-body-13)/20px var(--font-ui);
+  outline: none;
+}
+
+.editor::placeholder {
+  color: var(--slk-label-caption);
+}

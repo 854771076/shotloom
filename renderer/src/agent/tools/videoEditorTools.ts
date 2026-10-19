@@ -264,6 +264,7 @@ export function registerVideoEditorTools() {
     title: '修改剪辑时间线',
     description: '将 1–50 个操作按顺序作为一次可撤销修改提交。先调用 video_project_get 获取真实 ID。支持 split_clip、trim_clip、move_clip、remove_clip、remove_range、close_gap、duplicate_clip、add_clip、add_media、add_track、add_text、set_text、set_text_style、set_transform、set_clip、set_speed、set_track、set_canvas、add_effect、add_transition。add_media 用 video_project_media 返回的 materialId/nodeId 把画布产物或项目素材导入工程；add_clip 与 add_media 省略 atSec 时追加到目标轨道末尾，因此一次提交多段即按顺序首尾相接。set_canvas 只改画布尺寸（如抖音竖屏 1080×1920），不会改动已有片段；要让某个片段铺满画面，再用 set_transform 把它的框设为画布尺寸并设 fit:"fill"（居中裁剪填满），fit:"fit" 或省略则留边。时间单位是秒。validateOnly 可预检整个批次；失败则整个批次不写入。',
     effect: 'project_write',
+    activity: "editor",
     resolveEffect: (input) => input.validateOnly === true ? 'read' : 'project_write',
     isAvailable: editorAvailable,
     inputSchema: {
@@ -410,6 +411,7 @@ export function registerVideoEditorTools() {
     title: '导出剪辑成片',
     description: '仅在用户明确要求导出时调用。打开 MP4 保存对话框并等待真实导出完成；用户取消时返回未导出。',
     effect: 'project_write',
+    activity: "editor",
     isAvailable: editorAvailable,
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     // 导出会先等用户选保存路径，再等真实渲染完成，两者都不该被工具超时打断。
@@ -434,6 +436,7 @@ export function registerVideoEditorTools() {
     title: '剪辑撤销与重做',
     description: '对当前剪辑项目执行一次撤销或重做。每个 video_project_edit 批次是一条历史记录。',
     effect: 'project_write',
+    activity: "editor",
     isAvailable: editorAvailable,
     inputSchema: {
       type: 'object', required: ['action'],

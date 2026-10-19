@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { assertAgentProject, getAgentProjectIdentity, getAgentProjectKey } from '@/services/agentProjectIdentity';
+import { readGoal, isPlanMode } from '@/services/agentConversations';
 import { desktopApi } from '@/services/desktopApi';
 import { store } from '@/store/projectStore';
 import { settingsStore } from '@/store/settingsStore';
@@ -213,7 +214,11 @@ export async function runLoopAgent(
       planSummary: activeProductionPlanSummary(conversationId),
     });
     const messages = [...transcript, await userMessage([message, contextBlock].filter(Boolean).join('\n\n'), payload.attachments || [])];
-    const systemPrompt = buildAgentSystemPrompt(toolContext, LOOP_RUNTIME_MODEL_CONTRACT);
+    // goal 与 planMode 都是项目级持久状态，运行入口每步从 store.project 读取最新值装配 system prompt。
+    const systemPrompt = buildAgentSystemPrompt(toolContext, LOOP_RUNTIME_MODEL_CONTRACT, {
+      goal: readGoal(store.project),
+      planMode: isPlanMode(store.project),
+    });
     const result = await runAgentLoop({
       agent,
       context: toolContext,

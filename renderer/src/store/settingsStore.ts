@@ -40,6 +40,9 @@ export const settingsStore = reactive({
   modelPollIntervalMs: 1500,
   agentAutoEval: true, agentAutoLayout: true, agentCanRunNodes: false,
   agentShellApproval: 'full',
+  // 审批策略（服务层唯一判定）：'ask' 可以请求用户裁决；'never' 无人值守，需要审批的操作一律自动拒绝。
+  // 它独立于 agentShellApproval：后者是"哪些操作要问"，前者是"到底还问不问"。
+  agentApprovalPolicy: 'ask',
   agentPreferredTextModel: 'gpt-5.4',
   agentPreferredImageModel: 'gpt-image-2',
   agentPreferredVideoModel: 'grok-imagine-video',
@@ -114,6 +117,7 @@ function toPlainSettings(patch: AnyRecord = {}) {
     agentAutoEval: rawStore.agentAutoEval, agentAutoLayout: rawStore.agentAutoLayout,
     agentCanRunNodes: rawStore.agentCanRunNodes,
     agentShellApproval: rawStore.agentShellApproval,
+    agentApprovalPolicy: rawStore.agentApprovalPolicy,
     agentPreferredTextModel: rawStore.agentPreferredTextModel,
     agentPreferredImageModel: rawStore.agentPreferredImageModel,
     agentPreferredVideoModel: rawStore.agentPreferredVideoModel,
@@ -143,6 +147,7 @@ function applySettings(settings: AnyRecord) {
   settingsStore.agentAutoLayout = settings.agentAutoLayout !== false;
   settingsStore.agentCanRunNodes = settings.agentCanRunNodes === true;
   settingsStore.agentShellApproval = settings.agentShellApproval === 'ask' ? 'ask' : 'full';
+  settingsStore.agentApprovalPolicy = settings.agentApprovalPolicy === 'never' ? 'never' : 'ask';
   settingsStore.agentPreferredTextModel = normalizePreferredTextModel(settings.agentPreferredTextModel);
   settingsStore.agentPreferredImageModel = normalizePreferredImageModel(settings.agentPreferredImageModel);
   settingsStore.agentPreferredVideoModel = normalizePreferredVideoModel(settings.agentPreferredVideoModel);

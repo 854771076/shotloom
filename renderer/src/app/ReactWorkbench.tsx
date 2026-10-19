@@ -60,6 +60,7 @@ import { SettingsFeature } from "./views/SettingsFeature";
 import { TasksView } from "./views/TasksView";
 import { showToast } from "../store/notificationStore";
 import { recoverInterruptedAgentRuns, relieveAgentHistoryMemoryPressure } from "../agent/runtime/runStore";
+import { registerDefaultAgentTools } from "../agent/tools/registerDefaultTools";
 import { type AppRoute, useAppStore } from "./store/appStore";
 import { installMediaPreviewCacheMemoryPressureListener } from "../services/mediaPreviewCache";
 import { SimpleClipEditor } from "./editor/SimpleClipEditor";
@@ -100,6 +101,9 @@ export function ReactWorkbench() {
     let disposeMediaCachePressure: undefined | (() => void);
     let cancelled = false;
     void (async () => {
+      // 工具注册表是历史轨迹的标题与活动类别的唯一来源；只有开跑时才注册会让重开项目后
+      // 的旧步骤退回成 canvas_create_node 这类原始 id。
+      registerDefaultAgentTools();
       await loadAppSettings();
       await Promise.all([
         loadGlobalSkills(),

@@ -11,6 +11,10 @@ import type { AgentController } from "./contracts";
 import { MediaThumb } from "./MediaThumb";
 import styles from "./ArtifactList.module.css";
 
+// 产物是本轮的真实交付，不需要一条"本轮产物"标题去宣告它；两列铺开，
+// 超过四个先收起来，展开入口用数量说话（照搬参考实现的交付面板折叠方式）。
+const COLLAPSED_COUNT = 4;
+
 export function ArtifactList({
   refs,
   nodes,
@@ -20,30 +24,28 @@ export function ArtifactList({
   nodes: WorkflowNodeData[];
   controller: AgentController;
 }) {
-  const [open, setOpen] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const artifacts = artifactsForMessage(refs, nodes);
   if (!artifacts.length) return null;
+  const collapsible = artifacts.length > COLLAPSED_COUNT;
+  const shown = collapsible && !expanded ? artifacts.slice(0, COLLAPSED_COUNT) : artifacts;
   return (
     <section className={styles.section} aria-label="本轮产物">
-      <button
-        type="button"
-        className={styles.head}
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
-      >
-        <span className={styles.headLabel}>
-          <IconSymbol name="layers" />
-          本轮产物
-          <em>{artifacts.length}</em>
-        </span>
-        <IconSymbol name="chevron-down" className={styles.headChevron} data-collapsed={!open || undefined} />
-      </button>
-      {open && (
-        <div className={styles.grid}>
-          {artifacts.map((artifact) => (
-            <ArtifactCard key={artifact.nodeId} artifact={artifact} onFocus={controller.focusNodes} />
-          ))}
-        </div>
+      <div className={styles.grid} data-single={artifacts.length === 1 || undefined}>
+        {shown.map((artifact) => (
+          <ArtifactCard key={artifact.nodeId} artifact={artifact} onFocus={controller.focusNodes} />
+        ))}
+      </div>
+      {collapsible && (
+        <button
+          type="button"
+          className={styles.toggle}
+          aria-expanded={expanded}
+          onClick={() => setExpanded((value) => !value)}
+        >
+          <span>{expanded ? "收起" : `全部 ${artifacts.length} 个产物`}</span>
+          <IconSymbol name={expanded ? "chevron-up" : "chevron-down"} />
+        </button>
       )}
     </section>
   );

@@ -26,5 +26,7 @@ test('Enter 先交给 @ 菜单，其次才提交；只有一条提交路径', ()
   assert.match(keydown, /const target = mentionOptions\[mention\.index\][\s\S]*?insertMention\(target\)/);
   assert.match(keydown, /event\.key === "Enter" && !event\.shiftKey[\s\S]*?submit\(\)/);
   assert.doesNotMatch(keydown, /controller\.send\(/);
-  assert.match(composer, /function submit\(\)[\s\S]*?controller\.send\(\{/);
+  // 提交只有一条通道：整个面板里 controller.send 只出现一次，且只在 submit 经 sendToRuntime 抵达。
+  assert.equal((composer.match(/controller\.send\(/g) || []).length, 1);
+  assert.match(composer, /function submit\(\)[\s\S]*?sendToRuntime\(/);
 });

@@ -49,8 +49,7 @@ import { useVideoEditorTimeline } from "./useVideoEditorTimeline";
 import type { VideoEditorRuntime } from "./videoEditorRuntimeTypes";
 import {
   type AgentController,
-  type AgentMessage,
-  type ConversationItem,
+  type AgentPanelData,
 } from "../agent-chat/contracts";
 import { AgentChatPanel } from "../agent-chat/AgentChatPanel";
 import { registerActiveVideoEditor } from "../../agent/tools/videoEditorTools";
@@ -86,14 +85,7 @@ export interface VideoEditorWorkspaceProps {
   agentPanel?: AgentController & {
     subscribe: (listener: () => void) => () => void;
     getRevision: () => number;
-    read: () => {
-      messages: AgentMessage[];
-      conversations: ConversationItem[];
-      activeConversationId: string;
-      busy: boolean;
-      textModel: string;
-      textModels: Array<{ id: string; label: string; iconId: string }>;
-    };
+    read: () => AgentPanelData;
   };
 }
 
@@ -115,6 +107,9 @@ function VideoEditorAgentPanel({ agentPanel, onClose, nodeId }: {
       activeConversationId={data.activeConversationId}
       textModel={data.textModel}
       textModels={data.textModels}
+      goal={data.goal}
+      planMode={data.planMode}
+      goalArmed={data.goalArmed}
       controller={{
         ...agentPanel,
         close: onClose,

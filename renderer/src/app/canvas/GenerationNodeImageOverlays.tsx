@@ -6,7 +6,8 @@ import { CanvasOverlayRootContext, type WorkflowNodeActions, type WorkflowNodeDa
 
 /**
  * 本地图片的编辑覆盖层：裁剪保留来源连线由 action 负责，
- * 标注则把合成结果写回节点，预览优先使用标注图。
+ * 标注有两条出路——写回本节点（预览优先用标注图），或把合成结果存成新素材并
+ * 派生一个不改动原节点的图片节点。
  */
 export function GenerationNodeImageOverlays({
   node,
@@ -64,6 +65,9 @@ export function GenerationNodeImageOverlays({
           root={root}
           anchorRef={anchorRef}
           onCancel={() => onImageAnnotationClose?.()}
+          onCreateNode={async ({ blob }) => {
+            if (await actions.createAnnotationNode(node.id, blob)) onImageAnnotationClose?.();
+          }}
           onSave={async ({ blob }) => {
             const dataUrl = await new Promise<string>((resolve, reject) => {
               const reader = new FileReader();

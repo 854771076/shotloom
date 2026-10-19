@@ -4,7 +4,38 @@ import { contractsForAgentType, formatContractsBlock } from './contractLoader';
 import canvasAgentPrompt from './prompts/canvas-agent.md?raw';
 import editorAgentPrompt from './prompts/editor-agent.md?raw';
 import textAgentPrompt from './prompts/text-agent.md?raw';
+import type { AgentGoal } from '@/services/agentConversations';
 import type { AgentToolContext, JsonObject } from '../core/types';
+
+/**
+ * 当前项目的长期目标随每一轮的 system prompt 送出，让模型始终知道自己要持续追求什么。
+ * 它只是把持久状态据实呈现，是否朝目标推进、何时 complete/blocked 仍由模型判断。
+ */
+export function buildGoalContext(goal: AgentGoal | null | undefined): string {
+  if (!goal) return '';
+  const phaseLabel = { active: '进行中', paused: '已暂停', blocked: '受阻', complete: '已完成' }[goal.phase];
+  return [
+    `当前项目长期目标（${phaseLabel}）：${goal.objective}`,
+    `自动续行轮次进度：${goal.roundsStarted}/${goal.maxGoalRounds}。`,
+    goal.phase === 'blocked' && goal.blockedReason ? `受阻原因：${goal.blockedReason}` : '',
+    '本轮工作要朝这个目标推进，并优先用 get_goal 确认最新 revision。目标真正完成时用 update_goal 的 complete 收尾；确实无法继续时用 blocked 如实记录原因，不得虚报完成。',
+  ].filter(Boolean).join('\n');
+}
+
+/**
+ * 计划模式的项目级开关只改变提示词引导，不裁剪任何工具（见 services/agentConversations 的 planMode 契约）。
+ * 这段引导让模型知道自己这一轮应以只读调研与规划为主，并把"何时转入执行"交给用户，而不是让应用代码
+ * 去阻塞写工具——强制限制仍由权限层与 exit_plan_mode 的人工确认负责。
+ */
+export function buildPlanModeContext(planMode: boolean | undefined): string {
+  if (!planMode) return '';
+  return [
+    '当前项目处于计划模式（plan mode）。',
+    '这一阶段以只读调研与规划为主：用只读工具查看画布/工程、模型目录、素材与运行能力，形成或完善 Production Plan，并在回复里把方案讲清楚——阶段、工作项、依赖、将要产出的素材与验收标准。',
+    '计划模式改变的是这一轮该做什么，不裁剪你能调用的工具；但除非用户放行，默认不要执行会产生真实改动或成本的动作（创建/删除节点、启动生成、写时间线或导出）。',
+    '方案就绪、需要用户决定是否转入执行时，调用 exit_plan_mode 请用户确认：批准即退出计划模式并放行执行，拒绝则继续打磨计划、不要擅自执行。用户在计划模式内明确要求直接执行时，同样先经 exit_plan_mode 取得放行。',
+  ].join('\n');
+}
 
 /**
  * 主 Agent 的 system prompt 只有一个来源，由运行入口在每一步装配。
@@ -15,12 +46,15 @@ import type { AgentToolContext, JsonObject } from '../core/types';
 export function buildAgentSystemPrompt(
   context: AgentToolContext,
   runtimeModelContract: string,
+  session?: { goal?: AgentGoal | null; planMode?: boolean },
 ): string {
+  const planModeContext = buildPlanModeContext(session?.planMode);
   // 文本 Agent 面对的是编辑器里的一份草稿，不是画布工作流，因此它有独立的提示词，
   // 不复用画布的制作、节点与生成契约。
   if (context.agentId === TEXT_AGENT_ID) {
     return [
       textAgentPrompt.replace('{{runtime_model_contract}}', runtimeModelContract),
+      planModeContext,
       formatContractsBlock(contractsForAgentType(context.agentId)),
     ].filter(Boolean).join('\n\n');
   }
@@ -28,6 +62,7 @@ export function buildAgentSystemPrompt(
   if (context.agentId === EDITOR_AGENT_ID) {
     return [
       editorAgentPrompt.replace('{{runtime_model_contract}}', runtimeModelContract),
+      planModeContext,
       contracts,
     ].filter(Boolean).join('\n\n');
   }
@@ -39,6 +74,8 @@ export function buildAgentSystemPrompt(
     .replace('{{runtime_model_contract}}', runtimeModelContract);
   return [
     base,
+    buildGoalContext(session?.goal),
+    planModeContext,
     'Use Shotloom native tools for every canvas, project, task, model-catalog, Skill, or media operation.',
     'When a user asks what an existing image or video contains, inspect the real media instead of inferring from its filename, node title, prompt, or path. For a referenced canvas video, call canvas_media_frame with the real node ID or alias and one or more representative time points; the tool returns visual image attachments that you must actually examine before describing the content. Use bash/FFmpeg only as a fallback when no native media tool can perform the required inspection, and do not claim to have seen a frame unless an image attachment was returned successfully.',
     'For a non-trivial production request, inspect runtime capabilities first. Decide production scope from the full user message. If the scope is genuinely unresolved, use request_clarification and formulate the question and options for the actual context. Do not ask again when the user has already stated the scope clearly. Never infer execution merely because the user pasted a complete script.',

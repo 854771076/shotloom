@@ -156,7 +156,8 @@ export const GenerationNode: WorkflowNodeRenderer = memo(({
         semanticZoom={semanticZoom}
         onStarter={startFromStarter}
       />
-      {selected && !imageCropOpen && (
+      {/* 纯上传资源节点的内容就是那个文件本身，没有可再生成的提示词语义，不显示下方输入面板。 */}
+      {selected && !imageCropOpen && !state.uploadedResource && (
         <ScreenSpaceComposer nodeId={node.id}>
           <GenerationNodeComposer
             node={node}

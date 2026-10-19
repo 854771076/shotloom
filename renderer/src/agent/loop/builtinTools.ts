@@ -34,10 +34,11 @@ export function createLoopBuiltins(host: LoopBuiltinHost): LoopBuiltin[] {
   const skills = availableAgentSkills(host.agent.id);
   if (skills.length) {
     const contents = new Map(buildSkillDocuments(skills).map((skill) => [skill.id, skill.content]));
+    const catalog = skills.map((skill) => `${skill.id}：${String(skill.description || '').trim()}`).join('\n');
     builtins.push({
       name: 'skill',
-      description: '按 id 加载一个已授予本 Agent 的 Skill，返回其完整方法与质量标准说明。加载后该 Skill 命名空间下的工具才会对你可见。',
-      parameters: textSchema({ name: { type: 'string', description: 'Skill id' } }, ['name']),
+      description: `根据用户完整语义选择需要的 Skill，按 id 加载其方法与质量标准；加载后对应命名空间工具才可见。当前可用 Skill：\n${catalog}`,
+      parameters: textSchema({ name: { type: 'string', enum: skills.map((skill) => skill.id), description: '当前可用 Skill 的 id' } }, ['name']),
       run: async (input) => {
         const skillId = String(input.name || '').trim();
         const content = contents.get(skillId);

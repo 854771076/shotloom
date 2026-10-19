@@ -128,6 +128,7 @@ export function registerCatalogTools(): void {
     title: '读取提示词模板',
     description: '按需读取一个已启用的提示词模板，结合用户要求调整或组合其方法；可用 usageNote 记录用途。可以直接编写 prompt，无需加载模板。',
     effect: 'agent_state_write',
+    activity: 'skill',
     inputSchema: {
       type: 'object',
       required: ['recipeId'],

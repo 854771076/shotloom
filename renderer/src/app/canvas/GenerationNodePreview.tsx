@@ -62,7 +62,7 @@ export function GenerationNodePreview({
 }) {
   const {
     activeFilePath, activeFileName, activeKind, kind, metaIcon, metaLabel,
-    outputs, previewItem, selectedOutput, textContent, textPreview, uploaded,
+    outputs, previewItem, selectedOutput, textContent, textPreview, uploaded, uploadedResource,
   } = state;
   const videoPreviewRef = useRef<HTMLVideoElement>(null);
   const [videoTime, setVideoTime] = useState(0);
@@ -170,7 +170,8 @@ export function GenerationNodePreview({
                     <IconSymbol name="pencil" />
                     自己编写内容
                   </button>
-                  {TEXT_NODE_STARTERS.map((starter) => (
+                  {/* 生成型 starter 会把提示词写进下方输入面板；纯上传资源节点没有那个面板。 */}
+                  {!uploadedResource && TEXT_NODE_STARTERS.map((starter) => (
                     <button
                       key={starter.key}
                       type="button"

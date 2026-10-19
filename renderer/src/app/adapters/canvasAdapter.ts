@@ -56,6 +56,7 @@ import type {
 } from "../canvas/WorkflowCanvas";
 import {
   cropImage,
+  createAnnotationNode,
   splitImageGrid,
   captureVideoFrame,
   extractAudio,
@@ -471,6 +472,7 @@ export const nodeActions: WorkflowNodeActions = {
   },
   saveToAssets,
   cropImage,
+  createAnnotationNode,
   splitImageGrid,
   captureVideoFrame,
   extractAudio,

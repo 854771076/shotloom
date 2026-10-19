@@ -106,6 +106,7 @@ export interface WorkflowNodeActions {
   ) => void | Promise<void>;
   extractAudio: (id: string) => void | Promise<void>;
   cropImage: (id: string, rect: ImageCropRect) => void | Promise<void>;
+  createAnnotationNode: (id: string, blob: Blob) => void | Promise<boolean>;
   splitImageGrid: (id: string, rows: number, cols: number, selected: number[], rect: ImageCropRect) => void | Promise<void>;
   captureVideoFrame: (id: string, seconds: number) => void | Promise<void>;
   replaceResource: (id: string) => void;

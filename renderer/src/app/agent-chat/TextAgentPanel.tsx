@@ -28,6 +28,9 @@ export function TextAgentPanel({ nodeId, onClose }: { nodeId: string; onClose: (
         activeConversationId={data.activeConversationId}
         textModel={data.textModel}
         textModels={data.textModels}
+        goal={data.goal}
+        planMode={data.planMode}
+        goalArmed={data.goalArmed}
         controller={{
           ...agentPanelController,
           close: onClose,

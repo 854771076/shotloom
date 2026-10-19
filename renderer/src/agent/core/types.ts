@@ -9,6 +9,21 @@ export type AgentToolEffect =
   | 'canvas_write'
   | 'media_generation';
 
+/**
+ * 折叠轨迹头部归纳活动用的类别。它描述"这一步在改动哪个对象"，由工具自己声明，
+ * 缺省按 effect 归类；界面不得按工具名或文本猜测。
+ */
+export type AgentToolActivity =
+  | 'inspect'
+  | 'canvas'
+  | 'plan'
+  | 'write'
+  | 'editor'
+  | 'generate'
+  | 'skill'
+  | 'questions'
+  | 'tools';
+
 export interface AgentToolReceipt extends JsonObject {
   callId: string;
   toolName: string;
@@ -116,8 +131,19 @@ export interface AgentToolDefinition<TInput extends JsonObject = JsonObject, TRe
   inputSchema: JsonSchema;
   resolveInputSchema?: (context: AgentToolContext) => JsonSchema;
   effect: AgentToolEffect;
+  /**
+   * 折叠轨迹头部的活动类别；缺省按 effect 归类。只在同一 effect 内语义明显不同
+   * （例如同样写项目状态但改的是剪辑时间线）时才显式声明。
+   */
+  activity?: AgentToolActivity;
   resolveEffect?: (input: TInput, context: AgentToolContext) => AgentToolEffect;
   isAvailable?: (context: AgentToolContext) => boolean;
+  /**
+   * 无论运行模式如何、无论副作用类别，都必须先经用户确认才执行。
+   * 用于"模型提议、人类裁决"这一类单点人工闸口（如计划模式收尾），而不是把开放式流程
+   * 变成阻塞所有工具的代码门禁；effect 本身仍如实描述它改了什么。
+   */
+  approvalRequired?: boolean;
   /**
    * execute 的时长上限；缺省用 DEFAULT_AGENT_TOOL_TIMEOUT_MS，0 表示不设上限。
    * 等待用户输入或等待真实渲染完成的工具必须显式声明 0：它们的耗时由用户和厂商决定，

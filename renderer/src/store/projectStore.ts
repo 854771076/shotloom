@@ -13,6 +13,7 @@ import {
   PROJECT_SESSION_KEY,
 } from '@/utils/projectSession.ts';
 import { LatestSaveQueue } from '@/services/latestSaveQueue.ts';
+import { checkpointProjectProjections } from '@/store/projectProjections';
 import { recordPerformanceMetric } from '@/services/performanceMetrics';
 import { expandAgentArchivesForPersistence } from '@/services/agentSessionLifecycle.ts';
 import { restoreMissingGeneratedFiles } from '@/services/generatedResultArchive';
@@ -115,6 +116,8 @@ function clearActiveProjectSession() {
 
 function projectPersistenceSnapshot() {
   const startedAt = performance.now();
+  // 落盘前把投影尾日志压实成 checkpoint：存储有界，且加载时能据 checkpoint + 尾日志重放。
+  checkpointProjectProjections(store.project);
   const snapshot: AnyRecord = JSON.parse(JSON.stringify(store.project));
   if (Array.isArray(snapshot.agentConversations)) {
     snapshot.agentConversations = snapshot.agentConversations.map((conversation: AnyRecord) => ({
@@ -249,6 +252,23 @@ export async function flushAutoSave() {
     return true;
   } catch (error) {
     showToast((error as AnyRecord)?.message || '自动保存失败');
+    return false;
+  }
+}
+
+/**
+ * 目标自动续行的 checkpoint-before-drive：在派发下一轮之前，把投影尾日志压实并落盘，
+ * 保证「已消耗的轮次」先于任何模型回合持久化。没有可落盘目录（浏览器预览）时视为已 checkpoint，
+ * 不阻断运行；真实落盘失败返回 false，调用方据此收手而不是假装成功。
+ */
+export async function flushProjectCheckpoint(): Promise<boolean> {
+  checkpointProjectProjections(store.project);
+  if (!canAutoSaveProject()) return true;
+  try {
+    await writeProjectFile({ updateRecent: false });
+    autoSaveQueuedAt = 0;
+    return true;
+  } catch {
     return false;
   }
 }

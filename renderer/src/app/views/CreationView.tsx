@@ -23,9 +23,8 @@ import { IconSymbol } from "../components/IconSymbol";
 import { MaterialGrid, type MaterialItem } from "../components/MaterialGrid";
 import {
   type AgentController,
-  type AgentMessage,
+  type AgentPanelData,
   type AgentPanelHandle,
-  type ConversationItem,
 } from "../agent-chat/contracts";
 import { AgentChatPanel } from "../agent-chat/AgentChatPanel";
 import { CANVAS_AGENT_ID } from "../../agent/agents/definitions";
@@ -91,15 +90,6 @@ export interface CreationViewData {
   };
 }
 
-type AgentPanelData = {
-  messages: AgentMessage[];
-  conversations: ConversationItem[];
-  activeConversationId: string;
-  busy: boolean;
-  textModel: string;
-  textModels: Array<{ id: string; label: string; iconId: string }>;
-};
-
 function LiveAgentPanel({
   nodes,
   artifactNodes,
@@ -125,6 +115,9 @@ function LiveAgentPanel({
       activeConversationId={data.activeConversationId}
       textModel={data.textModel}
       textModels={data.textModels}
+      goal={data.goal}
+      planMode={data.planMode}
+      goalArmed={data.goalArmed}
       controller={controller}
     />
   );

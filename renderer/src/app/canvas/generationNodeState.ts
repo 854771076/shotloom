@@ -38,6 +38,15 @@ const emptySchema: ModelSchema = { models: [], params: [] };
 export const MAX_TEXT_PREVIEW_CHARS = 6000;
 
 /**
+ * 用户把手上的文件放进节点，而不是模型生成出来的结果。
+ * 这三类来源的节点内容就是那个文件本身，没有"改提示词再生成一次"的语义，
+ * 所以节点下方的输入面板不出现。
+ * 裁剪/标注/宫格/截帧/导演台/拼接是对已有素材的加工产物，对话产物是 Agent 的中间结果，
+ * 它们都还要在节点上继续写提示词，因此不在这个集合里。
+ */
+const uploadedResourceSourceTypes = new Set(["canvas-upload", "node-upload", "material-library"]);
+
+/**
  * 目录条目的 presentation 是可选键，值也可能是 undefined；
  * 配置契约只接受有值的可选键，所以缺失时不写出该键。
  */
@@ -103,6 +112,9 @@ export function generationNodeState(
   const uploadKind = uploaded ? generationMediaKind(uploaded) : "";
   const active = (selectedOutput || uploaded) as unknown as Record<string, unknown> | null;
   const activeKind = selectedOutput ? outputKind : uploadKind;
+  // 生成结果优先：节点一旦有了模型产物就不再是"纯上传资源"，输入面板照常出现。
+  const uploadedResource = !selectedOutput && Boolean(uploaded)
+    && uploadedResourceSourceTypes.has(String(node.sourceType || uploaded?.source || ""));
   const activeFilePath = selectedNodeLocalMedia(store.project, node).path;
   const activeFileName = String(
     selectedOutput?.fileName || uploaded?.name || node.title ||
@@ -165,6 +177,7 @@ export function generationNodeState(
     outputs,
     selectedOutput,
     uploaded,
+    uploadedResource,
     active,
     activeKind,
     activeFilePath,

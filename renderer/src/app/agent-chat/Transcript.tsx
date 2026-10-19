@@ -119,6 +119,17 @@ function MessageRow({
   const pendingQuestions = message.clarifications?.filter((question) => !question.answered) || [];
   const loading = !isUser && message.typing && !message.content && !message.toolCalls?.length;
 
+  // 应用写入的提示行不是一段助手回复：没有气泡、没有轨迹、没有计划与产物卡。
+  if (message.notice) {
+    return (
+      <div className={styles.notice} data-notice={message.notice}>
+        {message.notice === "divider" && <i aria-hidden="true" />}
+        <span>{message.content}</span>
+        {message.notice === "divider" && <i aria-hidden="true" />}
+      </div>
+    );
+  }
+
   if (isUser) {
     return (
       <div className={styles.userRow} data-last={isLast || undefined}>

@@ -419,6 +419,9 @@ test('Skill 命名空间工具只有在真正加载后才进入下一次请求',
 
     assert.ok(!toolNames(script.requests[0]).includes('skill_short_drama__inspect_structure'), '未加载 Skill 时命名空间工具不可见');
     assert.ok(toolNames(script.requests[0]).includes('skill'), '有授予 Skill 才会有 skill 工具');
+    const skillDefinition = script.requests[0].tools.find((tool) => tool.function.name === 'skill').function;
+    assert.match(skillDefinition.description, /short-drama：分镜方法/, '模型请求应说明可用 Skill 的用途');
+    assert.deepEqual(skillDefinition.parameters.properties.name.enum, ['short-drama', 'other-skill'], '工具参数只列当前授予的 Skill id');
     assert.ok(toolNames(script.requests[1]).includes('skill_short_drama__inspect_structure'), '加载后下一步就该可见');
     assert.match(JSON.parse(result.messages.find((message) => message.role === 'tool' && message.tool_call_id === 'call-skill').content).content, /先建立人物动机/);
     assert.equal(toolContent(result.messages, 'call-namespaced').success, true);

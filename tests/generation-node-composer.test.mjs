@@ -50,6 +50,16 @@ test('节点输入面板固定在屏幕空间，不跟随画布倍率缩放', ()
   assert.doesNotMatch(styles, /\.work-composer \{[\s\S]*?top:\s*calc\(100% \+ 10px\)/);
 });
 
+test('纯上传资源节点不显示下方输入面板', () => {
+  // 只有"用户放进来的文件"这一类来源隐藏面板；裁剪/标注/宫格/截帧/导演台/拼接/对话产物都留在集合外。
+  assert.match(source, /const uploadedResourceSourceTypes = new Set\(\["canvas-upload", "node-upload", "material-library"\]\)/);
+  // 生成结果优先：节点有模型产物时面板照常出现，隐藏只看当前选中的那一份输出。
+  assert.match(source, /const uploadedResource = !selectedOutput && Boolean\(uploaded\)/);
+  assert.match(source, /\{selected && !imageCropOpen && !state\.uploadedResource && \(\s*\n\s*<ScreenSpaceComposer nodeId=\{node\.id\}>\s*\n\s*<GenerationNodeComposer/);
+  // 生成型 starter 把提示词写进这个面板，面板不在时不能留下无效入口。
+  assert.match(source, /\{!uploadedResource && TEXT_NODE_STARTERS\.map/);
+});
+
 test('节点输入面板使用四分之三紧凑尺寸', () => {
   assert.match(source, /Math\.min\(570, Math\.max\(320, rootWidth - 24\)\)/);
   assert.match(styles, /\.work-composer \{[\s\S]*?height:\s*186px/);

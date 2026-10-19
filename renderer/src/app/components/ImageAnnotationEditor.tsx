@@ -1,18 +1,25 @@
 import { createPortal } from "react-dom";
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, type ComponentType, type CSSProperties, type RefObject } from "react";
 import ScreenshotsContext from "../../../../node_modules/react-screenshots/lib/Screenshots/ScreenshotsContext.js";
 import ScreenshotsCanvas from "../../../../node_modules/react-screenshots/lib/Screenshots/ScreenshotsCanvas/index.js";
-import ScreenshotsOperations from "../../../../node_modules/react-screenshots/lib/Screenshots/ScreenshotsOperations/index.js";
+import annotationOperations from "../../../../node_modules/react-screenshots/lib/Screenshots/operations/index.js";
+import composeImage from "../../../../node_modules/react-screenshots/lib/Screenshots/composeImage.js";
+import { HistoryItemType } from "../../../../node_modules/react-screenshots/lib/Screenshots/types.js";
 import zhCN from "../../../../node_modules/react-screenshots/lib/Screenshots/zh_CN.js";
+import { showToast } from "../../store/notificationStore";
+import { IconSymbol } from "./IconSymbol";
 
 export type ImageAnnotation = { id: string; kind: "rect" | "ellipse" | "arrow" | "line" | "pen" | "text" | "annotation" | "mosaic"; points: Array<{ x: number; y: number }>; text?: string; color?: string; strokeWidth?: number };
 export type ImageAnnotationSave = { blob: Blob; bounds: { x: number; y: number; width: number; height: number } };
 
 type ContextValue = { store: any; dispatcher: any };
 
-/** Uses react-screenshots' editing operations on an image-node canvas.
- * Its screenshot background/crop flow is intentionally not rendered here. */
-export function ImageAnnotationEditor({ imageUrl, imageWidth, imageHeight, semanticZoom = 1, root, anchorRef, onCancel, onSave }: { imageUrl: string; imageWidth: number; imageHeight: number; annotations?: ImageAnnotation[]; semanticZoom?: number; root: HTMLElement | null; anchorRef: RefObject<HTMLDivElement | null>; onCancel: () => void; onSave: (result: ImageAnnotationSave) => void }) {
+/**
+ * 操作条由本项目自己拼接：第三方只交出按钮清单，容器与定位一直由 `canvas.css` 的
+ * `.screenshots-operations` 覆盖决定，所以这里不引入它的 ScreenshotsOperations，
+ * 才能在末尾接上"标注完成，生成新节点"这颗它没有的按钮。
+ */
+export function ImageAnnotationEditor({ imageUrl, imageWidth, imageHeight, semanticZoom = 1, root, anchorRef, onCancel, onSave, onCreateNode }: { imageUrl: string; imageWidth: number; imageHeight: number; annotations?: ImageAnnotation[]; semanticZoom?: number; root: HTMLElement | null; anchorRef: RefObject<HTMLDivElement | null>; onCancel: () => void; onSave: (result: ImageAnnotationSave) => void; onCreateNode: (result: ImageAnnotationSave) => void | Promise<void> }) {
   const canvasContextRef = useRef<CanvasRenderingContext2D | null>(null);
   const emitterRef = useRef<Record<string, unknown>>({});
   const [image, setImage] = useState<HTMLImageElement | null>(null);
@@ -97,20 +104,52 @@ export function ImageAnnotationEditor({ imageUrl, imageWidth, imageHeight, seman
   }, []);
   const width = screenRect.width;
   const height = screenRect.height;
+  const bounds = useMemo(() => ({ x: 0, y: 0, width, height }), [width, height]);
   useEffect(() => {
     const next = new Image();
     next.onload = () => setImage(next);
     next.src = imageUrl;
     return () => { next.onload = null; };
   }, [imageUrl]);
-  const store = useMemo(() => ({ url: imageUrl, image, width, height, lang: { ...zhCN, operation_text_title: "标注", operation_mosaic_title: "马赛克", operation_ellipse_title: "圆形", operation_rectangle_title: "矩形", operation_cancel_title: "关闭", operation_ok_title: "完成" }, emitterRef, canvasContextRef, history, bounds: { x: 0, y: 0, width, height }, cursor: operation ? "crosshair" : "default", operation }), [imageUrl, image, width, height, history, operation]);
+  const composingRef = useRef(false);
+  const [composing, setComposing] = useState(false);
+  // 与第三方"完成"按钮同一条合成路径：先把选中态摘掉，否则蓝色选择框会被画进结果里。
+  const compose = (deliver: (result: ImageAnnotationSave) => void | Promise<void>) => {
+    if (!image || composingRef.current) return;
+    composingRef.current = true;
+    setComposing(true);
+    history.stack.forEach((item: any) => { if (item?.type === HistoryItemType.Source) item.isSelected = false; });
+    setHistory({ index: history.index, stack: history.stack });
+    window.setTimeout(() => {
+      void composeImage({ image, width, height, history, bounds })
+        .then((blob) => deliver({ blob, bounds }))
+        .catch((cause) => showToast(cause instanceof Error ? cause.message : "标注图像合成失败"))
+        .finally(() => {
+          composingRef.current = false;
+          setComposing(false);
+        });
+    });
+  };
+  const store = useMemo(() => ({ url: imageUrl, image, width, height, lang: { ...zhCN, operation_text_title: "标注", operation_mosaic_title: "马赛克", operation_ellipse_title: "圆形", operation_rectangle_title: "矩形", operation_cancel_title: "关闭", operation_ok_title: "完成" }, emitterRef, canvasContextRef, history, bounds, cursor: operation ? "crosshair" : "default", operation }), [imageUrl, image, width, height, history, bounds, operation]);
   const dispatcher = useMemo(() => ({ call: (name: string, ...args: unknown[]) => { if (name === "onCancel") onCancel(); if (name === "onSave" || name === "onOk") onSave({ blob: args[0] as Blob, bounds: args[1] as ImageAnnotationSave["bounds"] }); }, setHistory, setBounds: () => undefined, setCursor: () => undefined, setOperation }), [onCancel, onSave]);
   const context = useMemo<ContextValue>(() => ({ store, dispatcher }), [store, dispatcher]);
   if (!root) return null;
   return createPortal(<div className="canvas-image-annotation-editor nodrag nopan nowheel" style={{ left: screenRect.left, top: screenRect.top, width, height, "--canvas-annotation-toolbar-scale": "1", "--canvas-annotation-zoom": String(semanticZoom) } as CSSProperties} onPointerDown={(event) => event.stopPropagation()}>
     <ScreenshotsContext.Provider value={context}>
       {image && <ScreenshotsCanvas ref={canvasContextRef} />}
-      {image && <ScreenshotsOperations />}
+      {image && <div className="screenshots-operations" onDoubleClick={(event) => event.stopPropagation()} onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); }}>
+        <div className="screenshots-operations-buttons">
+          {annotationOperations.map((entry, index) => {
+            if (entry === "|") return <div className="screenshots-operations-divider" key={`divider-${index}`} />;
+            const Operation = entry as ComponentType;
+            return <Operation key={`operation-${index}`} />;
+          })}
+          <div className="screenshots-operations-divider" />
+          <div className={`screenshots-button canvas-annotation-node-button${composing ? " screenshots-button-disabled" : ""}`} title="标注完成，生成新节点" onClick={() => compose(onCreateNode)}>
+            <IconSymbol name="arrow-up" />
+          </div>
+        </div>
+      </div>}
     </ScreenshotsContext.Provider>
   </div>, root);
 }

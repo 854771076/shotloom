@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { IconSymbol } from "../components/IconSymbol";
-import type { AgentController, AgentPlanView } from "./contracts";
+import type { AgentController, AgentPlanView, AgentPlanStageView } from "./contracts";
 import styles from "./PlanCard.module.css";
 
 const stageStatusLabel: Record<string, string> = {
@@ -10,21 +10,24 @@ const stageStatusLabel: Record<string, string> = {
   done: "已完成",
 };
 
-// 头部进度按状态分段陈述而不是只报 done/total：进行中/受阻各占一段，
-// 零计数段省略，扫一眼就知道计划此刻卡在哪一类状态上。
+// 头部只报状态计数，不画进度条：扫一眼就知道计划卡在哪一类状态上。
+// 零计数的类别不出现，全完成时就只剩"7 已完成"。
 const stageProgress = (stages: NonNullable<AgentPlanView["stages"]>) => {
   const count = (status: string) => stages.filter((stage) => stage.status === status).length;
   const done = count("done");
-  const segments: string[] = [];
-  if (done) segments.push(`${done} 已完成`);
   const doing = count("doing");
-  if (doing) segments.push(`${doing} 进行中`);
   const blocked = count("blocked");
-  if (blocked) segments.push(`${blocked} 受阻`);
   const pending = stages.length - done - doing - blocked;
-  if (pending) segments.push(`${pending} 待编排`);
-  return segments.join(" · ");
+  return [
+    done && `${done} 已完成`,
+    doing && `${doing} 进行中`,
+    blocked && `${blocked} 受阻`,
+    pending && `${pending} 待编排`,
+  ].filter(Boolean).join(" · ");
 };
+
+const stageStatusName = (stage: AgentPlanStageView) =>
+  stageStatusLabel[String(stage.status || "")] || String(stage.status || "");
 
 export function PlanCard({
   plan,
@@ -42,8 +45,9 @@ export function PlanCard({
   }, [plan?.id]);
   if (!plan || plan.schemaVersion !== 2 || !stages.length) return null;
 
-  const done = stages.filter((stage) => stage.status === "done").length;
   const progress = stageProgress(stages);
+  // 只规划是这一轮真正需要被看见的例外；默认的执行型计划不必自报家门。
+  const planOnly = plan.executionMode !== "execute";
 
   return (
     <section className={styles.card} data-open={open || undefined}>
@@ -53,15 +57,12 @@ export function PlanCard({
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
       >
-        <IconSymbol name="workflow" className={styles.headIcon} />
-        <span className={styles.headCopy}>
-          <small>{plan.executionMode === "execute" ? "制作与执行" : "画布规划"}</small>
-          <strong>{plan.title || plan.goal || "画布制作"}</strong>
+        <IconSymbol name="list" className={styles.headIcon} />
+        <span className={styles.headTitle} title={planOnly ? `${plan.title || ""} · 仅规划` : undefined}>
+          <span className={styles.headName}>{plan.title || plan.goal || "画布制作"}</span>
+          {planOnly && <small>仅规划</small>}
         </span>
         <span className={styles.headCount}>{progress}</span>
-        <span className={styles.bar} aria-hidden="true">
-          <span className={styles.barFill} style={{ width: `${(done / stages.length) * 100}%` }} />
-        </span>
         <IconSymbol name="chevron-down" className={styles.headChevron} />
       </button>
       {open && (
@@ -73,6 +74,7 @@ export function PlanCard({
             const stageNodeIds = (stage.runtimeRefs || []).flatMap((ref) =>
               ref.nodeId ? [ref.nodeId] : [],
             );
+            const status = stageStatusName(stage);
             return (
               <li key={key} className={styles.stage} data-status={stage.status}>
                 <button
@@ -80,10 +82,11 @@ export function PlanCard({
                   className={styles.stageHead}
                   disabled={!detail}
                   aria-expanded={expanded}
+                  title={stage.title || `阶段 ${index + 1}`}
                   onClick={() => setExpandedStage(expanded ? null : key)}
                 >
-                  {/* 状态三层冗余：图标形状 + 颜色 + 行尾文字，任一通道失效都不丢信息。 */}
-                  <span className={styles.stageMark} aria-hidden="true">
+                  {/* 状态由形状与颜色承载，aria-label 补足文字通道；行尾不再重复一个状态词。 */}
+                  <span className={styles.stageMark} role="img" aria-label={status}>
                     {stage.status === "done" ? (
                       <IconSymbol name="check" className={styles.stageGlyph} />
                     ) : stage.status === "blocked" ? (
@@ -93,9 +96,6 @@ export function PlanCard({
                     )}
                   </span>
                   <span className={styles.stageTitle}>{stage.title || `阶段 ${index + 1}`}</span>
-                  <span className={styles.stageStatus}>
-                    {stageStatusLabel[String(stage.status || "")] || stage.status}
-                  </span>
                   {!!detail && <IconSymbol name="chevron-down" className={styles.stageChevron} />}
                 </button>
                 {expanded && (
@@ -111,14 +111,14 @@ export function PlanCard({
                             (ref) => ref.workItemId === workItem.id,
                           );
                           return (
-                            <li key={workItem.id}>
-                              <span className={styles.workItemHead}>
-                                <strong>{workItem.title}</strong>
-                                <em>{workItem.outputType || "output"}</em>
+                            <li key={workItem.id} className={styles.workItem}>
+                              <span className={styles.workItemTitle}>{workItem.title}</span>
+                              <span className={styles.workItemMeta}>
+                                {workItem.outputType || "output"}
+                                {runtimeRef?.nodeId || runtimeRef?.taskId ? " · 已绑定产物" : ""}
                               </span>
-                              {workItem.prompt && <p>{workItem.prompt}</p>}
-                              {(runtimeRef?.nodeId || runtimeRef?.taskId) && (
-                                <small>产物已绑定</small>
+                              {workItem.prompt && (
+                                <span className={styles.workItemPrompt}>{workItem.prompt}</span>
                               )}
                             </li>
                           );

@@ -50,6 +50,10 @@ const productionPlanWriteTools = ['plan_write', 'plan_patch_stage', 'plan_update
 const productionPlanReadTools = ['plan_get_stage_status', 'plan_get_stage_detail'];
 /** Skill 命名空间工具仍然要等对应 SKILL.md 真正加载后才可见，见 core/visibility.ts。 */
 const skillNamespacedTools = ['skill_short_drama__inspect_structure'];
+// 长期目标是跨轮、跨重启的持久完成目标，由主创作 Agent 拥有；会话级状态，不改画布。
+const goalTools = ['get_goal', 'create_goal', 'update_goal'];
+// 计划模式的收尾：只由面向用户的主 Agent 提议、由用户批准退出；子 Agent 不拥有这个人工闸口。
+const planTools = ['exit_plan_mode'];
 const videoEditorTools = [
   'video_project_get', 'video_project_media', 'video_project_edit', 'video_project_view',
   'video_project_diagnostics', 'video_project_frame', 'video_project_export', 'video_project_history',
@@ -67,7 +71,7 @@ export const AGENT_DEFINITIONS: AgentDefinition[] = [
       ...toolOutputReadTools,
       ...canvasReadTools, ...canvasWriteTools, ...generationTools, ...catalogTools,
       ...userInteractionTools, ...productionPlanWriteTools, ...productionPlanReadTools,
-      ...skillNamespacedTools,
+      ...skillNamespacedTools, ...goalTools, ...planTools,
     ],
     skills: ['*'],
     dispatch: ['production-planner', 'stage-executor', 'result-reviewer'],
@@ -82,7 +86,7 @@ export const AGENT_DEFINITIONS: AgentDefinition[] = [
     tools: [
       ...toolOutputReadTools,
       ...videoEditorTools, 'request_clarification', 'report_outcome',
-      'inspect_runtime_capabilities', 'inspect_model_catalog',
+      'inspect_runtime_capabilities', 'inspect_model_catalog', ...planTools,
     ],
     skills: ['video-editing'],
     dispatch: [],
@@ -94,7 +98,7 @@ export const AGENT_DEFINITIONS: AgentDefinition[] = [
     description: 'Text editor workspace agent bound to one open document draft',
     // 文本 agent 只在编辑器草稿上工作：既没有画布写入，也没有项目持久化权限。
     effects: ['read', 'agent_state_write'],
-    tools: [...toolOutputReadTools, ...textDraftTools, 'request_clarification'],
+    tools: [...toolOutputReadTools, ...textDraftTools, 'request_clarification', ...planTools],
     skills: ['text-writing'],
     dispatch: [],
   },

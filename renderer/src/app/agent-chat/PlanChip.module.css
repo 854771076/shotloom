@@ -1,0 +1,64 @@
+/* 与同一工具行里的其它 chip 共用形状与字号：一行两种轮廓只会更乱。 */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  min-width: 34px;
+  flex: 0 0 auto;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 999px;
+  color: var(--slk-label-accent);
+  background: var(--brand-accent-wash);
+  font: 500 var(--text-body-12)/1 var(--font-ui);
+  transition: background-color var(--slk-dur-fast) var(--slk-ease);
+}
+
+@media (hover: hover) {
+  .chip:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--brand-accent-wash) 55%, var(--slk-label-accent) 12%);
+  }
+}
+
+.chip:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.mark {
+  position: relative;
+  display: block;
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  flex: 0 0 auto;
+}
+
+.glyph {
+  position: absolute;
+  inset: 0;
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  transition: opacity var(--slk-dur-fast) var(--slk-ease);
+}
+
+.glyph[data-role="close"] {
+  opacity: 0;
+}
+
+@media (hover: hover) {
+  .chip:hover .glyph,
+  .chip:focus-visible .glyph {
+    opacity: 0;
+  }
+
+  .chip:hover .glyph[data-role="close"],
+  .chip:focus-visible .glyph[data-role="close"] {
+    opacity: 1;
+  }
+}
+
+.label {
+  min-width: 0;
+  white-space: nowrap;
+}

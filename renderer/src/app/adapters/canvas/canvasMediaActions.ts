@@ -137,6 +137,80 @@ export async function cropImage(id: string, crop: ImageCropRect) {
     }
 }
 
+export async function createAnnotationNode(id: string, blob: Blob) {
+    const source: any = (store.project.nodes || []).find(
+      (item: any) => item.id === id && item.type === "imageGeneration" && !item.archived,
+    );
+    if (!source) {
+      showToast("当前节点没有可用于标注的本地图片");
+      return false;
+    }
+    const stem = String(source.title || "图片")
+      .replace(/\.[a-z0-9]{1,10}$/i, "")
+      .replace(/[\\/:*?"<>|]/g, "-");
+    const name = `${stem}-标注.png`;
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ""));
+        reader.onerror = () => reject(reader.error || new Error("标注图片读取失败"));
+        reader.readAsDataURL(blob);
+      });
+      const file: any = await desktopApi.file.saveDataUrlToProject(dataUrl, name);
+      const filePath = String(file?.filePath || file?.path || "");
+      if (!filePath) throw new Error("标注结果未能写入项目素材目录");
+      const registered: any = registerImportedMaterial(
+        { ...file, name: file?.name || name, type: "image/png", mimeType: "image/png" },
+        {
+          resourceType: "image",
+          source: "image-annotation",
+          sourceType: "image-annotation",
+          nodeType: "imageGeneration",
+          assetTag: "图片标注",
+        },
+      );
+      if (!registered.material) throw new Error("标注结果未能登记为项目素材");
+      recordCanvasHistory("标注图片");
+      const output: any = addNode("imageGeneration");
+      const sourceDimensions = canvasNodeDimensions(source);
+      output.title = `${stem}-标注`;
+      output.prompt = "";
+      output.x = Math.round((Number(source.x) || 0) + sourceDimensions.width + 80);
+      output.y = Math.round(Number(source.y) || 0);
+      output.materialId = registered.material.id;
+      output.assetId = registered.asset?.id || "";
+      output.resourceType = "image";
+      output.sourceType = "image-annotation";
+      output.generatedFrom = { nodeId: source.id, type: "image-annotation" };
+      output.filePath = filePath;
+      output.uploadedFile = {
+        name: file?.name || name,
+        path: filePath,
+        filePath,
+        type: "image/png",
+        mimeType: "image/png",
+        size: file?.size || 0,
+        materialId: output.materialId,
+        assetId: output.assetId,
+        resourceType: "image",
+        source: "image-annotation",
+      };
+      registered.material.nodeId = output.id;
+      addCanvasEdge(store.project, source.id, output.id, {
+        touch: false,
+        kind: "derived-output",
+        edge: { data: { skipTaskInput: true, derivation: "image-annotation" } },
+      });
+      setSelectedNodeIds([output.id]);
+      touchProject();
+      showSuccessToast("已创建标注图片节点");
+      return true;
+    } catch (cause) {
+      showToast(cause instanceof Error ? cause.message : "标注结果生成新节点失败");
+      return false;
+    }
+}
+
 export async function splitImageGrid(id: string, rows: number, cols: number, selected: number[], rect: ImageCropRect) {
     const source: any = (store.project.nodes || []).find(
       (item: any) => item.id === id && item.type === "imageGeneration" && !item.archived,

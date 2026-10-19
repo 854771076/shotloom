@@ -11,6 +11,7 @@ export function registerShortDramaTools(): void {
     title: '读取剧本结构候选',
     description: '无损分页读取剧本文本，返回段落边界、显式场次标题候选和对白说话人候选。候选不是制作结论；Agent 根据完整语义复核并决定场次和工作项。',
     effect: 'agent_state_write',
+    activity: "inspect",
     inputSchema: {
       type: 'object',
       required: ['sourceText'],

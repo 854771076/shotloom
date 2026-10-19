@@ -6,6 +6,7 @@ import type {
   AgentToolContext, AgentToolDefinition, AgentToolEffect, JsonObject, PreparedAgentToolCall,
 } from '../core/types';
 import { createAgentInteraction } from './runStore';
+import { requestApproval } from './approvalWaterfall';
 import { waitForAgentApproval } from './runtimeInteractions';
 import {
   createLoopGuardState,
@@ -243,38 +244,27 @@ async function executeAgentToolCall(
     return refusedToolCall(context, call, 'permission',
       [`当前用户设置或权限不允许执行 ${prepared.definition.id}（${effect}）`]);
   }
-  if (policy === 'confirm') {
-    const stepId = `policy:${call.callId}`;
-    const interactionId = `${context.requestId}:tool_confirmation:${stepId}`;
+  // 拒绝权限仍优先；但工具自己声明 approvalRequired 时，无论询问/自动模式都要先让用户裁决
+  // （计划模式收尾这类单点人工闸口）。审批统一交给服务层：策略、回合边界与审计对只有那一份实现。
+  if (policy === 'confirm' || prepared.definition.approvalRequired === true) {
     const title = prepared.definition.title || prepared.definition.id;
-    createAgentInteraction({
-      id: interactionId, runId: context.requestId, conversationId: context.conversationId,
-      projectKey: context.projectKey, kind: 'tool_confirmation',
-      payload: {
-        toolCallId: call.callId, toolName: prepared.definition.id, stepId,
-        title, actionCount: 0, mode: 'decision', pendingArgs: prepared.input,
-      },
+    const approval = await requestApproval({
+      context,
       continuation: continuation(run, call.callId, prepared.definition.id),
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1_000).toISOString(),
-    });
-    context.emit({
-      type: 'interaction_requested', interactionId, kind: 'tool_confirmation',
-      toolCallId: call.callId, toolName: prepared.definition.id, stepId, title, actionCount: 0,
+      stepId: `policy:${call.callId}`,
+      toolCallId: call.callId,
+      toolName: prepared.definition.id,
+      title,
+      actionCount: 0,
+      mode: 'decision',
       pendingArgs: prepared.input,
-      createdAt: new Date().toISOString(),
     });
-    const resolution = await waitForAgentApproval(context.requestId, stepId, context.signal);
-    context.emit({
-      type: 'interaction_resolved', interactionId, kind: 'tool_confirmation',
-      toolCallId: call.callId, stepId, approved: resolution.approved,
-      createdAt: new Date().toISOString(),
-    });
-    if (!resolution.approved) {
-      throw new Error(resolution.error || `用户拒绝了「${title}」`);
+    if (approval.outcome !== 'allowed-once') {
+      throw new Error(approval.reason || `用户拒绝了「${title}」`);
     }
     // 用户在确认时改过参数：按工具自己的 schema 重新校验后执行，而不是用原参数。
-    if (resolution.modifiedArgs) {
-      const reprepared = prepareAgentToolCall(call.name, JSON.stringify(resolution.modifiedArgs), context);
+    if (approval.resolution?.modifiedArgs) {
+      const reprepared = prepareAgentToolCall(call.name, JSON.stringify(approval.resolution.modifiedArgs), context);
       prepared.input = reprepared.input;
     }
   }
@@ -307,33 +297,19 @@ async function executeAgentToolCall(
       const step = result.step || {};
       const stepId = String(step.id || step.stepId || '');
       if (!stepId) throw new Error('待确认工具没有返回稳定 stepId');
-      const interactionId = `${context.requestId}:tool_confirmation:${stepId}`;
-      createAgentInteraction({
-        id: interactionId, runId: context.requestId, conversationId: context.conversationId,
-        projectKey: context.projectKey, kind: 'tool_confirmation',
-        payload: {
-          toolCallId: call.callId, toolName: prepared.definition.id, stepId,
-          title: String(step.title || prepared.definition.title), actionCount: Number(step.actionCount || 0),
-          mode: 'step',
-        },
+      const approval = await requestApproval({
+        context,
         continuation: continuation(run, call.callId, prepared.definition.id),
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1_000).toISOString(),
+        stepId,
+        toolCallId: call.callId,
+        toolName: prepared.definition.id,
+        title: String(step.title || prepared.definition.title),
+        actionCount: Number(step.actionCount || 0),
+        mode: 'step',
       });
-      context.emit({
-        type: 'interaction_requested', interactionId, kind: 'tool_confirmation',
-        toolCallId: call.callId, toolName: prepared.definition.id, stepId,
-        title: String(step.title || prepared.definition.title), actionCount: Number(step.actionCount || 0),
-        createdAt: new Date().toISOString(),
-      });
-      const resolution = await waitForAgentApproval(context.requestId, stepId, context.signal);
-      result = resolution.approved
-        ? resolution.result
-        : { success: false, rejected: true, error: resolution.error || '用户拒绝了本次操作' };
-      context.emit({
-        type: 'interaction_resolved', interactionId, kind: 'tool_confirmation',
-        toolCallId: call.callId, stepId, approved: resolution.approved,
-        createdAt: new Date().toISOString(),
-      });
+      result = approval.outcome === 'allowed-once'
+        ? approval.resolution?.result
+        : { success: false, rejected: true, error: approval.reason || '用户拒绝了本次操作' };
     }
     const receipt = buildToolReceipt(call.callId, prepared.definition.id, effect, result,
       prepared.definition.summarizeResult?.(result));

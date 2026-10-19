@@ -55,6 +55,16 @@ Shotloom 的 Agent 以模型为决策主体。不要在应用代码中用关键�
 - `app/store/` 不得引入 domainReactivity；`store/` 下的纯函数模块（节点、边、步骤等图数据访问器）不携带引擎，只读写 projectStore 的同一份可变对象。
 - 以上边界由 `scripts/verify-module-discipline.mjs` 检查（`npm run check:layers`）。新增例外必须在该脚本的集合里显式登记并说明理由。
 
+## 项目级事件溯源投影
+
+`renderer/src/store/projectProjections.ts` 是 domainReactivity 之下的一层，不是第三个状态引擎：真相是只追加的整值事件日志，派生状态是对它的纯折叠，折叠结果只物化回项目字段再由 domainReactivity 合并通知。对外变更通道仍然只有 domainReactivity 一条，渲染路径照旧读物化字段，不引入第二套订阅。
+
+- `ProjectionDefinition.apply(state, event)` 必须同步、纯，且对本单元无关的事件**返回同一引用**（`Object.is`）；引用不变即零下游开销、不物化、不 bump revision。事件是整值事件，携带变更后的完整状态，不是增量；单元状态必须是普通 JSON（checkpoint 的前提）。
+- 注册是 fail-closed 的：同 key 同 `stateVersion` 重复注册是幂等空操作，同 key 不同 `stateVersion` 直接报错。没注册的 key 在快照里不存在，读它就是能力缺失。
+- 宿主分作用域：`scope: 'project'` 的日志与 checkpoint 落在 `project.projectionJournal` / `project.projectionCheckpoint` / `project.projectionSeq`，随项目 JSON 持久化；`scope: 'session'` 的运行态投影（如 `turnBoundary`）只活在内存里，**绝不进 checkpoint 行**。物化必须经调用方传入的原始对象（可能是 domainReactivity 的 Proxy），否则不会触发合并通知。读写 journal / seq 本身一律走 `toRaw` 后的普通对象，折叠运算不得被 Proxy 干扰引用判定。
+- 加载与创建路径各做一次：`createProject` 初始化空 journal/checkpoint；`normalizeProject` 调用 `restoreProjectProjections` 重放。**只有存在非空日志或 checkpoint 证据时**才以日志为准重建并物化字段，二者都空（legacy 项目）时不动物化字段，交给 `normalizeProjectState` 的就地规范化。重放**绝不放渲染路径**。保存前 `checkpointProjectProjections` 把尾日志压进 checkpoint 行并清空尾，保证存储有界。
+- 当前注册的投影：`goal`（`goal/change` → `project.goal`）、`planMode`（`plan/change` → `project.planMode`）为项目作用域；`turnBoundary`（`turn/start` / `turn/end`）为会话作用域。注册与物化分别在 `services/agentConversations.ts` 与投影引擎里，不得在界面另起一套。
+
 ## Agent 画布写入路径
 
 Agent 对画布的写入只有一条路径，三层各自拥有完整职责，不得再插入注册表、handler 分发层或只有转发动作的中间文件：
@@ -89,6 +99,9 @@ Agent 对画布的写入只有一条路径，三层各自拥有完整职责，�
 - `renderer/src/agent/loop/runLoopAgent.ts` 是唯一的 Agent 运行入口：模型循环、会话历史、上下文裁剪与子 Agent 全部由自研 loop 驱动，没有第二个引擎，也没有引擎选择层。
 - loop 支持模型目录明确声明的 OpenAI Chat Completions、OpenAI Responses 和 Anthropic Messages。`loop/modelRequest.ts` 的 `loopUnsupportedReason(model)` 是协议能力的唯一判断：声明的协议与 endpoint 不匹配时，本轮直接以诊断失败结束，不得把请求降级成“语义相近但不同”的协议，也不得用 `localStorage` 之类的开关绕过目录。三种协议只在请求与流式响应边界转换，内部会话历史与工具执行管道仍共用一份。
 - 执行管道 `runtime/executeToolCall.ts` 只有一份实现：权限确认、重复调用拦截、用户改参重校验、回执记账和 `tool_start`/`tool_end` 事件，loop 不得自行调用 `definition.execute`。
+- 审批（user-approval）只有一份服务层实现 `runtime/approvalWaterfall.ts`，工具管道与循环都只能经 `requestApproval`，不得各自内联确认卡。顺序是承重的：回合边界前置检查 → 写 `approval_asked` → **服务层就地判 `'never'` 策略**（拒绝，不创建交互、不发 `interaction_requested`）→ 派发确认 → 写 `approval_decided`。`'never'` 的判定绝不能靠监听器或注册顺序（后注册的拦截器不能放行一次注定被拒的提问）；没有开启回合时失败关闭（`unavailable`）且**不写半截审计对**；确认抛异常、非词表返回值一律归一化为失败关闭，绝不让调用方静默放行。中断（`AbortError`）写审计 `cancelled` 后**原样重抛**，不得伪装成一次普通"用户拒绝"。
+- 审批策略与"哪些操作要问"是两件事：`agentShellApproval`（`'ask'|'full'`）决定哪些副作用要问，`settingsStore.agentApprovalPolicy`（`'ask'|'never'`，默认 `'ask'`）决定到底还问不问。`'never'` 不是自动放行——它是无人值守立场：需要审批的操作一律自动拒绝。两处确认（`policy==='confirm'` 与工具自己声明的 `approvalRequired`）都走同一次 `requestApproval`；`policy==='deny'` 仍最先短路。
+- 审批的审计对必须落在一次已开启的模型回合内，否则与崩溃尾巴无法区分。回合边界是 `turnBoundary`（会话作用域投影，只活在内存里）：loop 每一步 `openAgentTurn(context, step)` 开启、在 `finally` 里 `closeAgentTurn(context)` 闭合，无论这一步如何结束都不留半开回合。边界只经 `commitProjectionEvent` 写投影，**不得**额外派生 runtime 事件（否则会改变 `turn_start` 计数契约）。审批服务的会话宿主挂在 `context.state` 的 `sessionProjectionHost` 键上，与工具管道同一份。
 - 提示词装配（`content/instructions.ts`）、附件转图片（`content/attachments.ts`）、运行失败诊断（`runtime/runtimeDiagnostics.ts`）和终态结果推导同样只有一份实现。诊断只按模型请求与本地运行环境的真实错误文本分类，不得为某个外部进程的实现细节分类。
 - `skill` 与 `dispatch_subagent` 是 loop 自带的循环机制，不进工具注册表；其可见性完全来自 Agent 定义的 `skills`/`dispatch`，为空就没有该工具。
 - loop 与 `context.emit` 必须是同一个事件出口：循环为每一轮（主 Agent 与每个子 Agent）派生一个带身份的事件出口，同时用作 `input.emit` 和工具管道的 `context.emit`。测试或调用方不得把它们拆成两条通道，否则权限确认与工具事件在界面上消失。
@@ -99,6 +112,20 @@ Agent 对画布的写入只有一条路径，三层各自拥有完整职责，�
 - 中断留下的无应答工具调用必须补齐后才能落盘，补写内容只按本地真实痕迹分档：有回执且回执证明改动了项目 → 不得重试；已开始派发但无回执 → 影响未知，先只读核验；上一次未正常退出的运行遗留 → 同样只能声明影响未知；本轮确实没派发 → 才可以说"没有产生任何效果"。派发点必须记账（管道在 `execute` 前、循环在 `builtin.run` 前），等待用户确认时被中断不算已派发。
 - 超长工具结果只由 `loop/toolOutputSpill.ts` 一份实现处理：超过阈值就把完整回执写进 `<projectDir>/.shotloom/agent-spill/`，历史只留头尾摘要和摘要里的 `callId`；读回只有 `read_tool_output`，它只按当前会话登记的 `callId` 取文件，不接受任意路径。因此每个 Agent 的白名单都必须授予它，模型才有办法看清被省略的内容。项目没有磁盘目录（浏览器预览）或写文件失败时只能退回"读不回来"的摘要，不得假装可以读回，也不得因此终止本轮。落盘索引随会话持久化并限制条数，超出上限的旧文件连记录一起移除。
 - 模型凭证仍由 Rust 侧注入：渲染进程只传 `providerId` 与 endpoint 元信息，请求里不含接口地址与密钥，`__` 前缀字段在发请求前剥离。自研 loop 的模型请求与画布生成共用 `generation_request`/`generation_stream` 网关，不得为 Agent 新增放宽网关校验的命令。
+
+## 长期目标与计划模式（/goal、/plan）
+
+- goal 与 plan 是项目级持久状态，不是会话级：一个项目同时只有一个进行中的目标与一个计划模式开关。持久字段固定为 `project.goal`（规范对象或 `null`）与 `project.planMode`（严格布尔）。改它们只允许经 `renderer/src/services/agentConversations.ts` 里那一组 CAS 动词（`createGoal`/`editGoal`/`pauseGoal`/`resumeGoal`/`completeGoal`/`blockGoal`/`clearGoal`、`isPlanMode`/`setPlanMode`、`takeGoalRound`）——用户命令、模型工具与续行 driver 共用同一组动词，界面不得再维护第二套目标结构。每次成功变更 `revision` 递增，携带旧 `{id,revision}` 的调用被拒绝并回清晰错误，而不是覆盖更新的视图。
+- 规范化只在保存/加载经 `normalizeProjectState` 做一次，且必须幂等：`planMode` 同值不写，`goal` 已是规范对象时保持原引用。渲染路径与 `ensure` 路径不得调用它——改写对象引用会每次 bump domain revision，触发无限重渲染。
+- `app/store/goalPlanStore.ts` 是按 `agentId:conversationId` 分面板的 zustand 界面态，只持有输入草稿与斜杠面板状态，不得写 `project.goal` 或 `project.planMode`。
+- 三条平面各负其职并汇聚到同一份 CAS 状态：用户斜杠命令层（`app/agent-chat/slashCommands.ts` 解析 + `app/adapters/agentChatAdapter.ts` 的 `runCommand`）、模型工具层（`agent/tools/goalTools.ts` 的 `get_goal`/`create_goal`/`update_goal`）、driver 自动续行层（见下）。命令层只改项目级状态并回一条本地结果消息；`/goal <目标>` 与 `/goal resume` 在空闲时启动目标 driver 的首轮，`/plan <正文>` 由界面把正文当作本轮真实请求发送，其余命令不发起模型请求。`create_goal`/`update_goal` 是 `agent_state_write`，默认不打扰用户。
+- 提示词注入只有一个入口：`content/instructions.ts` 的 `buildGoalContext` 与 `buildPlanModeContext`，由 `runLoopAgent` 每步从 `store.project` 读最新值后随 system prompt 送出。计划模式改变的是这一轮该做什么，不裁剪任何工具；是否以只读调研为主由模型判断，应用代码不得据此阻塞写工具。
+- 退出计划模式只有一条经用户裁决的路：`agent/tools/planTools.ts` 的 `exit_plan_mode`。它声明 `approvalRequired: true`，永远先在确认卡上请用户拍板——批准即把 `project.planMode` 置 `false` 并放行执行，拒绝则保持计划模式继续打磨方案。它是 `agent_state_write` 的项目级开关，不动画布、不启动生成；只授予三个主 Agent，子 Agent 一律不可见。不得把它改成阻塞所有写工具的应用层门禁。
+- 自动续行只推进已有目标，绝不凭空创建目标。持久轮次 `roundsStarted` 的唯一落盘点是 `takeGoalRound`：只有 `phase=active` 且未达 `maxGoalRounds` 时才加一并随之 `revision` 递增，其余情况据实返回原因（`no-goal`/`inactive`/`round-limit`）且不写状态。是否"武装"续行是进程本地运行决策，只活在 `app/adapters/agentSession.ts` 的会话闭包里，不进持久 goal、不跨重启：一轮运行干净结束且项目仍有 active 目标时才武装；运行失败、用户停止（含两轮之间无活跃请求时按停止）、目标转为非 active 或轮次达上限都立即停用。每一续行轮的指令把"是否已达成或受阻"的判断交回模型（要求先只读核验，再 `update_goal` 的 `complete`/`blocked`），应用代码不替模型宣布完成。
+- 自动续行用「预约 + 派发前复核」防止空耗与抢跑：`scheduleGoalRound` 在**有 competing 排队消息时不预约**；预约落定前先 `flushProjectCheckpoint()`（checkpoint-before-drive），落盘失败即收手、不假装成功；落盘期间目标被改、项目被切换或新消息排队都逐项复核，过不了就不预约。预约本身**不写** `roundsStarted`，只持有 `round = roundsStarted + 1`。
+- 真正的持久轮次推进 `takeGoalRound` 从「排程时」移到「派发时」`admitGoalRound`：只有预约仍是当前这次（未被 `stale`）、目标仍是同一 `id/revision` 的 `active` 目标、且 `round === roundsStarted + 1` 时才 `takeGoalRound`（唯一落盘点），随即再 `flushProjectCheckpoint()` 保证"已消耗的这一轮"先于模型回合落盘——崩溃不会让轮次回退，复核不过的预约也不会白白消耗轮次。
+- 有别的消息插到尚未派发的续行前面时，把该预约标 `stale`，`drain` 复核不过就不派发它；续行自己的投递不算 competing。运行失败、用户停止、目标转非 active、达上限或预约失效都立即收手并清空预约。
+- 修改这类行为时，测试只验证持久不变量与安全边界（CAS `revision`、幂等规范化不触发重渲染、`roundsStarted` 单点落盘、派发前复核与 competing/stale 语义、checkpoint-before-drive 顺序、`exit_plan_mode` 的人工确认与可见性、续行只推进已有目标），不得把"目标该不该继续"这类模型职责写成断言。
 
 ## 厂商适配器与模型来源
 

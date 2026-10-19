@@ -20,6 +20,7 @@ const presenter = read('../renderer/src/app/agent-session/runtimePresenter.ts');
 const canvasTools = read('../renderer/src/agent/tools/canvasTools.ts');
 const toolRegistry = read('../renderer/src/agent/core/toolRegistry.ts');
 const traceStyles = read(`${dir}ToolTrace.module.css`);
+const planStyles = read(`${dir}PlanCard.module.css`);
 const transcriptStyles = read(`${dir}Transcript.module.css`);
 const artifactStyles = read(`${dir}ArtifactList.module.css`);
 const tokens = read('../renderer/styles/agent-theme.css');
@@ -67,14 +68,17 @@ test('助手面板字号只走 tokens.css 阶梯，字体栈只有一个入口',
   assert.match(modules, /var\(--font-mono\)/);
 });
 
-test('运行轨迹默认一行摘要，等待确认时才自动展开', () => {
+test('运行轨迹默认一行摘要，待确认或出错时才自动展开', () => {
   assert.match(trace, /const \[open, setOpen\] = useState\(false\)/);
-  assert.match(trace, /setOpen\(hasPending\)/);
+  assert.match(trace, /setOpen\(hasPending \|\| failed\)/);
   assert.match(trace, /if \(\(!tools\.length && !knownSubagents\.length\) \|\| waitingForAnswer\) return null/);
   assert.match(trace, /aria-expanded=\{open\}/);
   assert.match(trace, /\{open && \(\s*<ol className=\{styles\.steps\}/);
   assert.match(trace, /等待确认/);
-  assert.match(trace, /执行过程/);
+  // 折叠头部说的是"这一组做了什么"，由类别折叠而来；不再重复一次"执行过程有错误"，
+  // 也不再摆一个 settled/total 计数——失败由消息级失败块承担，数量不是用户要的信息。
+  assert.match(trace, /const headline = settled \? processTitle\(summary\) : liveTitle\(summary\)/);
+  assert.doesNotMatch(trace, /执行过程有错误|styles\.headCount/);
   assert.doesNotMatch(trace, /运行记录/);
   // 只有真实交互号才渲染确认区，不能凭空出现可点的批准按钮。
   assert.match(trace, /tool\.pending && tool\.interactionId/);
@@ -90,10 +94,12 @@ test('工具步骤显示注册表标题与真实产出', () => {
   assert.match(canvasTools, /nodeSummaryLabel\(input\.nodeId\)\} @ /);
   assert.doesNotMatch(canvasTools, /node\(s\)/);
   assert.match(trace, /\{expanded && \(/);
-  // 参数与结果只在展开时挂载全文；收起行只留摘要与耗时。
+  // 参数与结果只在展开时挂载全文；耗时同样只在展开体里，摘要行尾不留一列数字。
   assert.match(trace, /\{\(!!tool\.output \|\| !!previews\.length\) && \(/);
   assert.match(trace, /JSON\.stringify\(args, null, 2\)/);
   assert.match(trace, /formatDuration\(tool\.startedAt, tool\.endedAt\)/);
+  assert.doesNotMatch(trace, /styles\.stepDuration/);
+  assert.match(traceStyles, /\.stepLine \{[^}]*grid-template-columns: var\(--icon-xs\) minmax\(0, 1fr\) var\(--icon-xs\)/);
   // 缩略图必须复用项目的图片预览缓存，直接引用 asset 协议在画布里从来不是图片路径。
   assert.match(trace, /useMediaPreviewCache\(\{ path, kind: "image", maxSize: 320 \}\)/);
   assert.doesNotMatch(trace, /convertFileSrc/);
@@ -103,9 +109,21 @@ test('工具步骤显示注册表标题与真实产出', () => {
 // 图标由工具自己声明，展示层只保留运行时合成行的类别图标，不再把所有步骤画成同一个扳手。
 test('工具步骤图标取自注册表声明而不写死在界面', () => {
   assert.match(trace, /kindIcon\[String\(tool\.kind \|\| ""\)\] \|\| agentToolIcon\(String\(tool\.name \|\| ""\)\)/);
-  assert.match(trace, /name=\{active \? toolIcon\(active\) : "workflow"\} className=\{styles\.headIcon\}/);
+  // 头部图标来自活动类别，而不是"最后一步用的工具"。
+  assert.match(trace, /name=\{headIcon\(summary\)\} className=\{styles\.headIcon\}/);
   assert.doesNotMatch(trace, /statusIcon|"wrench"/);
   assert.match(toolRegistry, /return definition\.icon \|\| effectIcon\[definition\.effect\] \|\| 'wrench'/);
+  assert.match(toolRegistry, /return definition\.activity \|\| effectActivity\[definition\.effect\] \|\| 'tools'/);
+});
+
+// 完成的一步不再重复一个"已运行"：图标 + 标题 + 摘要已经说完了。
+// 只有需要用户行动的三种状态才留状态词，失败还要把结果首行顶到摘要位。
+test('步骤行只在需要行动的状态下显示状态词', () => {
+  assert.doesNotMatch(trace, /success: '已运行'|success: "已运行"/);
+  assert.match(trace, /const stateText = statusLabel\[status\] \|\| ""/);
+  assert.match(trace, /\{!!stateText && <span className=\{styles\.stepState\}/);
+  assert.match(trace, /status === "error" \? firstLine\(tool\.output\)/);
+  assert.match(traceStyles, /\.step\[data-status="error"\] \.stepSummary \{[^}]*--slk-state-error/);
 });
 
 test('待确认调用允许在批准前修改参数，非法 JSON 不得提交', () => {
@@ -130,6 +148,8 @@ test('运行中composer不锁死输入，停止是独立控件，排队消息只
 
 test('相同 Runtime 失败合并成紧凑诊断卡，重试只在非运行态出现', () => {
   assert.match(panel, /compactRepeatedFailures\(messages\)/);
+  assert.doesNotMatch(panel, /useMemo\(\(\) => compactRepeatedFailures\(messages\), \[messages\]\)/,
+    '消息数组就地更新时，不能用数组引用缓存展示列表');
   assert.match(presentation, /repeatedFailureCount/);
   assert.match(presentation, /markdownByMessage = new WeakMap/);
   assert.match(transcript, /repeatsFollowingFailure\(message, next\)/);
@@ -151,6 +171,13 @@ test('制作计划只在 plan 变化时重置展开，并按阶段定位真实�
   assert.match(plan, /controller\.focusNodes\(stageNodeIds\)/);
   assert.doesNotMatch(plan, /controller\.focusNodes\(\s*stages/);
   assert.doesNotMatch(plan, /plan_review|result_review|reviewProductionStage/);
+  // 计划卡是一张待办披露卡：头部只有图标 + 标题 + 状态计数 + 箭头，进度不画成条形图，
+  // 也不在标题上方摆一个模式眉标；展开体是定高滚动的扁平行列表。
+  assert.doesNotMatch(planStyles, /\.bar|barFill/);
+  assert.doesNotMatch(plan, /styles\.headCopy|executionMode === "execute" \? /);
+  assert.match(planStyles, /\.stages \{[^}]*max-height:\s*180px/);
+  assert.match(planStyles, /\.stages \{[^}]*overflow-y:\s*auto/);
+  assert.doesNotMatch(planStyles, /\.workItems > li \{[^}]*background:/);
 });
 
 test('@ 引用的节点卡片只发送契约字段，媒体预览与附件不进请求', () => {
@@ -213,6 +240,23 @@ test('产物卡复用共享媒体缩略图，定位入口悬停才出现', () =>
   assert.doesNotMatch(artifactStyles, /\.card \{[^}]*(box-shadow|background:|--slk-stroke-color)/);
   assert.match(artifactStyles, /\.locate \{[^}]*opacity:\s*0/);
   assert.match(artifactStyles, /\.card:hover \.locate,[\s\S]*?\.locate:focus-visible \{\s*opacity:\s*1/);
+  // 产物不再自带一条"本轮产物"标题：两列铺开，超过四个先收起，数量只在折叠入口说一次。
+  assert.match(artifacts, /aria-label="本轮产物"/);
+  assert.doesNotMatch(artifacts, /styles\.head|name="layers"/);
+  assert.match(artifacts, /const COLLAPSED_COUNT = 4/);
+  assert.match(artifacts, /expanded \? "收起" : `全部 \$\{artifacts\.length\} 个产物`/);
+  assert.match(artifactStyles, /\.grid \{[^}]*repeat\(2, minmax\(0, 1fr\)\)/);
+});
+
+// 应用写入的事实不是助手正文：一行提示不能带轨迹、计划与产物卡，也不自成气泡。
+test('轮次边界与状态提示是提示行而不是助手回复', () => {
+  assert.match(transcript, /if \(message\.notice\) \{/);
+  assert.match(transcript, /data-notice=\{message\.notice\}/);
+  assert.match(session, /notice: "divider"/);
+  assert.match(session, /notice: "status"/);
+  assert.doesNotMatch(session, /title: "目标"/);
+  // 分隔线只在 divider 上出现，状态行不带线。
+  assert.match(transcriptStyles, /\.notice\[data-notice="divider"\] > i \{/);
 });
 
 // 复制回复不是这一屏的职责，正文选中即可复制，不再常驻一个操作按钮。

@@ -1,6 +1,21 @@
 import type { AgentArtifactRefs } from "./artifactHelpers";
 import type { AgentReference } from "./mediaReference";
+import type { SlashCommand } from "./slashCommands";
 import type { WorkflowNodeData } from "../canvas/WorkflowCanvas";
+
+/**
+ * 项目级长期目标的界面视图。字段与 services/agentConversations 的规范对象一致，
+ * 界面只读不写，也不在这里维护第二套目标结构。
+ */
+export interface AgentGoalView {
+  id: string;
+  revision: number;
+  objective: string;
+  phase: "active" | "paused" | "blocked" | "complete";
+  maxGoalRounds: number;
+  roundsStarted: number;
+  blockedReason?: string;
+}
 
 /** 可被 @ 引用的画布节点，以及它在输入区呈现出的媒体预览。 */
 export interface MentionableNode {
@@ -34,6 +49,11 @@ export interface AgentMessage {
     suggestions?: string[];
   };
   meta?: string[];
+  /**
+   * 应用自己写入的一行提示，不是模型正文：`divider` 是轮次边界，`status` 是需要看见但
+   * 不该伪装成助手回复的事实（轮次上限、持久化失败）。界面按行呈现，不叠加轨迹/计划/产物。
+   */
+  notice?: "divider" | "status";
   /** 用户这条消息引用的真实素材，界面按媒体卡呈现。 */
   references?: AgentReference[];
   toolCalls?: AgentToolCall[];
@@ -107,6 +127,19 @@ export interface AgentSubagentView {
   seq?: number;
 }
 
+export interface AgentPlanStageView {
+  id?: string;
+  order?: number;
+  title?: string;
+  description?: string;
+  status?: string;
+  authored?: boolean;
+  workItems?: Array<{ id?: string; title?: string; outputType?: string; prompt?: string }>;
+  runtimeRefs?: Array<{ workItemId?: string; nodeId?: string; taskId?: string }>;
+  summary?: string;
+  blockedReason?: string;
+}
+
 export interface AgentPlanView {
   schemaVersion?: number;
   id?: string;
@@ -114,18 +147,7 @@ export interface AgentPlanView {
   goal?: string;
   executionMode?: string;
   revision?: number;
-  stages?: Array<{
-    id?: string;
-    order?: number;
-    title?: string;
-    description?: string;
-    status?: string;
-    authored?: boolean;
-    workItems?: Array<{ id?: string; title?: string; outputType?: string; prompt?: string }>;
-    runtimeRefs?: Array<{ workItemId?: string; nodeId?: string; taskId?: string }>;
-    summary?: string;
-    blockedReason?: string;
-  }>;
+  stages?: AgentPlanStageView[];
 }
 
 export interface ConversationItem {
@@ -148,6 +170,19 @@ export interface AgentController {
     references?: AgentReference[];
     conversationId?: string;
   }) => boolean;
+  /** 命令层是否按忙闲拦截：goal 状态变更随时可执行，plan 开关与查询在运行中不生效。 */
+  isCommandRunBusy: (command: SlashCommand) => boolean;
+  /**
+   * 执行一条斜杠命令：改项目级 goal/plan 持久状态。
+   * 成功不再回显文本（目标条与计划徽标就是状态的唯一可见处），失败回清晰错误；
+   * `/plan <正文>` 会把正文回传给界面，由界面作为本轮真实请求发出。
+   */
+  runCommand: (
+    command: SlashCommand,
+    ctx: { conversationId: string; model: string },
+  ) => { deliverText?: string; error?: string };
+  /** 重新武装当前进行中目标的自动续行：进程本地决策，只属于会话层。 */
+  goalDrive: (ctx: { conversationId: string; model: string }) => void;
   clear: (conversationId?: string) => void;
   close: () => void;
   cancel: () => void;
@@ -171,4 +206,21 @@ export interface TextModelOption {
   id: string;
   label: string;
   iconId: string;
+}
+
+/**
+ * 面板一次读取到的全部呈现数据。goal 与 plan 的项目级状态在这里一次性交给界面，
+ * 界面不再自己去 store 读第二份，也不维护自己的目标结构。
+ */
+export interface AgentPanelData {
+  messages: AgentMessage[];
+  conversations: ConversationItem[];
+  activeConversationId: string;
+  busy: boolean;
+  textModel: string;
+  textModels: TextModelOption[];
+  goal: AgentGoalView | null;
+  planMode: boolean;
+  /** 自动续行是否处于武装状态：进程本地运行决策，与持久 phase 共同决定是否可点播放。 */
+  goalArmed: boolean;
 }

@@ -1,7 +1,8 @@
 import { uid } from '@/utils/format';
 import { generationOutputIssue } from '@/utils/generationResultValidation';
 import { summarizeGenerationPayload, type GenerationPayload } from '@/domain/graph/generationPayload';
-import { ensureAgentConversations } from '@/services/agentConversations.ts';
+import { ensureAgentConversations, normalizeProjectState } from '@/services/agentConversations.ts';
+import { restoreProjectProjections } from '@/store/projectProjections';
 import {
   CANVAS_NODE_SIZE_SCALE,
   CANVAS_NODE_SIZING_VERSION,
@@ -26,6 +27,8 @@ export function createProject(name = '未命名项目'): any {
     tasks: [],
     agentConversations: [],
     activeAgentConversationId: '',
+    goal: null,
+    planMode: false,
     canvasViewport: { x: 0, y: 0, zoom: 1 },
     canvasNodeSizeScale: CANVAS_NODE_SIZE_SCALE,
     canvasNodeSizingVersion: CANVAS_NODE_SIZING_VERSION,
@@ -36,6 +39,9 @@ export function createProject(name = '未命名项目'): any {
     agentRuntimeEvents: [],
     agentInteractions: [],
     productionPlans: [],
+    projectionJournal: [],
+    projectionCheckpoint: {},
+    projectionSeq: 0,
     canvasHistory: [],
     canvasRedoStack: [],
     settings: {
@@ -48,6 +54,7 @@ export function createProject(name = '未命名项目'): any {
     updatedAt: new Date().toISOString(),
   };
   ensureAgentConversations(project);
+  normalizeProjectState(project);
   return project;
 }
 
@@ -235,6 +242,14 @@ export function normalizeProject(input: unknown): any {
     canvasRedoStack: Array.isArray(project?.canvasRedoStack)
       ? project?.canvasRedoStack.slice(0, MAX_CANVAS_HISTORY)
       : [],
+    // 投影日志/checkpoint 是 goal/planMode 的事件真相；加载时据它重放并物化派生字段。
+    projectionJournal: Array.isArray(project?.projectionJournal) ? project.projectionJournal : [],
+    projectionCheckpoint: project?.projectionCheckpoint && typeof project.projectionCheckpoint === 'object'
+      ? project.projectionCheckpoint
+      : {},
+    projectionSeq: Number.isSafeInteger(project?.projectionSeq) && Number(project.projectionSeq) >= 0
+      ? Number(project.projectionSeq)
+      : 0,
     settings: {
       autoSave: project?.settings?.autoSave !== false,
       defaultTextModel: project?.settings?.defaultTextModel || base.settings.defaultTextModel,
@@ -243,6 +258,9 @@ export function normalizeProject(input: unknown): any {
     },
   };
   ensureAgentConversations(normalized);
+  normalizeProjectState(normalized);
+  // 事件日志存在时以日志为准重放并物化 goal/planMode；二者皆空（legacy）时不动物化字段。
+  restoreProjectProjections(normalized);
   return normalized;
 }
 

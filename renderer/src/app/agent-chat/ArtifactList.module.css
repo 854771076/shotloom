@@ -1,66 +1,44 @@
 .section {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 10px;
 }
 
-.head {
-  display: flex;
+/* 两列铺开，单个产物就占满一行；产物本身不带标题条，数量只在折叠入口上说一次。 */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.grid[data-single] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.toggle {
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  width: 100%;
-  min-height: 24px;
-  padding: 0 2px;
+  justify-content: center;
+  gap: 4px;
+  align-self: center;
+  padding: 1px 11px;
   border: 0;
+  border-radius: var(--slk-radius-sm);
   color: var(--slk-label-tertiary);
   background: transparent;
-  font: 550 var(--text-body-12)/20px var(--font-ui);
-  text-align: left;
+  font: 400 var(--text-body-12)/18px var(--font-ui);
 }
 
 @media (hover: hover) {
-  .head:hover {
+  .toggle:hover {
     color: var(--slk-label-secondary);
+    background: var(--slk-hover-wash);
   }
 }
 
-.headLabel {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.headLabel > svg {
+.toggle > svg {
   width: var(--icon-sm);
   height: var(--icon-sm);
-}
-
-.headLabel em {
-  padding: 0 5px;
-  border-radius: var(--slk-radius-xs);
-  color: var(--slk-label-secondary);
-  background: var(--slk-bg-sunken);
-  font-family: var(--font-mono);
-  font-size: var(--text-caption-10);
-  font-style: normal;
-  line-height: 16px;
-}
-
-.headChevron {
-  width: var(--icon-sm);
-  height: var(--icon-sm);
-  transition: transform var(--slk-dur) var(--slk-ease);
-}
-
-.headChevron[data-collapsed] {
-  transform: rotate(-90deg);
-}
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
-  gap: 8px;
 }
 
 /* 产物卡只呈现素材本身：无边框、无底色，靠圆角和缩略图说话。 */

@@ -5,6 +5,8 @@ import { registerShortDramaTools } from './scriptTools';
 import { registerTextDraftTools } from './textTools';
 import { registerProductionPlanTools } from './productionPlanTools';
 import { registerVideoEditorTools } from './videoEditorTools';
+import { registerGoalTools } from './goalTools';
+import { registerPlanTools } from './planTools';
 import { hasAgentTool } from '../core/toolRegistry';
 
 export function registerDefaultAgentTools(): void {
@@ -19,4 +21,6 @@ export function registerDefaultAgentTools(): void {
   registerShortDramaTools();
   registerTextDraftTools();
   registerVideoEditorTools();
+  registerGoalTools();
+  registerPlanTools();
 }

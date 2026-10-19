@@ -1,5 +1,6 @@
 import type {
-  AgentToolContext, AgentToolDefinition, JsonObject, JsonSchema, JsonValue, PreparedAgentToolCall,
+  AgentToolActivity, AgentToolContext, AgentToolDefinition, JsonObject, JsonSchema, JsonValue,
+  PreparedAgentToolCall,
 } from './types';
 import { TOOL_ID_RE, skillToolNamespace, toolBaseName } from './toolIdentity.ts';
 import { visibleAgentTools } from './visibility.ts';
@@ -121,6 +122,23 @@ export function agentToolIcon(toolId: string): string {
   const definition = tools.get(toolId) || tools.get(toolBaseName(toolId));
   if (!definition) return 'wrench';
   return definition.icon || effectIcon[definition.effect] || 'wrench';
+}
+
+// 折叠轨迹头部的活动类别：effect 是默认归类，只有同一 effect 内对象不同的工具才显式声明。
+// 未注册的工具（技能、模板、系统行）由界面自己的行类别补足，这里统一按最泛的一档处理。
+const effectActivity: Record<string, AgentToolActivity> = {
+  read: 'inspect',
+  canvas_write: 'canvas',
+  project_write: 'plan',
+  agent_state_write: 'plan',
+  media_generation: 'generate',
+};
+
+/** 展示层活动类别。新增工具不声明 activity 就落在 effect 对应的那一档。 */
+export function agentToolActivity(toolId: string): AgentToolActivity {
+  const definition = tools.get(toolId) || tools.get(toolBaseName(toolId));
+  if (!definition) return 'tools';
+  return definition.activity || effectActivity[definition.effect] || 'tools';
 }
 
 export function registerSkillTool<TInput extends JsonObject>(

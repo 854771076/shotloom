@@ -195,7 +195,7 @@ test('文本 Agent 的 Skill 选择独立于画布与剪辑', () => {
 
 // fail-closed 的代价是漏写就静默失效：这里保证每个真实注册的工具都至少属于一个 Agent。
 test('所有默认工具都至少被一个 Agent 白名单授予', () => {
-  const files = ['canvasTools', 'catalogTools', 'lifecycleTools', 'productionPlanTools', 'textTools', 'videoEditorTools'];
+  const files = ['canvasTools', 'catalogTools', 'lifecycleTools', 'productionPlanTools', 'textTools', 'videoEditorTools', 'goalTools', 'planTools'];
   const registered = [];
   for (const file of files) {
     const source = readSource(`../renderer/src/agent/tools/${file}.ts`);
@@ -214,4 +214,14 @@ test('所有默认工具都至少被一个 Agent 白名单授予', () => {
   const unknown = [...granted].filter((id) => !registered.includes(id));
   assert.deepEqual(unknown, [], 'Agent 白名单引用了不存在的工具');
   assert.ok(registered.length >= 35, `默认工具数量异常：${registered.length}`);
+});
+
+// 历史轨迹的标题、图标与活动类别只有注册表这一个来源：只有开跑时才注册，重开项目后
+// 旧步骤就会退回成 canvas_create_node 这类原始 id，折叠头部也只剩最泛的一档。
+test('默认工具在应用启动时就注册，历史轨迹不依赖一次真实运行', () => {
+  const workbench = readSource('renderer/src/app/ReactWorkbench.tsx');
+  assert.match(workbench, /import \{ registerDefaultAgentTools \} from "\.\.\/agent\/tools\/registerDefaultTools"/);
+  assert.match(workbench, /registerDefaultAgentTools\(\);\n\s*await loadAppSettings\(\)/);
+  // loop 仍然自己注册一次：注册是幂等的，直接调用 runLoopAgent 的测试与宿主不依赖界面启动。
+  assert.match(readSource('renderer/src/agent/loop/runLoopAgent.ts'), /registerDefaultAgentTools\(\)/);
 });

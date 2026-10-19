@@ -19,6 +19,7 @@ import { agentPresentation } from "./agentPresentation";
 import { HistoryDrawer } from "./HistoryDrawer";
 import type {
   AgentController,
+  AgentGoalView,
   AgentMessage,
   AgentPanelHandle,
   ConversationItem,
@@ -37,6 +38,10 @@ export interface AgentChatPanelProps {
   activeConversationId: string;
   textModel: string;
   textModels: TextModelOption[];
+  /** 项目级长期目标与计划模式的当前事实，输入区上方的目标条与计划徽标据此呈现。 */
+  goal: AgentGoalView | null;
+  planMode: boolean;
+  goalArmed: boolean;
   controller: AgentController;
 }
 
@@ -54,7 +59,8 @@ export const AgentChatPanel = forwardRef<AgentPanelHandle, AgentChatPanelProps>(
     const previousCount = useRef(messages.length);
     const domainRevision = useSyncExternalStore(subscribeDomain, getDomainRevision, getDomainRevision);
 
-    const presented = useMemo(() => compactRepeatedFailures(messages), [messages]);
+    // 会话消息在同一数组上就地更新；仅以数组引用缓存会把新消息和工具轨迹永久挡在界面外。
+    const presented = compactRepeatedFailures(messages);
     const aliasMaps = useMemo(() => agentNodeAliasMaps(nodes as never[]), [nodes]);
     const mentionable = useMemo(
       () =>
@@ -81,7 +87,7 @@ export const AgentChatPanel = forwardRef<AgentPanelHandle, AgentChatPanelProps>(
         return;
       }
       setUnread((value) => value + added);
-    }, [messages]);
+    }, [messages.length, activeConversationId]);
 
     // 流式输出时贴着底部跟随，但不使用平滑动画，否则每一帧都在追一段未完成的滚动。
     useEffect(() => {

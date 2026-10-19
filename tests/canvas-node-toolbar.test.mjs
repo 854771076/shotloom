@@ -123,6 +123,36 @@ test('本地图片节点使用 react-screenshots 完成标注并保存合成图�
   // 只裁图像层，外层容器仍要 visible，否则操作条浮不到图片之外。
   assert.match(styles, /\.canvas-image-annotation-editor \{\n(?:[^}\n]*\n)*?  overflow: visible;/);
   assert.match(annotationEditor, /ScreenshotsContext\.Provider/);
+  // 图标档位与节点选中工具栏同一档（--icon-md）：第三方图标字体按 em 刻字，缩到这一档才不比产品线性图标粗。
+  assert.match(styles, /\.canvas-node-selection-toolbar svg \{ width: var\(--icon-md\); height: var\(--icon-md\); \}/);
+  assert.match(styles, /\.canvas-image-annotation-editor \.screenshots-button \{\n(?:[^}\n]*\n)*?  font-size: var\(--icon-md\);\n/);
+  assert.match(styles, /\.canvas-image-annotation-editor \.screenshots-button > span \{\n  line-height: 1;\n\}/);
+  // 分隔线由本项目给出：第三方自带的样式是 26px 实色粗线，会在细图标之间形成更重的块。
+  assert.match(styles, /\.canvas-image-annotation-editor \.screenshots-operations-divider \{\n  width: var\(--toolbar-divider-width\);/);
+});
+
+// 标注的第二条出路：把合成结果另存成新素材并派生一个节点，原节点一个字段都不动。
+test('标注可以派生新的图片节点而不改动原节点', () => {
+  // 操作条由本项目拼接，否则第三方那份固定的按钮清单里放不下"生成新节点"。
+  assert.match(annotationEditor, /import annotationOperations from "\.\.\/\.\.\/\.\.\/\.\.\/node_modules\/react-screenshots\/lib\/Screenshots\/operations\/index\.js"/);
+  assert.match(annotationEditor, /annotationOperations\.map/);
+  assert.match(annotationEditor, /title="标注完成，生成新节点"/);
+  assert.match(annotationEditor, /compose\(onCreateNode\)/);
+  // 合成必须和"完成"走同一条路：先摘掉选中态，否则蓝色选择框会被画进结果图。
+  assert.match(annotationEditor, /HistoryItemType\.Source\) item\.isSelected = false/);
+  assert.match(annotationEditor, /composeImage\(\{ image, width, height, history, bounds \}\)/);
+  assert.match(generation, /if \(await actions\.createAnnotationNode\(node\.id, blob\)\) onImageAnnotationClose\?\.\(\)/);
+
+  const annotationAction = adapter.slice(
+    adapter.indexOf('export async function createAnnotationNode'),
+    adapter.indexOf('export async function splitImageGrid'),
+  );
+  assert.ok(annotationAction.length > 0, '缺少 createAnnotationNode 实现');
+  assert.doesNotMatch(annotationAction, /annotationImageUrl|annotationData|Object\.assign\(/);
+  assert.match(annotationAction, /recordCanvasHistory\([\s\S]*?addNode\("imageGeneration"\)/);
+  assert.match(annotationAction, /output\.uploadedFile = \{[\s\S]*?filePath,[\s\S]*?mimeType: "image\/png"/);
+  assert.match(annotationAction, /derivation: "image-annotation"/);
+  assert.match(styles, /\.canvas-image-annotation-editor \.canvas-annotation-node-button svg \{\s*\n\s*width: var\(--icon-md\);/);
 });
 
 test('空媒体节点从顶部工具栏上传且节点内部只保留占位图标', () => {

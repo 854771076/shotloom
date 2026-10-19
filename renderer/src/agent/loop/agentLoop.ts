@@ -1,6 +1,7 @@
 import { agentDefinition, type AgentDefinition } from '../agents/definitions.ts';
 import { buildConcludeTurnInstruction, buildSteeringMessage, buildSubagentPrompt } from '../content/instructions';
 import { executeAgentToolCalls } from '../runtime/executeToolCall';
+import { closeAgentTurn, openAgentTurn } from '../runtime/approvalWaterfall';
 import { receiptChangesProject } from '../runtime/toolReceipts';
 import { toolCallFingerprint } from '../runtime/loopGuard';
 import type { AgentToolContext, JsonObject } from '../core/types';
@@ -235,117 +236,124 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentLoopResu
         createdAt: new Date().toISOString(),
       });
     }
-    emit({ type: 'turn_start', turn: step, createdAt: new Date().toISOString() });
-    const body = buildLoopRequestBody(
-      input.plan,
-      tools,
-      [{ role: 'system', content: input.systemPrompt }, ...window.messages],
-    );
-    const turn = await input.callModel(body, (delta) => emit({ type: 'text_delta', turnId, delta }));
-    // usage.input 是含前缀与工具 schema 的真实占用，反推出的前缀留给下一轮预算。
-    if (turn.usage?.input) observedPrefixTokens = Math.max(0, turn.usage.input - window.estimatedTokens);
-    // 模型上报真实占用时用上报值，否则用本轮请求的估算值，保证面板不会显示 0。
-    const used = (turn.usage?.input || window.estimatedTokens + estimatedPrefixTokens) + (turn.usage?.output || 0);
-    emit({
-      type: 'context_usage',
-      estimatedTokens: used,
-      inputLimit: input.plan.contextLimit,
-      inputBudget,
-      prefixTokens,
-      transcriptBudget,
-      outputReserve: input.plan.outputLimit,
-      ratio: used / inputBudget,
-      createdAt: new Date().toISOString(),
-    });
+    // 回合是审计对的提交边界：审批只能发生在开启区间内。开启后无论这一步如何结束
+    // （返回、continue、抛异常）都在 finally 里闭合，绝不让一个回合跨步骤半开。
+    openAgentTurn(context, step);
+    try {
+      emit({ type: 'turn_start', turn: step, createdAt: new Date().toISOString() });
+      const body = buildLoopRequestBody(
+        input.plan,
+        tools,
+        [{ role: 'system', content: input.systemPrompt }, ...window.messages],
+      );
+      const turn = await input.callModel(body, (delta) => emit({ type: 'text_delta', turnId, delta }));
+      // usage.input 是含前缀与工具 schema 的真实占用，反推出的前缀留给下一轮预算。
+      if (turn.usage?.input) observedPrefixTokens = Math.max(0, turn.usage.input - window.estimatedTokens);
+      // 模型上报真实占用时用上报值，否则用本轮请求的估算值，保证面板不会显示 0。
+      const used = (turn.usage?.input || window.estimatedTokens + estimatedPrefixTokens) + (turn.usage?.output || 0);
+      emit({
+        type: 'context_usage',
+        estimatedTokens: used,
+        inputLimit: input.plan.contextLimit,
+        inputBudget,
+        prefixTokens,
+        transcriptBudget,
+        outputReserve: input.plan.outputLimit,
+        ratio: used / inputBudget,
+        createdAt: new Date().toISOString(),
+      });
 
-    messages.push({
-      role: 'assistant',
-      content: turn.text || null,
-      ...(turn.responseItems?.length ? { responseItems: turn.responseItems } : {}),
-      ...(turn.toolCalls.length ? { tool_calls: turn.toolCalls } : {}),
-    });
-    commit();
+      messages.push({
+        role: 'assistant',
+        content: turn.text || null,
+        ...(turn.responseItems?.length ? { responseItems: turn.responseItems } : {}),
+        ...(turn.toolCalls.length ? { tool_calls: turn.toolCalls } : {}),
+      });
+      commit();
 
-    if (turn.finishReason === 'length') {
-      throw new Error('Agent 达到本轮输出上限，回复或工具参数可能不完整');
-    }
+      if (turn.finishReason === 'length') {
+        throw new Error('Agent 达到本轮输出上限，回复或工具参数可能不完整');
+      }
 
-    if (!turn.toolCalls.length) {
-      // 模型说完这句话的这一刻用户又补了指令：不能把补充丢掉，也不能让它成为本轮最后的话，
-      // 写进历史再继续一轮。补充排在结论回合之前，因为用户的新话可能改变该提交什么结论。
-      if (takeSteeringIntoHistory()) continue;
-      // 真实改过项目却没有提交通过核验的终态：不替它编造结论，也不静默把一句总结当成交付，
-      // 只再给一次结论机会。机会只有一次，避免它反复用文本绕开 report_outcome。
-      // 改动标记来自共享的 run，所以子 Agent 落地的写同样要求父级自己收尾；
-      // 而终态结论属于本会话，子 Agent 提交过的结论不能替父级交付。
-      if (!outcomeRequested
-        && context.run.hasAppliedActions
-        && !context.state.get('verifiedOutcome')
-        && tools.some((tool) => tool.function.name === 'report_outcome')) {
-        outcomeRequested = true;
-        messages.push({
-          role: 'user',
-          content: buildConcludeTurnInstruction(String(context.state.get('lastOutcomeIssue') || '')),
-        });
-        commit();
+      if (!turn.toolCalls.length) {
+        // 模型说完这句话的这一刻用户又补了指令：不能把补充丢掉，也不能让它成为本轮最后的话，
+        // 写进历史再继续一轮。补充排在结论回合之前，因为用户的新话可能改变该提交什么结论。
+        if (takeSteeringIntoHistory()) continue;
+        // 真实改过项目却没有提交通过核验的终态：不替它编造结论，也不静默把一句总结当成交付，
+        // 只再给一次结论机会。机会只有一次，避免它反复用文本绕开 report_outcome。
+        // 改动标记来自共享的 run，所以子 Agent 落地的写同样要求父级自己收尾；
+        // 而终态结论属于本会话，子 Agent 提交过的结论不能替父级交付。
+        if (!outcomeRequested
+          && context.run.hasAppliedActions
+          && !context.state.get('verifiedOutcome')
+          && tools.some((tool) => tool.function.name === 'report_outcome')) {
+          outcomeRequested = true;
+          messages.push({
+            role: 'user',
+            content: buildConcludeTurnInstruction(String(context.state.get('lastOutcomeIssue') || '')),
+          });
+          commit();
+          continue;
+        }
+        reply = turn.text;
+        if (!reply.trim()) {
+          throw new Error('模型返回了 0 token 空响应；请检查文本模型 endpoint 与 OpenAI-compatible 流式响应格式');
+        }
+        return { reply, modelRounds, messages };
+      }
+
+      let progressed = false;
+      for (const segment of segmentByDispatchRoute(turn.toolCalls, (name) => builtinByName.has(name))) {
+        const results = segment.kind === 'builtin'
+          ? await runBuiltinSegment(segment.calls)
+          : await executeAgentToolCalls(
+            { context, model: input.plan.model },
+            segment.calls.map((call) => ({
+              callId: call.id, name: call.function.name, argumentsJson: call.function.arguments || '{}',
+            })),
+          );
+        for (const [index, call] of segment.calls.entries()) {
+          const signature = callSignature(call);
+          // 这一轮试过的新调用，或真实落到项目上的改动，都算向前推进了一步。
+          if (!seenCallSignatures.has(signature)) {
+            seenCallSignatures.add(signature);
+            progressed = true;
+          }
+          const { __toolAttachments: rawAttachments, ...output } = results[index] || {};
+          messages.push({
+            role: 'tool',
+            tool_call_id: call.id,
+            content: await serializeToolOutputForTranscript({
+              context, callId: call.id, toolName: call.function.name, text: JSON.stringify(output),
+            }),
+          });
+          const attachments = Array.isArray(rawAttachments) ? rawAttachments as JsonObject[] : [];
+          if (attachments.length) {
+            const parts = imageParts(attachments);
+            if (parts.length) {
+              messages.push({
+                role: 'user',
+                content: [{ type: 'text', text: `以上是工具 ${call.function.name} 返回的真实素材帧，请实际查看后再继续。` }, ...parts],
+              });
+            }
+          }
+          const receipt = context.run.toolReceipts.get(call.id);
+          if (receipt && receiptChangesProject(receipt)) progressed = true;
+          commit();
+        }
+      }
+      if (progressed) {
+        stalledRounds = 0;
         continue;
       }
-      reply = turn.text;
-      if (!reply.trim()) {
-        throw new Error('模型返回了 0 token 空响应；请检查文本模型 endpoint 与 OpenAI-compatible 流式响应格式');
-      }
-      return { reply, modelRounds, messages };
-    }
-
-    let progressed = false;
-    for (const segment of segmentByDispatchRoute(turn.toolCalls, (name) => builtinByName.has(name))) {
-      const results = segment.kind === 'builtin'
-        ? await runBuiltinSegment(segment.calls)
-        : await executeAgentToolCalls(
-          { context, model: input.plan.model },
-          segment.calls.map((call) => ({
-            callId: call.id, name: call.function.name, argumentsJson: call.function.arguments || '{}',
-          })),
+      stalledRounds += 1;
+      if (stalledRounds >= STALLED_ROUND_LIMIT) {
+        throw new Error(
+          `Agent 连续 ${stalledRounds} 轮只重复已经试过的调用，也没有真实改动项目，本轮已停止以避免无限执行`,
         );
-      for (const [index, call] of segment.calls.entries()) {
-        const signature = callSignature(call);
-        // 这一轮试过的新调用，或真实落到项目上的改动，都算向前推进了一步。
-        if (!seenCallSignatures.has(signature)) {
-          seenCallSignatures.add(signature);
-          progressed = true;
-        }
-        const { __toolAttachments: rawAttachments, ...output } = results[index] || {};
-        messages.push({
-          role: 'tool',
-          tool_call_id: call.id,
-          content: await serializeToolOutputForTranscript({
-            context, callId: call.id, toolName: call.function.name, text: JSON.stringify(output),
-          }),
-        });
-        const attachments = Array.isArray(rawAttachments) ? rawAttachments as JsonObject[] : [];
-        if (attachments.length) {
-          const parts = imageParts(attachments);
-          if (parts.length) {
-            messages.push({
-              role: 'user',
-              content: [{ type: 'text', text: `以上是工具 ${call.function.name} 返回的真实素材帧，请实际查看后再继续。` }, ...parts],
-            });
-          }
-        }
-        const receipt = context.run.toolReceipts.get(call.id);
-        if (receipt && receiptChangesProject(receipt)) progressed = true;
-        commit();
       }
-    }
-    if (progressed) {
-      stalledRounds = 0;
-      continue;
-    }
-    stalledRounds += 1;
-    if (stalledRounds >= STALLED_ROUND_LIMIT) {
-      throw new Error(
-        `Agent 连续 ${stalledRounds} 轮只重复已经试过的调用，也没有真实改动项目，本轮已停止以避免无限执行`,
-      );
+    } finally {
+      closeAgentTurn(context);
     }
   }
 }

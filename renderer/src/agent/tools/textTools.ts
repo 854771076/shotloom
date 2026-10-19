@@ -40,6 +40,7 @@ export function registerTextDraftTools(): void {
     title: '写入当前草稿',
     description: '把内容写入文本编辑器当前的未保存草稿。replace 替换整篇，append 追加到末尾。写入不会保存节点，用户仍需在编辑器里保存；草稿里有用户未保存的改动时不要用 replace 覆盖，先读取并合并。',
     effect: 'agent_state_write',
+    activity: 'write',
     isAvailable: (context) => Boolean(textDraftTarget(boundTextNodeId(context))),
     inputSchema: {
       type: 'object',
