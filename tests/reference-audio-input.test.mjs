@@ -86,7 +86,11 @@ after(async () => {
   await env?.dispose();
 });
 
-function seedanceProject({ includeImage = true, audio = {} } = {}) {
+const SEEDANCE = 'doubao-seedance-2-5-260628';
+// StarRouter 的 Seedance 2.0 是目录里唯一仍声明「参考音频必须搭配图片/视频」的模型。
+const SEEDANCE_AUDIO_REQUIRES_VISUAL = 'starrouter-doubao-seedance-2-0-260128';
+
+function seedanceProject({ model = SEEDANCE, includeImage = true, audio = {} } = {}) {
   const image = {
     id: 'image', type: 'resource', title: '人物参考', status: 'completed',
     resourceType: 'image', mimeType: 'image/png', fileName: 'person.png',
@@ -100,7 +104,7 @@ function seedanceProject({ includeImage = true, audio = {} } = {}) {
   };
   const target = {
     id: 'target', type: 'videoGeneration', title: 'Seedance 镜头',
-    model: 'doubao-seedance-2-0-260128', inputMode: 'reference', prompt: '人物按参考音色说出台词', config: {},
+    model, inputMode: 'reference', prompt: '人物按参考音色说出台词', config: {},
   };
   return {
     target,
@@ -115,7 +119,7 @@ function seedanceProject({ includeImage = true, audio = {} } = {}) {
   };
 }
 
-test('Seedance 2.0 收集图片与参考音频并选择全模态模式', () => {
+test('Seedance 2.5 收集图片与参考音频并选择全模态模式', () => {
   const { target, project } = seedanceProject();
   const readiness = generationUpstreamReadiness(target, project);
   assert.deepEqual(readiness.issues, []);
@@ -128,21 +132,24 @@ test('Seedance 2.0 收集图片与参考音频并选择全模态模式', () => {
   assert.equal(payload.modelInputs.audios[0].inputSlot, 'referenceAudio');
 });
 
-test('Seedance 2.0 拒绝没有图片或视频搭配的单独参考音频', () => {
-  const { target, project } = seedanceProject({ includeImage: false });
+test('参考音频只在模型声明需要搭配视觉素材时才拒绝单独接入', () => {
+  const { target, project } = seedanceProject({ model: SEEDANCE_AUDIO_REQUIRES_VISUAL, includeImage: false });
   const readiness = generationUpstreamReadiness(target, project);
   assert.equal(readiness.ready, false);
   assert.match(readiness.issues.join('；'), /必须同时搭配至少一张图片或至少一个视频/);
+
+  const relaxed = seedanceProject({ includeImage: false });
+  assert.equal(generationUpstreamReadiness(relaxed.target, relaxed.project).ready, true);
 });
 
-test('Seedance 2.0 按目录约束校验参考音频格式与时长', () => {
+test('Seedance 2.5 按目录约束校验参考音频格式与时长', () => {
   const { target, project } = seedanceProject({
-    audio: { fileName: 'voice.flac', mimeType: 'audio/flac', duration: 18 },
+    audio: { fileName: 'voice.flac', mimeType: 'audio/flac', duration: 31 },
   });
   const readiness = generationUpstreamReadiness(target, project);
   assert.equal(readiness.ready, false);
   assert.match(readiness.issues.join('；'), /flac 格式不受当前模型支持/);
-  assert.match(readiness.issues.join('；'), /时长不能超过 15 秒/);
+  assert.match(readiness.issues.join('；'), /时长不能超过 30 秒/);
 });
 
 test('首帧模式通过显式槽位选择供应商 mode 并保留输入顺序', () => {
@@ -173,12 +180,12 @@ test('首帧模式通过显式槽位选择供应商 mode 并保留输入顺序',
 });
 
 test('Seedance 向画布和 Agent 同时公开参考素材与首尾帧模式', () => {
-  const modes = getGenerationInputModes('doubao-seedance-2-0-260128');
+  const modes = getGenerationInputModes(SEEDANCE);
   assert.deepEqual(modes.map((mode) => mode.value), ['reference', 'firstLastFrame']);
 
   const first = { id: 'first', type: 'resource', title: '首帧', status: 'completed', resourceType: 'image', url: 'https://example.com/first.png' };
   const last = { id: 'last', type: 'resource', title: '尾帧', status: 'completed', resourceType: 'image', url: 'https://example.com/last.png' };
-  const target = { id: 'target', type: 'videoGeneration', title: '首尾帧视频', model: 'doubao-seedance-2-0-260128', inputMode: 'firstLastFrame', prompt: '昼夜过渡', config: {} };
+  const target = { id: 'target', type: 'videoGeneration', title: '首尾帧视频', model: SEEDANCE, inputMode: 'firstLastFrame', prompt: '昼夜过渡', config: {} };
   const project = {
     nodes: [first, last, target],
     edges: [

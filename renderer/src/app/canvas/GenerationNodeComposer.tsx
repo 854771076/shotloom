@@ -3,7 +3,7 @@ import { getGenerationInputModes, getModelInfo, getModelSchema } from "../../dom
 import { compileGenerationNodeConfig } from "../../domain/graph/GenerationNodeContract";
 import { DEFAULT_CAMERA_CONFIG } from "../../utils/cameraConfig.ts";
 import { IMAGE_STYLE_PRESETS } from "../../utils/imageStylePresets.ts";
-import { modelDescription, optionLabel } from "../../utils/modelPresentation.ts";
+import { modelDescription, optionLabel, paramPresentation } from "../../utils/modelPresentation.ts";
 import { openMediaViewer } from "../store/overlayStore";
 import { IconSymbol } from "../components/IconSymbol";
 import { ProviderBrandIcon } from "../components/ProviderBrandIcon";
@@ -11,7 +11,7 @@ import { CameraControlPanel } from "./CameraControlPanel";
 import { GenerationSettingsPanel } from "./GenerationSettingsPanel";
 import { isImeKeyEvent, useImeCommit } from "./imeComposition";
 import { generationMediaKind, useGenerationLocalPreview } from "./generationNodeMedia";
-import { generationModelIcon, toGenerationConfigParam, type GenerationNodeState } from "./generationNodeState";
+import { generationModelIcon, toGenerationConfigParam, type GenerationNodeState, type GenerationSchemaParam } from "./generationNodeState";
 import type { WorkflowIncomingInput, WorkflowNodeActions, WorkflowNodeData } from "./WorkflowCanvas";
 
 function generationInputLabel(input: WorkflowIncomingInput) {
@@ -25,6 +25,13 @@ function booleanParamSummary(key: string, label: string, value: unknown) {
   if (/audio/i.test(key) || label.includes("声音") || label.includes("有声")) return value ? "有声" : "无声";
   if (/watermark/i.test(key) || label.includes("水印")) return value ? "水印" : "无水印";
   return value ? label : "关闭";
+}
+
+/** 滑杆的值是裸数字（"1"、"10"），在摘要里看不出是哪项参数，所以带上参数名；其余值本身可读。 */
+function paramSummary(param: GenerationSchemaParam, value: unknown) {
+  if (param.type === "boolean") return booleanParamSummary(param.key, param.label, value);
+  const text = optionLabel(param, value);
+  return paramPresentation(param).control === "slider" ? `${param.label} ${text}` : text;
 }
 
 function ComposerInputThumbnail({
@@ -194,7 +201,11 @@ export function GenerationNodeComposer({
         </div>
         <textarea
           ref={promptRef}
-          placeholder={kind === "text" ? "输入给大模型的文本生成提示词" : "描述你想生成的画面、视频或音频"}
+          placeholder={kind === "text"
+            ? "输入给大模型的文本生成提示词"
+            : kind === "audio"
+              ? "输入要朗读的文本"
+              : "描述你想生成的画面或视频"}
           rows={2}
           {...promptCommit}
           onKeyDown={(e) => {
@@ -268,9 +279,7 @@ export function GenerationNodeComposer({
             {activeInputMode && <span>{activeInputMode.label}</span>}
             {summaryParams.slice(0, 4).map((param) => (
               <span key={param.key}>
-                {param.type === "boolean"
-                  ? booleanParamSummary(param.key, param.label, config[param.key] ?? param.default)
-                  : optionLabel(param, config[param.key] ?? param.default)}
+                {paramSummary(param, config[param.key] ?? param.default)}
               </span>
             ))}
             <IconSymbol name="chevron-down" />

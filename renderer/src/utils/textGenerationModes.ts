@@ -13,26 +13,10 @@ export const TEXT_SUBTASK_OPTIONS = Object.freeze([
   { value: TEXT_SUBTASKS.STORYBOARD, label: '分镜生成' },
 ]);
 
-export const ADVANCED_TEXT_SUBTASK_MODELS = Object.freeze([
-  'gemini-3.6-flash',
-  'gpt-5.4',
-  'gpt-5.6',
-]);
-
 export function normalizeTextSubtask(value: unknown) {
   return TEXT_SUBTASK_OPTIONS.some((option) => option.value === value)
     ? value
     : TEXT_SUBTASKS.GENERATE;
-}
-
-export function modelSupportsTextSubtask(model: unknown, subtask: unknown, capability: AnyRecord = {}) {
-  const normalizedSubtask = normalizeTextSubtask(subtask);
-  if (normalizedSubtask === TEXT_SUBTASKS.GENERATE) return true;
-  const configured = Array.isArray(capability.supportedTextSubtasks)
-    ? capability.supportedTextSubtasks
-    : [];
-  return configured.includes(normalizedSubtask)
-    || ADVANCED_TEXT_SUBTASK_MODELS.includes(String(model || ''));
 }
 
 export function stripJsonFence(value: unknown = '') {

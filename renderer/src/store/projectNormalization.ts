@@ -1,4 +1,5 @@
 import { uid } from '@/utils/format';
+import { defaultGenerationModel } from '@/utils/defaultGenerationModels';
 import { generationOutputIssue } from '@/utils/generationResultValidation';
 import { summarizeGenerationPayload, type GenerationPayload } from '@/domain/graph/generationPayload';
 import { ensureAgentConversations, normalizeProjectState } from '@/services/agentConversations.ts';
@@ -46,9 +47,9 @@ export function createProject(name = '未命名项目'): any {
     canvasRedoStack: [],
     settings: {
       autoSave: true,
-      defaultTextModel: 'gpt-5.4',
-      defaultImageModel: 'gpt-image-2',
-      defaultVideoModel: 'grok-imagine-video',
+      defaultTextModel: defaultGenerationModel('textGeneration'),
+      defaultImageModel: defaultGenerationModel('imageGeneration'),
+      defaultVideoModel: defaultGenerationModel('videoGeneration'),
     },
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),

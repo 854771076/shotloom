@@ -133,6 +133,7 @@ Agent 对画布的写入只有一条路径，三层各自拥有完整职责，�
 
 - 厂商与协议由代码声明，模型能力只写在 `renderer/src/config/model-catalog-v2/<provider>.json`；`model-catalog-v2.json` 只保存厂商索引与全局模型顺序。界面不提供添加厂商、添加/编辑模型、停用模型和试跑入口；设置里每个内置厂商只能保存 API Key 与可选接口地址，其余配置一律不接受。
 - 未在 `adapters/index.ts` 登记的厂商不存在：`getProviderAdapter` 直接失败，不回落到通用协议。支持新厂商 = 新增一个适配器文件并在注册表登记一行；只有协议形状无法用目录声明表达时（如 RunningHub 的素材上传 + 工作流提交）才自己实现 compile/submit/poll。
+- 厂商把失败写在 HTTP 200 的响应体里时（MiniMax 全系的 `base_resp.status_code`），模式用 `errorCodePath` 声明状态码路径，非 0 即失败；说明文字默认取 `errorPath`，异步任务另有轮询错误路径时用 `errorMessagePath` 单独声明。不声明就按现有行为处理，不得在适配器里写厂商名判断。
 - 适配器声明的 `baseUrl` 是唯一默认地址。`normalizeProviderConfigs` 在加载和保存时把"用户覆盖优先，否则内置地址"的实际生效值写回设置，Rust 网关只读设置中的 baseUrl，不再维护厂商地址表。加载时发现磁盘值与生效值不一致必须回写一次，否则原生层会读到缺失地址。
 - 请求不得携带地址或密钥覆盖通道（`__baseUrl`/`__apiKey` 与 `GenerationRequest.base_url`/`api_key` 已删除）。`baseUrlRequired` 的厂商（Qwen 百炼）没有可内置地址，界面必须提示填写，不得用另一个语义相近的地址顶上。
 - `ProviderConfig` 只含 `apiKey`/`baseUrl`。历史设置里的 `custom`、`models`、`disabledModelIds`、`displayName`、`iconId` 和未知厂商 id 在规范化时被丢弃，不写迁移兼容层。
@@ -201,6 +202,9 @@ Agent 对画布的写入只有一条路径，三层各自拥有完整职责，�
 - 参数摘要允许截断，但发送按钮不得被挤出节点编辑器。编辑器宽度应根据画布可视区域限制并校正水平位置，不能越过画布边界。
 - 只有一个输入模式时不显示无意义的模式下拉；有两个及以上模式时才在设置面板展示模式切换。
 - 新模型增加大量参数时，应由设置面板内部滚动承载，不能恢复底栏横向堆叠，也不能让弹层被参数容器裁切。
+- `presentation.control: 'select'` 只给选项多到铺不成选项块的参数（如 41 个语种）。原生 select 的上下双箭头是操作系统控件，必须抹掉原生外观并复用音色选择器同一枚 chevron；四到六档的参数（采样率、比特率）一律铺成选项块，面板里不得残留原生下拉外观。
+- 倍率型滑杆（语速 0.5–2、音量 0.1–10）用 `presentation.scale: 'log'` 声明对数轨道，否则默认值 1 会停在线性轨道的 9% 处看起来像空轨。轨道域与真实值的换算只在 `utils/modelPresentation.ts` 的 `sliderTrackDomain`/`sliderTrackPosition`/`sliderValueFromTrack` 一处，写回配置的仍是按 `presentation.step` 量化后的真实值，滑杆组件不得自己算。
+- 底栏摘要里裸数字读不出是哪项参数：滑杆类参数必须带参数名（"语速 1"而不是"1"），选项块的值本身可读，不加标签。
 
 ## 生成节点模块边界
 

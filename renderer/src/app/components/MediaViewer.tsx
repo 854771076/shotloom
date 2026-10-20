@@ -1,4 +1,6 @@
 import {
+  type CSSProperties,
+  type KeyboardEvent,
   type PointerEvent,
   useEffect,
   useRef,
@@ -21,6 +23,8 @@ import { markdownToRichHtml, richHtmlToMarkdown } from "../../utils/richTextMark
 import { diffTextLines } from "../../utils/textVersionDiff.ts";
 
 const MIN_ZOOM = .5, MAX_ZOOM = 5, STEP = .25;
+const TEXT_AGENT_WIDTH_KEY = "shotloom:text-agent-panel-width-v1";
+const TEXT_AGENT_MIN_WIDTH = 280, TEXT_AGENT_MAX_WIDTH = 720, TEXT_EDITOR_MIN_WIDTH = 320;
 function formatMediaTime(value: number) {
   if (!Number.isFinite(value) || value < 0) return "0:00";
   const seconds = Math.floor(value);
@@ -50,8 +54,16 @@ export function MediaViewer() {
   const [videoMuted, setVideoMuted] = useState(false);
   const [capturingFrame, setCapturingFrame] = useState(false);
   const [agentOpen, setAgentOpen] = useState(true);
+  const [textAgentWidth, setTextAgentWidth] = useState(() => {
+    const saved = Number(window.localStorage.getItem(TEXT_AGENT_WIDTH_KEY));
+    return Number.isFinite(saved) && saved > 0
+      ? Math.round(Math.min(TEXT_AGENT_MAX_WIDTH, Math.max(TEXT_AGENT_MIN_WIDTH, saved)))
+      : 380;
+  });
+  const [stageWidth, setStageWidth] = useState(0);
   const panOrigin = useRef<{ x: number; y: number; id: number } | null>(null);
   const backdrop = useRef<HTMLDivElement>(null);
+  const stage = useRef<HTMLElement>(null);
   const textEditor = useRef<HTMLDivElement>(null);
   const reset = () => {
     setZoom(1);
@@ -112,7 +124,7 @@ export function MediaViewer() {
     };
   }, [media.open, media.src, media.filePath, media.kind]);
   useEffect(() => {
-    function key(event: KeyboardEvent) {
+    function key(event: globalThis.KeyboardEvent) {
       if (!media.open) return;
       if (event.key === "Escape") closeViewer();
       else if (media.kind === "image" && ["+", "="].includes(event.key)) {
@@ -143,7 +155,51 @@ export function MediaViewer() {
       },
     });
   }, [media.open, agentNodeId]);
+  useEffect(() => {
+    const el = stage.current;
+    if (!agentNodeId || !agentOpen || !el) return;
+    const measure = () => setStageWidth(el.clientWidth);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [agentNodeId, agentOpen]);
   if (!media.open || !surface) return null;
+  /* 用户拖出来的宽度是偏好，实际列宽还要留出编辑器的最小空间：打开版本历史或
+     缩小浮层时先按当前空间收窄，偏好本身保持不变。判定用舞台真实可用宽度，
+     窗口宽度含侧栏，按它算会把编辑器挤成一条。 */
+  const agentSpace = (stageWidth || window.innerWidth) - (historyOpen ? 286 : 0) - TEXT_EDITOR_MIN_WIDTH;
+  const agentPanelWidth = Math.min(textAgentWidth, Math.max(TEXT_AGENT_MIN_WIDTH, Math.min(TEXT_AGENT_MAX_WIDTH, agentSpace)));
+  function resizeTextAgentPanel(nextWidth: number) {
+    // 只夹到硬边界：可用空间的变化由上面的渲染夹宽度处理，不把一时的窄空间写进偏好。
+    const width = Math.round(Math.min(TEXT_AGENT_MAX_WIDTH, Math.max(TEXT_AGENT_MIN_WIDTH, nextWidth)));
+    setTextAgentWidth(width);
+    window.localStorage.setItem(TEXT_AGENT_WIDTH_KEY, String(width));
+  }
+  function startTextAgentResize(event: PointerEvent<HTMLDivElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    const startX = event.clientX;
+    const startWidth = agentPanelWidth;
+    const target = event.currentTarget;
+    target.setPointerCapture(event.pointerId);
+    const move = (moveEvent: globalThis.PointerEvent) => {
+      resizeTextAgentPanel(startWidth + startX - moveEvent.clientX);
+    };
+    const finish = () => {
+      target.removeEventListener("pointermove", move);
+      target.removeEventListener("pointerup", finish);
+      target.removeEventListener("pointercancel", finish);
+    };
+    target.addEventListener("pointermove", move);
+    target.addEventListener("pointerup", finish);
+    target.addEventListener("pointercancel", finish);
+  }
+  function resizeTextAgentWithKeyboard(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    event.preventDefault();
+    resizeTextAgentPanel(agentPanelWidth + (event.key === "ArrowLeft" ? 16 : -16));
+  }
   function startPan(event: PointerEvent<HTMLElement>) {
     if (media.kind !== "image" || zoom <= 1 || event.button !== 0) return;
     setPanning(true);
@@ -289,6 +345,7 @@ export function MediaViewer() {
       role="dialog"
       tabIndex={-1}
       aria-label={media.title}
+      style={{ "--text-agent-panel-width": `${agentPanelWidth}px` } as CSSProperties}
       onPointerDown={(e) => e.target === e.currentTarget && closeViewer()}
     >
       <header className="media-viewer-toolbar">
@@ -367,6 +424,7 @@ export function MediaViewer() {
         </>}
       </header>
       <main
+        ref={stage}
         className={`media-viewer-stage${
           media.kind === "image" && zoom > 1 ? " pannable" : ""
         }${panning ? " panning" : ""}${
@@ -425,6 +483,7 @@ export function MediaViewer() {
               className="media-viewer-text"
               contentEditable
               data-placeholder="输入内容..."
+              data-empty={textDraft.trim() ? undefined : ""}
               aria-label="编辑文本详情"
               spellCheck={false}
               suppressContentEditableWarning
@@ -467,7 +526,22 @@ export function MediaViewer() {
           </aside>
         )}
         {agentNodeId && agentOpen && (
-          <TextAgentPanel nodeId={agentNodeId} onClose={() => setAgentOpen(false)} />
+          <>
+            <div
+              className="text-agent-divider"
+              style={{ right: agentPanelWidth }}
+              role="separator"
+              aria-label="调整编辑器与文本助手宽度"
+              aria-orientation="vertical"
+              aria-valuemin={TEXT_AGENT_MIN_WIDTH}
+              aria-valuemax={TEXT_AGENT_MAX_WIDTH}
+              aria-valuenow={agentPanelWidth}
+              tabIndex={0}
+              onPointerDown={startTextAgentResize}
+              onKeyDown={resizeTextAgentWithKeyboard}
+            />
+            <TextAgentPanel nodeId={agentNodeId} onClose={() => setAgentOpen(false)} />
+          </>
         )}
       </main>
       <footer className="media-viewer-hint">

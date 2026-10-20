@@ -183,24 +183,6 @@ export const canvasController: WorkflowCanvasController = {
       return;
     }
     recordCanvasHistory("创建节点");
-    if (type === "__character_multiview__") {
-      const identity: any = addNode("textGeneration");
-      identity.title = "角色身份｜角色圣经";
-      identity.prompt =
-        "建立可用于连续镜头生成的角色身份圣经，描述身份、年龄阶段、外形、体型、服装配饰、固定色彩与不可变化特征。";
-      identity.x = Math.round(position.x);
-      identity.y = Math.round(position.y);
-      const sheet: any = addNode("imageGeneration");
-      sheet.title = "角色设定板｜多视角与表情";
-      sheet.prompt =
-        "基于上游角色身份圣经生成单一角色设定板：正面、侧面、背面全身，三分之四半身、表情组和服装配饰色板；所有区域身份、比例与装束严格一致，中性背景，不添加文字水印。";
-      sheet.x = Math.round(position.x + 470);
-      sheet.y = Math.round(position.y);
-      addCanvasEdge(store.project, identity.id, sheet.id, { touch: false });
-      setSelectedNodeIds([identity.id, sheet.id]);
-      touchProject();
-      return;
-    }
     const node: any = addNode(type);
     node.x = Math.round(position.x);
     node.y = Math.round(position.y);

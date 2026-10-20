@@ -22,15 +22,6 @@ export function CanvasContextMenu(
           <i><IconSymbol name="upload" /></i>
           <span>上传</span>
         </button>
-        <button
-          type="button"
-          role="menuitem"
-          className="character-workflow-entry"
-          onClick={() => void onCreate("__character_multiview__")}
-        >
-          <i><IconSymbol name="user" /></i>
-          <span>角色设定板</span>
-        </button>
       </div>
       <div className="canvas-context-menu-section" role="group" aria-labelledby="canvas-menu-nodes">
         <span id="canvas-menu-nodes" className="canvas-context-menu-label">创作节点</span>

@@ -37,6 +37,49 @@ export function paramPresentation(param: AnyRecord | null | undefined): AnyRecor
     : {};
 }
 
+/** 对数滑杆的轨道域：只描述拖动位置，写回配置的仍是目录 step 量化后的真实值。 */
+const LOG_SLIDER_RANGE = 1000;
+
+/** 倍率型参数（语速 0.5–2、音量 0.1–10）的默认值 1 在线性轨道上贴着左端，看起来像空轨；
+ *  目录声明 scale:'log' 后几何中点落在轨道正中。min<=0 时无法取对数，按线性处理。 */
+function usesLogSlider(param: AnyRecord): boolean {
+  const presentation = paramPresentation(param);
+  const min = Number(presentation.min);
+  const max = Number(presentation.max);
+  return presentation.scale === 'log' && Number.isFinite(min) && min > 0 && max > min;
+}
+
+export function sliderTrackDomain(param: AnyRecord): { min: number; max: number; step: number } {
+  const presentation = paramPresentation(param);
+  if (!usesLogSlider(param)) {
+    return {
+      min: Number(presentation.min),
+      max: Number(presentation.max),
+      step: Number(presentation.step) || 1,
+    };
+  }
+  return { min: 0, max: LOG_SLIDER_RANGE, step: 1 };
+}
+
+export function sliderTrackPosition(param: AnyRecord, value: number): number {
+  if (!usesLogSlider(param)) return value;
+  const presentation = paramPresentation(param);
+  const min = Number(presentation.min);
+  const max = Number(presentation.max);
+  const clamped = Math.min(max, Math.max(min, value));
+  return Math.round((Math.log(clamped / min) / Math.log(max / min)) * LOG_SLIDER_RANGE);
+}
+
+export function sliderValueFromTrack(param: AnyRecord, position: number): number {
+  if (!usesLogSlider(param)) return position;
+  const presentation = paramPresentation(param);
+  const min = Number(presentation.min);
+  const max = Number(presentation.max);
+  const decimals = String(presentation.step ?? '').split('.')[1]?.length || 0;
+  const raw = min * Math.pow(max / min, position / LOG_SLIDER_RANGE);
+  return Number(Math.min(max, Math.max(min, raw)).toFixed(decimals));
+}
+
 export function aspectRatioStyle(value: any) {
   const match = String(value || '1:1').trim().match(
     /([0-9]+(?:\.[0-9]+)?)\s*(?::|x|×|\/)\s*([0-9]+(?:\.[0-9]+)?)/i,

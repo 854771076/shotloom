@@ -2,11 +2,11 @@
   "provider": "anthropic",
   "models": [
     {
-      "id": "claude-sonnet-5",
-      "name": "Claude Sonnet 5",
+      "id": "claude-opus-5-5",
+      "name": "Claude Opus 5.5",
       "provider": "anthropic",
       "type": "textGeneration",
-      "sortOrder": 6,
+      "sortOrder": 4,
       "enabled": true,
       "defaultMode": "text-generation",
       "modes": [
@@ -175,11 +175,11 @@
       ]
     },
     {
-      "id": "claude-opus-4-8",
-      "name": "Claude Opus 4.8",
+      "id": "claude-sonnet-5-5",
+      "name": "Claude Sonnet 5.5",
       "provider": "anthropic",
       "type": "textGeneration",
-      "sortOrder": 7,
+      "sortOrder": 5,
       "enabled": true,
       "defaultMode": "text-generation",
       "modes": [

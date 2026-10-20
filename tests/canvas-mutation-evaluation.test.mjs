@@ -45,7 +45,7 @@ test('画布增量评估允许可选 recipeId 但拒绝 config 内重复真值',
 test('画布增量评估会识别仅 outputSpec 发生的更新', () => {
   const project = {
     nodes: [{
-      id: 'image-1', type: 'imageGeneration', title: '图片', prompt: '夜景', model: 'gpt-image-2',
+      id: 'image-1', type: 'imageGeneration', title: '图片', prompt: '夜景', model: 'gpt-image-2.5-sunburst',
       outputSpec: { aspectRatio: '1:1' }, config: { size: '1024x1024' },
     }],
     edges: [],

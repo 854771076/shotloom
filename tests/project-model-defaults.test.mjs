@@ -4,6 +4,8 @@ import {
   projectDefaultModelKey,
   resolveProjectDefaultModel,
 } from '../renderer/src/utils/projectModelDefaults.ts';
+import { DEFAULT_GENERATION_MODELS } from '../renderer/src/utils/defaultGenerationModels.ts';
+import { loadModelCatalog } from './helpers/modelCatalog.mjs';
 
 test('项目按文本、图片、视频分别解析默认模型', () => {
   const settings = {
@@ -19,10 +21,15 @@ test('项目按文本、图片、视频分别解析默认模型', () => {
   assert.equal(resolveProjectDefaultModel(settings, 'videoGeneration'), 'video-model');
 });
 
-test('旧的单一 defaultModel 字段不再参与默认模型解析', () => {
+test('未配置默认模型时回落到目录里的新一代模型', () => {
   const legacySettings = { defaultModel: 'legacy-model' };
-  assert.equal(resolveProjectDefaultModel(legacySettings, 'textGeneration'), 'gpt-5.4');
-  assert.equal(resolveProjectDefaultModel(legacySettings, 'imageGeneration'), 'gpt-image-2');
-  assert.equal(resolveProjectDefaultModel(legacySettings, 'videoGeneration'), 'grok-imagine-video');
+  const catalog = loadModelCatalog();
+  for (const [nodeType, modelId] of Object.entries(DEFAULT_GENERATION_MODELS)) {
+    assert.equal(resolveProjectDefaultModel(legacySettings, nodeType), modelId,
+      `${nodeType} 的回落必须来自唯一默认模型来源`);
+    const model = catalog.models.find((item) => item.id === modelId);
+    assert.equal(model?.enabled, true, `${modelId} 必须在册且启用`);
+    assert.equal(model?.type, nodeType, `${modelId} 必须是 ${nodeType}`);
+  }
 });
 

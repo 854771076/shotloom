@@ -1,5 +1,5 @@
-import { getModelInfo, resolveModelRuntimeContract } from '@/domain/catalog/ModelCatalog';
-import { getModelCredentialStatus } from '@/store/settingsStore';
+import { getModelInfo, getModelReasoningEffortParam, resolveModelRuntimeContract } from '@/domain/catalog/ModelCatalog';
+import { getModelCredentialStatus, settingsStore } from '@/store/settingsStore';
 import { listAgentTools } from '../core/toolRegistry.ts';
 import type { AgentToolContext } from '../core/types';
 import type { ChatMessage } from './transcript';
@@ -19,6 +19,8 @@ export interface LoopModelPlan {
   headers: Record<string, string>;
   auth: { type: string; name?: string; prefix?: string };
   requestOptions: Record<string, unknown>;
+  /** 用户显式选择且当前模型确实声明的思考程度档位；'' 表示沿用目录与模型默认。 */
+  reasoningEffort: string;
   contextLimit: number;
   outputLimit: number;
   timeoutMs: number;
@@ -55,6 +57,17 @@ export function loopUnsupportedReason(model: string): string {
   return '';
 }
 
+/**
+ * 思考程度只在当前模型的目录里声明了档位时才生效：用户换到一个没有这个开关的模型时，
+ * 请求回到模型默认，而不是把上一个模型的档位名发给它。
+ */
+function resolveReasoningEffort(model: string): string {
+  const preferred = String(settingsStore.agentReasoningEffort || '').trim();
+  if (!preferred) return '';
+  const param = getModelReasoningEffortParam(model);
+  return param?.options.includes(preferred) ? preferred : '';
+}
+
 export function resolveLoopModelPlan(model: string): LoopModelPlan {
   const reason = loopUnsupportedReason(model);
   if (reason) throw new Error(reason);
@@ -76,6 +89,7 @@ export function resolveLoopModelPlan(model: string): LoopModelPlan {
     headers: contract.headers || {},
     auth: contract.auth || { type: 'bearer' },
     requestOptions: structuredClone(contract.agent?.requestOptions || {}),
+    reasoningEffort: resolveReasoningEffort(model),
     contextLimit: Number(contract.inputConstraints?.text?.maxTokens || 64_000),
     outputLimit: Number(contract.outputConstraints?.maxTokens || 8_192),
     timeoutMs: MODEL_REQUEST_TIMEOUT_MS,
@@ -173,9 +187,22 @@ export function buildLoopRequestBody(
       stream: true,
       ...(tools.length ? { tools, tool_choice: 'auto' } : {}) };
   }
+  const body: Record<string, unknown> = { ...payload, ...plan.requestOptions };
+  // 目录用 camelCase 的 reasoningEffort 声明 Agent 通道的推理档位，它只是本地键名：
+  // 原样 spread 会给 OpenAI 兼容端点发一个未知字段，等于目录写的默认从来没生效。
+  const declared = typeof body.reasoningEffort === 'string' ? body.reasoningEffort : '';
+  delete body.reasoningEffort;
+  delete body.reasoning_effort;
+  delete body.reasoning;
+  // 用户显式选的档位覆盖目录为 Agent 通道写死的推理默认。字段名按协议走：
+  // Responses 用 reasoning.effort，Chat Completions 用 reasoning_effort。
+  const effort = plan.reasoningEffort || declared;
+  if (effort && plan.protocol !== 'anthropic-messages') {
+    if (plan.protocol === 'openai-responses') body.reasoning = { effort };
+    else body.reasoning_effort = effort;
+  }
   return {
-    ...payload,
-    ...plan.requestOptions,
+    ...body,
     __agentProtocol: plan.protocol || 'openai-chat-completions',
     __providerId: plan.providerId,
     __endpointPath: plan.endpointPath,

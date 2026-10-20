@@ -33,7 +33,7 @@ test('模型可见 action schema 只在工具边界约束动作类型', () => {
     tempId: 'image-1',
     nodeType: 'imageGeneration',
     prompt: '电影感夜景中的红色汽车',
-    model: 'gpt-image-2',
+    model: 'gpt-image-2.5-sunburst',
     recipeId: 'general-image',
     outputSpec: { aspectRatio: '16:9' },
     config: { aspectRatio: '16:9' },
@@ -42,7 +42,7 @@ test('模型可见 action schema 只在工具边界约束动作类型', () => {
     type: 'create_gen_node',
     nodeType: 'imageGeneration',
     prompt: '使用参考图生成夜景汽车',
-    model: 'gpt-image-2',
+    model: 'gpt-image-2.5-sunburst',
     recipeId: 'general-image',
     inputLinks: [{ nodeId: 'N-01' }],
   }));
@@ -63,7 +63,7 @@ test('模型可见 action schema 只在工具边界约束动作类型', () => {
     type: 'create_gen_node',
     nodeType: 'imageGeneration',
     prompt: '错误的简写输入',
-    model: 'gpt-image-2',
+    model: 'gpt-image-2.5-sunburst',
     recipeId: 'general-image',
     inputLinks: ['N-01'],
   }), /inputLinks\[0\] must be object/);
@@ -209,7 +209,7 @@ test('动作归一化补齐类型、临时 ID、节点类型和输入列表', ()
 });
 
 test('独立创建调用使用不同幂等 ID，同一次调用重试保持稳定', () => {
-  const action = { type: 'create_gen_node', prompt: '夜景', model: 'gpt-image-2' };
+  const action = { type: 'create_gen_node', prompt: '夜景', model: 'gpt-image-2.5-sunburst' };
   const first = normalizeAgentAction(action, 0, 'run-1:tool:call-a');
   const retry = normalizeAgentAction(action, 0, 'run-1:tool:call-a');
   const second = normalizeAgentAction(action, 0, 'run-1:tool:call-b');
@@ -299,8 +299,8 @@ test('图事务入口拒绝生成节点重复使用 config.prompt/config.model',
     type: 'imageGeneration',
     title: '测试图片',
     prompt: '顶层提示词',
-    model: 'gpt-image-2',
-    config: { prompt: '重复提示词', model: 'gpt-image-2', aspectRatio: '16:9' },
+    model: 'gpt-image-2.5-sunburst',
+    config: { prompt: '重复提示词', model: 'gpt-image-2.5-sunburst', aspectRatio: '16:9' },
   }], [], [], []);
 
   assert.equal(result.valid, false);

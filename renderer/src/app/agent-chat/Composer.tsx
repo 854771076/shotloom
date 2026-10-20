@@ -14,6 +14,8 @@ import { desktopApi } from "../../services/desktopApi.ts";
 import { saveAppSettings, settingsStore } from "../../store/settingsStore.ts";
 import { nodeChatAttachmentKey } from "../../services/nodeChatAttachment.ts";
 import { availableAgentSkills } from "../../agent/tools/catalogTools";
+import { getAgentReasoningDefault, getModelReasoningEffortParam } from "../../domain/catalog/ModelCatalog.ts";
+import { optionLabel } from "../../utils/modelPresentation.ts";
 import { isImeKeyEvent } from "../canvas/imeComposition";
 import { showToast } from "../../store/notificationStore";
 import { useGoalPlanStore } from "../store/goalPlanStore";
@@ -364,6 +366,12 @@ export function Composer(props: ComposerProps) {
   const disabled = !textModels.length;
   const activeModel = textModels.find((item) => item.id === textModel);
   const shellMode = settingsStore.agentShellApproval === "ask" ? "ask" : "full";
+  // 思考程度只在当前模型目录声明了档位时存在；存的档位不被该模型支持时按"跟随模型默认"显示，
+  // 这样界面说的和真正发出去的一致，也不会替模型编造它没有的级别。
+  const reasoningParam = getModelReasoningEffortParam(textModel);
+  const storedReasoning = String(settingsStore.agentReasoningEffort || "");
+  const reasoningEffort = reasoningParam?.options.includes(storedReasoning) ? storedReasoning : "";
+  const agentReasoningDefault = getAgentReasoningDefault(textModel);
   // 计划模式改变的是"这一轮该写什么"，输入提示跟着换，用户才知道接下来是拿方案而不是拿成片。
   const placeholder = planMode
     ? "描述本轮任务：Agent 会先只做调研并产出计划，待你确认后再执行"
@@ -569,6 +577,30 @@ export function Composer(props: ComposerProps) {
               ))}
             </SelectorChip>
 
+            {reasoningParam && (
+              <SelectorChip
+                open={menu === "reason"}
+                card
+                label={reasoningEffort ? optionLabel(reasoningParam, reasoningEffort) : "思考"}
+                hint={reasoningEffort
+                  ? `思考程度：${optionLabel(reasoningParam, reasoningEffort)}`
+                  : "思考程度：跟随模型默认"}
+                icon="sliders"
+                active={Boolean(reasoningEffort)}
+                disabled={disabled}
+                onToggle={() => setMenu(menu === "reason" ? null : "reason")}
+              >
+                <ReasonSlider
+                  param={reasoningParam}
+                  value={reasoningEffort}
+                  agentDefault={agentReasoningDefault}
+                  onChange={(level) => {
+                    void saveAppSettings({ agentReasoningEffort: level });
+                  }}
+                />
+              </SelectorChip>
+            )}
+
             <SelectorChip
               open={menu === "mode"}
               label={shellMode === "ask" ? "询问" : "自动"}
@@ -636,7 +668,7 @@ export function Composer(props: ComposerProps) {
   );
 }
 
-type Selector = "skill" | "model" | "mode";
+type Selector = "skill" | "model" | "reason" | "mode";
 
 function SelectorChip({
   open,
@@ -647,6 +679,7 @@ function SelectorChip({
   active,
   tone,
   disabled,
+  card,
   onToggle,
   children,
 }: {
@@ -658,6 +691,8 @@ function SelectorChip({
   active?: boolean;
   tone?: "accent" | undefined;
   disabled?: boolean;
+  /** 卡片式弹层：内容自己排版，不套菜单列表的行样式。 */
+  card?: boolean;
   onToggle: () => void;
   children: React.ReactNode;
 }) {
@@ -679,10 +714,128 @@ function SelectorChip({
         <IconSymbol name="chevron-down" className={styles.chipChevron} />
       </button>
       {open && (
-        <div className={styles.menu} role="menu">
+        <div className={card ? `${styles.menu} ${styles.menuCard}` : styles.menu} role={card ? undefined : "menu"}>
           {children}
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * 思考程度是有序档位，所以用离散滑轨表达：刻度数量只来自目录声明的 options，旋钮落在第几格就发第几档。
+ * 未显式选择时旋钮停在 Agent 真正会使用的那一档并以常规色显示，↺ 清空选择回到"跟随模型默认"。
+ *
+ * 轨道自己实现而不用原生 input[type=range]：原生旋钮在 WebKit 里撑不出这套比例，填充条还会盖住刻度。
+ * 拖动过程只更新本地预览，抬手才写一次设置，否则一次拖动会打几十次落盘。
+ */
+function ReasonSlider({ param, value, agentDefault, onChange }: {
+  param: NonNullable<ReturnType<typeof getModelReasoningEffortParam>>;
+  value: string;
+  agentDefault: string;
+  onChange: (level: string) => void;
+}) {
+  const trackRef = useRef<HTMLDivElement | null>(null);
+  const [preview, setPreview] = useState<number | null>(null);
+  const options = param.options.map(String);
+  const chosen = options.indexOf(value);
+  const resting = chosen >= 0 ? chosen : Math.max(0, options.indexOf(agentDefault));
+  const following = chosen < 0;
+  const shown = Math.min(options.length - 1, Math.max(0, preview ?? resting));
+  const label = optionLabel(param, options[shown]);
+
+  const indexAt = (clientX: number) => {
+    const box = trackRef.current?.getBoundingClientRect();
+    if (!box) return resting;
+    // 旋钮中心只在 (轨道宽 - 一个旋钮) 这段行程里移动，刻度点用的是同一条算式。
+    const travel = box.width - box.height;
+    const ratio = travel > 0 ? (clientX - box.left - box.height / 2) / travel : 0;
+    return Math.round(ratio * (options.length - 1));
+  };
+  const stepTo = (index: number) => onChange(options[Math.min(options.length - 1, Math.max(0, index))] || "");
+
+  /**
+   * 拖动的监听挂在 window 上而不是用 setPointerCapture：指针按在轨道上以后可能滑出轨道甚至松手，
+   * 只有 window 级监听保证一定收得到抬手，也保证抬手前只更新本地预览。
+   */
+  const startDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    let latest = indexAt(event.clientX);
+    setPreview(latest);
+    const move = (moveEvent: PointerEvent) => {
+      const next = indexAt(moveEvent.clientX);
+      if (next === latest) return;
+      latest = next;
+      setPreview(next);
+    };
+    const detach = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", detach);
+    };
+    const up = () => {
+      detach();
+      stepTo(latest);
+      setPreview(null);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", detach);
+  };
+
+  return (
+    <div className={styles.reason}>
+      <div className={styles.reasonHead}>
+        <div className={styles.reasonValue}>
+          <strong data-following={following || undefined}>{label}</strong>
+          <small>{following ? "跟随模型默认" : `模型默认：${optionLabel(param, agentDefault)}`}</small>
+        </div>
+        <button
+          type="button"
+          className={styles.reasonReset}
+          title="跟随模型默认"
+          disabled={following}
+          onClick={() => onChange("")}
+        >
+          <IconSymbol name="rotate-ccw" />
+        </button>
+      </div>
+      <div
+        ref={trackRef}
+        className={styles.reasonTrack}
+        style={{
+          "--reason-divisions": String(options.length - 1),
+          "--reason-current": String(shown),
+        } as React.CSSProperties}
+        onPointerDown={startDrag}
+      >
+        {options.map((option, index) => (
+          <span
+            key={option}
+            className={styles.reasonStop}
+            data-on={index <= shown || undefined}
+            style={{ "--reason-index": String(index) } as React.CSSProperties}
+          />
+        ))}
+        <div
+          className={styles.reasonKnob}
+          role="slider"
+          tabIndex={0}
+          aria-label="思考程度"
+          aria-valuemin={0}
+          aria-valuemax={options.length - 1}
+          aria-valuenow={shown}
+          aria-valuetext={following ? `跟随模型默认（${label}）` : label}
+          onKeyDown={(event) => {
+            const target = event.key === "ArrowLeft" || event.key === "ArrowDown" ? shown - 1
+              : event.key === "ArrowRight" || event.key === "ArrowUp" ? shown + 1
+                : event.key === "Home" ? 0
+                  : event.key === "End" ? options.length - 1 : -1;
+            if (target < 0) return;
+            event.preventDefault();
+            stepTo(target);
+          }}
+        />
+      </div>
     </div>
   );
 }

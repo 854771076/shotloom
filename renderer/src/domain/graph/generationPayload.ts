@@ -5,6 +5,7 @@ import { applyCameraConfigToPrompt, normalizeCameraConfig } from '@/utils/camera
 import { extractGeneratedFiles } from '@/utils/generatedOutputParsing.ts';
 import { applyImageStylePreset } from '@/utils/imageStylePresets.ts';
 import { normalizeInputRole } from '@/utils/generationInputRole.ts';
+import { defaultGenerationModel } from '@/utils/defaultGenerationModels';
 import { compileGenerationNodeConfig } from '@/domain/graph/GenerationNodeContract';
 import { inputSlotOrder, isSlotValidForMode } from '@/domain/graph/GenerationInputContract';
 import { textNodeContent } from '@/utils/textNodeContent.ts';
@@ -252,7 +253,7 @@ function schemaParamsPayload(type: string | undefined, config: GenerationNodeCon
 
 function basePayload(node: CanvasNode, config: GenerationNodeConfig, project: CanvasProject | null | undefined): GenerationPayload {
   const inputs = collectUpstreamInputs(node, project);
-  const model = pickString(node.model, 'gpt-image-2');
+  const model = pickString(node.model, defaultGenerationModel(node.type));
   const inputRoles = [
     ...inputs.map(effectiveInputRole),
     ...(node.imageEdit?.sourceFile ? ['image'] : []),

@@ -75,6 +75,8 @@ const paths = {
     '<path d="M5 5a2 2 0 0 1 3-1.7l10 7a2 2 0 0 1 0 3.4l-10 7A2 2 0 0 1 5 19Z"/>',
   refresh:
     '<path d="M21 12a9 9 0 0 1-15.3 6.4"/><path d="M3 12A9 9 0 0 1 18.3 5.6"/><path d="M18 2v4h4"/><path d="M6 22v-4H2"/>',
+  "rotate-ccw":
+    '<path d="M3 12a9 9 0 1 0 2.6-6.4L3 8"/><path d="M3 3v5h5"/>',
   redo: '<path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h2"/>',
   search: '<path d="m21 21-4.3-4.3"/><circle cx="11" cy="11" r="8"/>',
   scissors:

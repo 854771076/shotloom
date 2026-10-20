@@ -68,7 +68,8 @@ test('编辑器把当前草稿挂成唯一的 Agent 通道，面板关闭即注�
   assert.match(mediaViewer, /read: \(\) => \(textEditor\.current \? richHtmlToMarkdown\(textEditor\.current\.innerHTML\)/);
   assert.match(mediaViewer, /editor\.innerHTML = markdownToRichHtml\(draft\)/);
   assert.match(mediaViewer, /\[media\.open, agentNodeId\]\)/);
-  assert.match(mediaViewer, /agentNodeId && agentOpen && \(\s*<TextAgentPanel nodeId=\{agentNodeId\}/);
+  assert.match(mediaViewer, /agentNodeId && agentOpen && \(\s*<>\s*<div\s+className="text-agent-divider"/);
+  assert.match(mediaViewer, /<TextAgentPanel nodeId=\{agentNodeId\} onClose=\{\(\) => setAgentOpen\(false\)\} \/>/);
 });
 
 test('画布与剪辑面板显式声明自己的 Agent，提示词装配只有一处分支', () => {

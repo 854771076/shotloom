@@ -100,6 +100,12 @@
   caret-color: var(--slk-button-accent);
 }
 
+/* 全局 :focus-visible 焦点环与 .input 同为 (0,1,0)，靠源码顺序才会压过上面的
+   outline:none。文本框永远算键盘焦点，必须用同类名+伪类（0,2,0）显式关掉。 */
+.input:focus-visible {
+  outline: none;
+}
+
 .input::placeholder {
   color: var(--slk-label-caption);
 }
@@ -190,10 +196,13 @@
 .tools {
   display: flex;
   align-items: center;
+  /* 工具行任何情况下都只有一行：窄面板（文本/剪辑浮层里的 300–380px 列）放不下时
+     让选择器收缩、标签省略，而不是换行、溢出或压到发送按钮上。
+     这里不能开 overflow：下拉菜单挂在 .selector 里，裁掉轨道就等于裁掉菜单。 */
+  flex-wrap: nowrap;
   gap: 4px;
   flex: 1 1 auto;
   min-width: 0;
-  overflow: visible;
 }
 
 .add {
@@ -232,14 +241,24 @@
 
 .selector {
   position: relative;
+  /* 收缩发生在选择器轨道上，标签才有东西可省略；上限仍是原来的 168px，
+     宽面板里不会因此变宽。 */
+  flex: 0 1 auto;
   min-width: 0;
+  max-width: 168px;
 }
 
 .chip {
   display: flex;
   align-items: center;
   gap: 5px;
-  max-width: 168px;
+  /* 表单控件的 width: auto 不会跟随被压缩的父盒，必须显式跟随，
+     否则标签不会省略、选择器会顶出 .selector 并叠到相邻控件上。 */
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  /* 极端窄时裁在自己的胶囊里，不能让图标和箭头溢出去叠到相邻选择器上。 */
+  overflow: hidden;
   height: 28px;
   padding: 0 8px;
   border: 0;
@@ -393,6 +412,163 @@
   height: var(--icon-sm);
   flex: 0 0 auto;
   color: var(--slk-label-accent);
+}
+
+/* 卡片式弹层：内容自己排版，不套用菜单列表的滚动与行样式。 */
+.menuCard {
+  width: max(272px, 100%);
+  max-width: min(340px, calc(100vw - 40px));
+  max-height: none;
+  overflow: visible;
+  padding: 14px 16px 16px;
+}
+
+.reason {
+  display: grid;
+  gap: 14px;
+}
+
+.reasonHead {
+  position: relative;
+  display: grid;
+  justify-items: center;
+}
+
+.reasonValue {
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+  min-width: 0;
+}
+
+.reasonValue strong {
+  font-size: var(--text-title-20);
+  line-height: var(--text-title-20--line-height);
+  font-weight: 500;
+  color: var(--slk-label-accent);
+}
+
+/* 未显式选择时不发强调色：强调只留给"你替模型做了决定"这一种状态。 */
+.reasonValue strong[data-following] {
+  color: var(--slk-label-primary);
+}
+
+.reasonValue small {
+  color: var(--slk-label-caption);
+  font-size: var(--text-body-13);
+  line-height: var(--text-body-13--line-height);
+}
+
+.reasonReset {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  color: var(--slk-label-tertiary);
+  background: transparent;
+}
+
+.reasonReset > svg {
+  width: var(--icon-md);
+  height: var(--icon-md);
+}
+
+.reasonReset:disabled {
+  color: var(--slk-label-caption);
+  opacity: 0.45;
+  cursor: default;
+}
+
+@media (hover: hover) {
+  .reasonReset:hover:not(:disabled) {
+    color: var(--slk-label-primary);
+    background: var(--slk-hover-wash);
+  }
+}
+
+.reasonTrack {
+  --reason-track-height: 30px;
+  --reason-rail-height: 22px;
+  /* 轨道高度即旋钮直径，刻度与旋钮中心都按 (轨道宽 - 旋钮) 的行程定位，
+     这样点在第几格、旋钮停在哪、发出去哪一档三者不会错开。 */
+  --reason-span: calc(100% - var(--reason-track-height));
+  --reason-step: calc(var(--reason-span) / var(--reason-divisions, 1));
+  position: relative;
+  height: var(--reason-track-height);
+  border-radius: 999px;
+  cursor: pointer;
+  touch-action: none;
+}
+
+/* 自定义属性在声明它的那个元素上完成替换，所以"第几格"的算式必须写在真正用它的元素上：
+   刻度点用 --reason-index，旋钮和填充用 --reason-current。写在轨道上会让所有刻度挤在同一格。 */
+.reasonTrack::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  inset-inline: 0;
+  top: calc((100% - var(--reason-rail-height)) / 2);
+  height: var(--reason-rail-height);
+  border-radius: 999px;
+  background: var(--slk-bg-selector);
+}
+
+.reasonTrack::after {
+  --reason-center: calc(var(--reason-track-height) / 2 + var(--reason-step) * var(--reason-current, 0));
+  content: "";
+  position: absolute;
+  z-index: 0;
+  left: 0;
+  top: calc((100% - var(--reason-rail-height)) / 2);
+  width: var(--reason-center);
+  height: var(--reason-rail-height);
+  border-radius: 999px;
+  background: var(--brand-accent);
+}
+
+.reasonStop {
+  --reason-center: calc(var(--reason-track-height) / 2 + var(--reason-step) * var(--reason-index, 0));
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: var(--reason-center);
+  width: 5px;
+  height: 5px;
+  margin: -2.5px 0 0 -2.5px;
+  border-radius: 999px;
+  background: var(--grip);
+  pointer-events: none;
+}
+
+.reasonStop[data-on] {
+  background: var(--brand-accent-foreground);
+  opacity: 0.6;
+}
+
+.reasonKnob {
+  --reason-center: calc(var(--reason-track-height) / 2 + var(--reason-step) * var(--reason-current, 0));
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  left: var(--reason-center);
+  width: var(--reason-track-height);
+  height: var(--reason-track-height);
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  background: var(--slk-bg-raised);
+  box-shadow: 0 0 0 0.5px var(--slk-border-l2), var(--shadow-lift);
+  outline: none;
+}
+
+/* 键盘用户必须看得见旋钮被聚焦，这是滑轨自己的焦点，不是输入框卡片的那一套。 */
+.reasonKnob:focus-visible {
+  box-shadow: 0 0 0 3px var(--brand-accent-tint), var(--shadow-lift);
 }
 
 .send {

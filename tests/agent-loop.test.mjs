@@ -7,6 +7,7 @@
 import test, { after, before, afterEach, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRendererEnv } from './helpers/rendererSsr.mjs';
+import { optionLabel } from '../renderer/src/utils/modelPresentation.ts';
 
 const storage = new Map();
 let env;
@@ -59,6 +60,7 @@ const PLAN = {
   endpointPath: '/v1/chat/completions', endpointScope: 'v1', endpointMethod: 'POST',
   headers: { 'x-marker': 'loop' }, auth: { type: 'bearer' },
   requestOptions: { temperature: 0.3 },
+  reasoningEffort: '',
   contextLimit: 4_000, outputLimit: 400, timeoutMs: 300_000,
 };
 
@@ -1122,7 +1124,7 @@ test('loop 只驱动目录明确声明的三种 Agent 协议', () => {
     (modelRequest.loopUnsupportedReason(model.id) ? unsupported : supported).push(model.id);
   }
   assert.ok(supported.length);
-  assert.ok(supported.includes('gpt-5.6'));
+  assert.ok(supported.includes('gpt-6-astra'));
   assert.ok(supported.some((id) => id.startsWith('claude-')));
   for (const id of unsupported) assert.match(modelRequest.loopUnsupportedReason(id), /未声明支持|运行时契约|协议声明/);
 });
@@ -1156,4 +1158,47 @@ test('Responses 和 Messages 请求保留工具历史并只发送各自协议字
   assert.equal(chat.messages[0].responseItems, undefined, '跨协议继续对话时不能把 Responses 元数据发给 Chat 接口');
   assert.equal(chat.messages[1].compactionNote, undefined, '压缩说明的本地标记不得发给 provider');
   assert.equal(chat.messages[1].compactionLines, undefined);
+});
+
+test('思考程度只在目录声明的档位内生效，并按各自协议字段发出', () => {
+  const levels = catalog.getModelReasoningEffortParam('gpt-6-astra');
+  assert.deepEqual(levels.options, ['low', 'medium', 'high', 'xhigh', 'max']);
+  assert.equal(optionLabel(levels, 'xhigh'), '极高');
+  assert.equal(catalog.getModelReasoningEffortParam('claude-opus-5-5'), null,
+    '目录没有声明档位的模型没有这个开关，界面和请求都不许替模型编造级别');
+  // 滑轨上"不选择时使用哪一档"的说明与循环真正发出的值必须来自同一份解析结果。
+  assert.equal(catalog.getAgentReasoningDefault('gpt-6-astra'), 'medium');
+  assert.equal(catalog.getAgentReasoningDefault('starrouter-gpt-5.5'), 'none',
+    '中转服务把 Agent 通道固定为关闭推理，界面不能拿界面参数默认去说"中"');
+  assert.equal(catalog.getAgentReasoningDefault('claude-opus-5-5'), '', '没有档位就没有默认档');
+
+  const configs = settingsStore.settingsStore.providerConfigs;
+  const stored = settingsStore.settingsStore.agentReasoningEffort;
+  try {
+    settingsStore.settingsStore.providerConfigs = { openai: { apiKey: 'sk-test' }, google: { apiKey: 'sk-test' } };
+    settingsStore.settingsStore.agentReasoningEffort = 'max';
+    assert.equal(modelRequest.resolveLoopModelPlan('gpt-6-astra').reasoningEffort, 'max');
+    assert.equal(modelRequest.resolveLoopModelPlan('gemini-3.8-flash').reasoningEffort, '',
+      '换到没有该档位的模型必须回到模型默认，不能把上一个模型的档位名发给它');
+
+    const responses = modelRequest.buildLoopRequestBody(
+      { ...PLAN, protocol: 'openai-responses', reasoningEffort: 'max' }, [], [{ role: 'user', content: '目标' }]);
+    assert.deepEqual(responses.reasoning, { effort: 'max' }, 'Responses 协议用 reasoning.effort');
+    assert.equal(responses.reasoning_effort, undefined);
+
+    const chat = modelRequest.buildLoopRequestBody({
+      ...PLAN, protocol: 'openai-chat-completions', requestOptions: { reasoningEffort: 'none' }, reasoningEffort: 'high',
+    }, [], [{ role: 'user', content: '目标' }]);
+    assert.equal(chat.reasoning_effort, 'high', '用户显式选择要覆盖目录为 Agent 通道写死的推理默认');
+    assert.equal(chat.reasoningEffort, undefined);
+
+    const unset = modelRequest.buildLoopRequestBody({
+      ...PLAN, protocol: 'openai-chat-completions', requestOptions: { reasoningEffort: 'none' },
+    }, [], [{ role: 'user', content: '目标' }]);
+    assert.equal(unset.reasoning_effort, 'none', '目录声明的 Agent 推理默认必须按协议字段发出');
+    assert.equal(unset.reasoningEffort, undefined, 'camelCase 只是目录里的本地键名，不得原样发给端点');
+  } finally {
+    settingsStore.settingsStore.providerConfigs = configs;
+    settingsStore.settingsStore.agentReasoningEffort = stored;
+  }
 });

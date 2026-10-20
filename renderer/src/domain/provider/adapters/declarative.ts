@@ -30,6 +30,22 @@ function pickScalar(value: unknown): string {
   return '';
 }
 
+/**
+ * 声明了 errorCodePath 的厂商（MiniMax 全系）把失败写在 HTTP 200 的响应体里：码非 0 就是失败，
+ * 说明文字在 errorMessagePath（未声明时用 errorPath）。不这样报的厂商不声明这些路径，行为完全不变。
+ * 没有这一步，上游的"余额不足/音色不存在"只会变成一条"没有返回可归档媒体文件"，
+ * Agent 拿不到可以据此修正的原因。
+ */
+function inBodyProtocolError(data: Record<string, any>, contract: ModelRuntimeContract): string {
+  if (!contract.errorCodePath) return '';
+  const code = firstProtocolValue(data, contract.errorCodePath);
+  if (code === undefined || code === null || code === '') return '';
+  const numeric = Number(code);
+  if (Number.isFinite(numeric) ? numeric === 0 : String(code).trim() === '0') return '';
+  return pickStr(firstProtocolValue(data, contract.errorMessagePath || contract.errorPath || ''))
+    || '厂商响应体报告失败';
+}
+
 async function collectProtocolResourceValues(
   refs: ResourceRef[],
   { preferDataUrl = false, fallbackMimeType = 'application/octet-stream' } = {},
@@ -246,6 +262,10 @@ export class DeclarativeAdapter implements ProviderAdapter {
       auth: contract.auth,
       signal, timeoutMs: 60000,
     });
+    const inBodyError = inBodyProtocolError(data, contract);
+    if (inBodyError) {
+      return { status: 'failed', progress: 0, error: inBodyError, result: { raw: data }, raw: data };
+    }
     const rawStatus = pickScalar(firstProtocolValue(data, contract.statusPath || ''));
     if (!rawStatus) throw new Error(`${contract.modelId}/${contract.modeId} 的轮询响应缺少状态路径 ${contract.statusPath}`);
     const status = contract.pollStatusMap?.[rawStatus] || normalizeRemoteStatus(rawStatus);
@@ -264,6 +284,10 @@ export class DeclarativeAdapter implements ProviderAdapter {
   private submittedTask(data: Record<string, any>, request: CompiledProviderRequest): ProviderTask {
     const contract = request.contract;
     if (!contract) throw new Error('声明式请求缺少运行时模型契约');
+    const inBodyError = inBodyProtocolError(data, contract);
+    if (inBodyError) {
+      return { remoteTaskId: '', status: 'failed', progress: 0, result: { raw: data }, error: inBodyError, raw: data };
+    }
     const tid = contract.isAsync ? pickStr(firstProtocolValue(data, contract.taskIdPath || '')) : '';
     if (contract.isAsync && !tid) throw new Error(`${contract.modelId}/${contract.modeId} 的提交响应缺少任务 ID 路径 ${contract.taskIdPath}`);
     const result = contract.isAsync ? { raw: data } : this.protocolResult(data, contract);

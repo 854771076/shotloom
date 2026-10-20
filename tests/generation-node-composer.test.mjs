@@ -19,7 +19,9 @@ test('点击发送与输入框回车复用运行入口', () => {
 test('文本节点提示词与节点正文使用独立数据', () => {
   assert.match(source, /textNodeContent\(\{ \.\.\.node, generatedOutputs: outputs \}\)/);
   assert.doesNotMatch(source, /node\.textContent \|\| node\.prompt/);
-  assert.match(source, /placeholder=\{kind === "text" \? "输入给大模型的文本生成提示词"/);
+  assert.match(source, /placeholder=\{kind === "text"\s*\?\s*"输入给大模型的文本生成提示词"/);
+  // 音频节点是逐字朗读而不是按描述生成：占位文案必须说清这里放的是要朗读的文本。
+  assert.match(source, /kind === "audio"\s*\?\s*"输入要朗读的文本"/);
   assert.match(source, /className="text-result-starters nodrag nopan"[\s\S]*?试试：[\s\S]*?className="text-result-starter"[\s\S]*?自己编写内容/);
 });
 test('非文本节点使用模型目录类型与节点内配置面板', () => {
@@ -119,16 +121,33 @@ test('生成参数收纳到分组面板且发送按钮保持在底栏', () => {
   assert.match(styles, /\.generation-settings-panel \{[\s\S]*?width:\s*384px/);
   assert.match(styles, /\.generation-settings-input \{/);
   assert.match(styles, /\.generation-settings-slider \{/);
+  // 比例卡：5 列时单卡可用文字宽恰好等于最长标签（实测 59px 对 59px），零余量会在真机折行。
+  assert.match(styles, /\.ratios \{[^}]*grid-template-columns:\s*repeat\(auto-fill,\s*minmax\(\s*(7[6-9]|8[0-9]|9[0-9])px/);
+  assert.match(styles, /\.ratios button \{[^}]*min-height:\s*56px/);
+  assert.doesNotMatch(styles, /\.ratios button \{[^}]*[^-]height:/, '固定高度会让两行标签溢出卡片');
   assert.match(styles, /\.generation-settings-group-title \{/);
+  // 原生 select 的上下双箭头是操作系统控件，和面板里的选项块、音色选择器不是同一套图形。
+  assert.match(source, /className="generation-settings-select"/);
+  assert.match(source, /<select[\s\S]{0,140}aria-label=\{param\.label\}/);
+  assert.match(styles, /\.generation-settings-select > select \{[^}]*appearance: none/);
+  assert.match(styles, /\.generation-settings-select > svg \{[^}]*position: absolute/);
+  // 倍率型滑杆的轨道映射只读目录声明，界面不再自己算 min/max。
+  assert.match(source, /sliderTrackDomain\(param\)/);
+  assert.match(source, /sliderValueFromTrack\(param, Number\(event\.target\.value\)\)/);
+  assert.doesNotMatch(source, /const min = Number\(presentation\.min\)/, '滑杆轨道域只能由 modelPresentation 一处计算');
+  // 滑杆的值是裸数字，摘要里必须带参数名，否则"· 1 ·"读不出是哪项参数。
+  assert.match(source, /paramSummary\(param, config\[param\.key\] \?\? param\.default\)/);
+  assert.match(source, /paramPresentation\(param\)\.control === "slider" \? `\$\{param\.label\} \$\{text\}` : text/);
   assert.match(styles, /\.work-run-btn \{[^}]*?flex:\s*0 0 var\(--canvas-slot-size\)/);
   assert.match(styles, /\.work-composer \{[\s\S]*?width:\s*100%/);
   assert.match(source, /className="work-composer nodrag nopan nowheel"[\s\S]*?onPointerDown=\{\(event\) => event\.stopPropagation\(\)\}/);
   assert.match(source, /className="generation-settings-panel nodrag nopan nowheel"/);
 });
 
-test('切换模型时按新协议重编译配置且空数字不写成零', () => {
+test('切换模型时按新协议重编译配置，空数字不写成零、自由文本可写回', () => {
   assert.match(source, /model,[\s\S]*?config: compileGenerationNodeConfig\([\s\S]*?getModelSchema\(node\.type, model\)\.params/);
-  assert.match(source, /onConfigChange\(param\.key, numeric && value !== "" \? Number\(value\) : undefined\)/);
+  assert.match(source, /onConfigChange\(param\.key, numeric \? \(value === "" \? undefined : Number\(value\)\) : value\)/);
+  assert.doesNotMatch(source, /numeric && value !== "" \? Number\(value\) : undefined/, '自由文本参数不得被写成 undefined');
   assert.match(source, /min=\{numeric && Number\.isFinite\(Number\(presentation\.min\)\)/);
   assert.match(source, /max=\{numeric && Number\.isFinite\(Number\(presentation\.max\)\)/);
 });

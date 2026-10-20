@@ -2,8 +2,8 @@
   "provider": "xai",
   "models": [
     {
-      "id": "grok-4.5",
-      "name": "Grok 4.5",
+      "id": "grok-4.7",
+      "name": "Grok 4.7",
       "provider": "xai",
       "type": "textGeneration",
       "sortOrder": 5,
@@ -20,7 +20,7 @@
           },
           "inputConstraints": {
             "text": {
-              "maxTokens": 256000
+              "maxTokens": 500000
             }
           },
           "agent": {
@@ -71,7 +71,7 @@
           },
           "inputConstraints": {
             "text": {
-              "maxTokens": 256000
+              "maxTokens": 500000
             }
           },
           "agent": {
@@ -122,7 +122,7 @@
           },
           "inputConstraints": {
             "text": {
-              "maxTokens": 256000
+              "maxTokens": 500000
             }
           },
           "agent": {
@@ -166,8 +166,8 @@
       ]
     },
     {
-      "id": "grok-imagine-image-quality",
-      "name": "Grok Imagine Image Quality",
+      "id": "grok-imagine-image-2.0",
+      "name": "Grok Imagine Image 2.0",
       "provider": "xai",
       "type": "imageGeneration",
       "sortOrder": 3,
@@ -212,8 +212,38 @@
                 "16:9",
                 "9:16",
                 "4:3",
-                "3:4"
+                "3:4",
+                "3:2",
+                "2:3",
+                "21:9",
+                "5:2"
               ]
+            },
+            {
+              "key": "imageSize",
+              "label": "清晰度",
+              "type": "select",
+              "default": "1k",
+              "options": [
+                "1k",
+                "2k"
+              ]
+            },
+            {
+              "key": "quality",
+              "label": "质量",
+              "type": "select",
+              "default": "auto",
+              "options": [
+                "low",
+                "medium",
+                "auto"
+              ],
+              "optionLabels": {
+                "low": "低",
+                "medium": "中",
+                "auto": "自动"
+              }
             },
             {
               "key": "generationCount",
@@ -235,7 +265,9 @@
             "model": "{{model}}",
             "prompt": "{{prompt}}",
             "aspect_ratio": "{{params.aspectRatio}}",
-            "n": "{{params.generationCount}}"
+            "n": "{{params.generationCount}}",
+            "resolution": "{{params.imageSize}}",
+            "quality": "{{params.quality}}"
           },
           "resultUrlPath": "data.*.url",
           "resultBase64Path": "data.*.b64_json"
@@ -243,11 +275,11 @@
       ]
     },
     {
-      "id": "grok-imagine-video",
-      "name": "Grok Imagine Video",
+      "id": "grok-imagine-video-1.5",
+      "name": "Grok Imagine Video 1.5",
       "provider": "xai",
       "type": "videoGeneration",
-      "sortOrder": 1,
+      "sortOrder": 2,
       "enabled": true,
       "defaultMode": "text-or-image-to-video",
       "modes": [
@@ -280,9 +312,20 @@
           },
           "outputConstraints": {
             "durations": [
+              1,
+              2,
+              3,
+              4,
               5,
+              6,
+              7,
               8,
+              9,
               10,
+              11,
+              12,
+              13,
+              14,
               15
             ],
             "defaultDuration": 8,
@@ -304,9 +347,20 @@
               "default": 8,
               "numeric": true,
               "options": [
+                1,
+                2,
+                3,
+                4,
                 5,
+                6,
+                7,
                 8,
+                9,
                 10,
+                11,
+                12,
+                13,
+                14,
                 15
               ]
             },
@@ -316,114 +370,15 @@
               "type": "select",
               "default": "16:9",
               "options": [
+                "1:1",
                 "16:9",
                 "9:16",
-                "1:1"
-              ]
-            },
-            {
-              "key": "resolution",
-              "label": "分辨率",
-              "type": "select",
-              "default": "720p",
-              "options": [
-                "480p",
-                "720p"
-              ]
-            }
-          ],
-          "auth": {
-            "type": "bearer"
-          },
-          "requestTemplate": {
-            "model": "{{model}}",
-            "prompt": "{{prompt}}",
-            "image": "{{imageObject}}",
-            "duration": "{{duration}}",
-            "aspect_ratio": "{{aspectRatio}}",
-            "resolution": "{{resolution}}"
-          },
-          "taskIdPath": "request_id",
-          "statusPath": "status",
-          "errorPath": "error.message",
-          "pollStatusMap": {
-            "pending": "running",
-            "done": "completed",
-            "expired": "failed",
-            "failed": "failed"
-          },
-          "resultUrlPath": "video.url"
-        }
-      ]
-    },
-    {
-      "id": "grok-imagine-video-1.5",
-      "name": "Grok Imagine Video 1.5",
-      "provider": "xai",
-      "type": "videoGeneration",
-      "sortOrder": 2,
-      "enabled": true,
-      "defaultMode": "image-to-video",
-      "modes": [
-        {
-          "id": "image-to-video",
-          "label": "图生视频",
-          "inputMode": "firstFrame",
-          "inputSlots": [
-            "firstFrame"
-          ],
-          "endpoint": {
-            "method": "POST",
-            "path": "/videos/generations",
-            "scope": "root"
-          },
-          "taskEndpoint": {
-            "method": "GET",
-            "path": "/videos/{taskId}",
-            "scope": "root"
-          },
-          "isAsync": true,
-          "inputConstraints": {
-            "images": {
-              "min": 1,
-              "max": 1,
-              "roles": [
-                "referenceImage"
-              ]
-            }
-          },
-          "outputConstraints": {
-            "durations": [
-              5,
-              8,
-              10,
-              12,
-              15
-            ],
-            "defaultDuration": 8,
-            "formats": [
-              "mp4"
-            ]
-          },
-          "params": [
-            {
-              "key": "prompt",
-              "label": "提示词",
-              "type": "text",
-              "required": true
-            },
-            {
-              "key": "duration",
-              "label": "时长",
-              "type": "select",
-              "default": 8,
-              "numeric": true,
-              "options": [
-                5,
-                8,
-                10,
-                12,
-                15
+                "4:3",
+                "3:4",
+                "3:2",
+                "2:3",
+                "21:9",
+                "5:2"
               ]
             },
             {
@@ -436,6 +391,12 @@
                 "720p",
                 "1080p"
               ]
+            },
+            {
+              "key": "generateAudio",
+              "label": "生成同步声音",
+              "type": "boolean",
+              "default": true
             }
           ],
           "auth": {
@@ -444,11 +405,11 @@
           "requestTemplate": {
             "model": "{{model}}",
             "prompt": "{{prompt}}",
-            "image": {
-              "url": "{{imageUrl}}"
-            },
+            "image": "{{imageObject}}",
             "duration": "{{duration}}",
-            "resolution": "{{resolution}}"
+            "aspect_ratio": "{{aspectRatio}}",
+            "resolution": "{{resolution}}",
+            "generate_audio": "{{params.generateAudio}}"
           },
           "taskIdPath": "request_id",
           "statusPath": "status",

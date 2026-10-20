@@ -264,3 +264,26 @@ test('助手消息不带复制按钮', () => {
   assert.doesNotMatch(transcript, /MessageActions|navigator\.clipboard|styles\.action|IconSymbol name="copy"/);
   assert.doesNotMatch(transcriptStyles, /\.actions \{|\.action \{/);
 });
+
+const composerStyles = read(`${dir}Composer.module.css`);
+
+// 文本与剪辑浮层里的面板只有 300–380px：工具行任何情况下都只有一行，
+// 靠选择器收缩 + 标签省略容纳，不得换行、溢出或压到发送按钮上。
+test('工具行永远保持一行，窄面板里选择器收缩而不是换行', () => {
+  assert.match(composerStyles, /\.tools \{[^}]*flex-wrap: nowrap;[^}]*min-width: 0;/);
+  assert.doesNotMatch(composerStyles, /\.tools \{[^}]*flex-wrap: wrap/);
+  // 下拉菜单挂在 .selector 里，裁掉工具轨道等于裁掉菜单。
+  assert.doesNotMatch(composerStyles, /\.tools \{[^}]*overflow:/);
+  // 表单控件的 width:auto 不跟随被压缩的父盒，必须显式跟随才会省略标签。
+  assert.match(composerStyles, /\.selector \{[^}]*flex: 0 1 auto;[^}]*min-width: 0;[^}]*max-width: 168px;/);
+  assert.match(composerStyles, /\.chip \{[^}]*width: 100%;[^}]*overflow: hidden;/);
+  assert.match(composerStyles, /\.send \{[^}]*flex: 0 0 auto;/);
+});
+
+// 全局焦点环 `:focus-visible` 与 `.input` 同为 (0,1,0)，而 dev 下模块样式表先于
+// 全局区域表注入，只写一条 outline:none 会按源码顺序输给全局环，输入框上重新出现方框。
+test('输入框不画独立焦点环，焦点只由整张输入卡表达', () => {
+  assert.match(read('../renderer/styles.css'), /:focus-visible \{[^}]*outline: 2px solid var\(--ring\);/);
+  assert.match(composerStyles, /\.input:focus-visible \{[^}]*outline: none;/);
+  assert.match(composerStyles, /\.card:focus-within \{[^}]*box-shadow: var\(--slk-elevation-prominent\);/);
+});

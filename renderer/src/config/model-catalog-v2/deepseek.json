@@ -166,8 +166,8 @@
       ]
     },
     {
-      "id": "deepseek-v4-flash",
-      "name": "DeepSeek V4 Flash",
+      "id": "deepseek-flash",
+      "name": "DeepSeek Flash",
       "provider": "deepseek",
       "type": "textGeneration",
       "sortOrder": 9,

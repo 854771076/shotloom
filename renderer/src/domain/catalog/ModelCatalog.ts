@@ -6,6 +6,8 @@
  */
 
 import { modelCatalogV2 } from '../../config/model-catalog-v2/index';
+import { systemVoiceOptionLabels } from '../../config/systemVoices';
+import { defaultGenerationModel } from '@/utils/defaultGenerationModels';
 import {
   GENERATION_INPUT_MODE_LABELS,
   slotsForInputMode,
@@ -43,13 +45,15 @@ export interface CatalogParam {
   conflictsWith?: string[] | undefined;
   visibleWhen?: Record<string, unknown> | undefined;
   presentation?: string | {
-    control: 'segmented' | 'select' | 'ratio' | 'resolution' | 'slider' | 'number' | 'toggle' | 'text' | 'hidden';
+    control: 'segmented' | 'select' | 'ratio' | 'resolution' | 'slider' | 'number' | 'toggle' | 'text' | 'voice' | 'hidden';
     group?: string;
     summary?: boolean;
     unit?: string;
     min?: number;
     max?: number;
     step?: number;
+    /** 倍率型滑杆（音量 0.1–10、语速 0.5–2）用对数轨道，否则默认值会贴着轨道左端。 */
+    scale?: 'linear' | 'log';
   } | undefined;
   optionLabels?: Record<string, string> | undefined;
 }
@@ -113,6 +117,17 @@ export interface CatalogMode {
   statusPath?: string;
   progressPath?: string;
   errorPath?: string;
+  /**
+   * 有些厂商（MiniMax 全系）把失败写在 HTTP 200 的响应体里：`base_resp.status_code` 非 0 就是失败。
+   * 不声明这个路径就按“响应体里没有结果就是没结果”处理。
+   */
+  errorCodePath?: string;
+  /**
+   * body 内失败时说明文字的路径，与 errorCodePath 配对使用。
+   * 异步任务另有 errorPath（如 MiniMax 的 `task.error.message`）时必须单独声明这一条，
+   * 否则提交阶段的真实原因会被轮询用的路径读成空。未声明时回退到 errorPath。
+   */
+  errorMessagePath?: string;
   resultTextPath?: string;
   resultUrlPath?: string;
   resultBase64Path?: string;
@@ -170,6 +185,11 @@ const GENERATION_ENDPOINT_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 const ENDPOINT_SCOPES = new Set(['origin', 'root', 'v1']);
 const TASK_ENDPOINT_METHODS = new Set(['GET', 'POST']);
 const AGENT_TRANSPORTS = new Set(['provider-default', 'openai-chat-completions', 'openai-responses', 'anthropic-messages']);
+
+function isVoiceParam(param: { presentation?: CatalogParam['presentation'] }): boolean {
+  const presentation = param.presentation;
+  return typeof presentation === 'object' && presentation?.control === 'voice';
+}
 
 function isJsonValue(value: unknown): boolean {
   if (value === null || typeof value === 'string' || typeof value === 'boolean') return true;
@@ -380,6 +400,10 @@ export interface ModelRuntimeContract {
   statusPath?: string | undefined;
   progressPath?: string | undefined;
   errorPath?: string | undefined;
+  /** 厂商用响应体内的非 0 状态码报错时声明该码的路径。 */
+  errorCodePath?: string | undefined;
+  /** body 内失败说明文字的路径；缺省回退到 errorPath。 */
+  errorMessagePath?: string | undefined;
   resultTextPath?: string | undefined;
   resultUrlPath?: string | undefined;
   resultBase64Path?: string | undefined;
@@ -415,7 +439,7 @@ export interface TypeMeta {
 
 // ── Singleton Catalog ────────────────────────────────────────────────────────
 
-const defaultTextTypeMeta: TypeMeta = { value: 'textGeneration', label: '文本生成', defaultModel: 'gpt-5.4', icon: 'chat' };
+const defaultTextTypeMeta: TypeMeta = { value: 'textGeneration', label: '文本生成', defaultModel: defaultGenerationModel('textGeneration'), icon: 'chat' };
 
 // capabilityFromMode / defaultCap 的推断形状是运行时契约的组成部分（contractFor 直接展开它），
 // 因此把它固化成显式契约；字段缺失时消费方会退回 defaultCap 的取值。
@@ -456,6 +480,8 @@ export interface ModelInputCapability {
   statusPath?: string | undefined;
   progressPath?: string | undefined;
   errorPath?: string | undefined;
+  errorCodePath?: string | undefined;
+  errorMessagePath?: string | undefined;
   resultTextPath?: string | undefined;
   resultUrlPath?: string | undefined;
   resultBase64Path?: string | undefined;
@@ -733,6 +759,8 @@ class ModelCatalog {
       statusPath: mode.statusPath,
       progressPath: mode.progressPath,
       errorPath: mode.errorPath,
+      errorCodePath: mode.errorCodePath,
+      errorMessagePath: mode.errorMessagePath,
       resultTextPath: mode.resultTextPath,
       resultUrlPath: mode.resultUrlPath,
       resultBase64Path: mode.resultBase64Path,
@@ -775,11 +803,37 @@ class ModelCatalog {
           options: (p.options || []).map((o) => (o && typeof o === 'object' ? (o as Record<string, unknown>).value : o)),
           ...(p.visibleWhen ? { visibleWhen: { ...p.visibleWhen } } : {}),
           ...(p.presentation ? { presentation: p.presentation } : {}),
+          // 音色参数只声明 control=voice，具体清单属于系统音色库，不在每个厂商模式里重复一遍。
+          ...(isVoiceParam(p) && !p.optionLabels ? { optionLabels: systemVoiceOptionLabels } : {}),
           ...(p.optionLabels ? { optionLabels: { ...p.optionLabels } } : {}),
         })),
       };
     }
     return { models: models.length ? models : [modelId].filter(Boolean) as string[], params: [] };
+  }
+
+  /**
+   * 文本模型在目录里声明的思考程度档位。界面与 Agent 循环共用这一份判定：
+   * 没有声明档位、或只声明了一档（没有可选余地）就没有这个开关，代码不去猜厂商支持哪些级别。
+   */
+  getModelReasoningEffortParam(modelId: string): ModelSchema['params'][number] | null {
+    const param = this.getModelSchema('textGeneration', modelId).params
+      .find((item) => item.key === 'reasoningEffort');
+    return param && param.options.length > 1 ? param : null;
+  }
+
+  /**
+   * 用户没有选档位时 Agent 通道真正发出的那一档。目录可以在 agent.requestOptions 里为 Agent 固定
+   * 一个与界面参数默认不同的推理档位（例如中转服务把 Agent 固定为关闭），否则回落到参数默认。
+   * 界面用它写"不选择时使用哪一档"，循环用它补默认值，两边说的必须是同一个数。
+   */
+  getAgentReasoningDefault(modelId: string): string {
+    const param = this.getModelReasoningEffortParam(modelId);
+    if (!param) return '';
+    const declared = this.getModeConfig(modelId)?.agent?.requestOptions?.reasoningEffort;
+    const candidate = typeof declared === 'string' ? declared : param.default;
+    if (param.options.some((option) => String(option) === String(candidate))) return String(candidate);
+    return String(param.options[0]);
   }
 
   defaultConfigForType(type: string, modelId?: string): Record<string, unknown> {
@@ -816,8 +870,8 @@ class ModelCatalog {
   // ── Type meta ──────────────────────────────────────────────────────────────
 
   static readonly GENERATION_TYPES: TypeMeta[] = [
-    { value: 'imageGeneration', label: '图片生成', defaultModel: 'gpt-image-2', icon: 'image' },
-    { value: 'videoGeneration', label: '视频生成', defaultModel: 'grok-imagine-video', icon: 'play' },
+    { value: 'imageGeneration', label: '图片生成', defaultModel: defaultGenerationModel('imageGeneration'), icon: 'image' },
+    { value: 'videoGeneration', label: '视频生成', defaultModel: defaultGenerationModel('videoGeneration'), icon: 'play' },
     { value: 'audioGeneration', label: '音频生成', defaultModel: '', icon: 'waveform' },
     defaultTextTypeMeta,
   ];
@@ -857,6 +911,8 @@ export const resolveModeIdForInputMode = (modelId: string, inputMode?: string) =
   modelCatalog.resolveModeIdForInputMode(modelId, inputMode);
 export const getModelIdsByType = (nodeType: string) => modelCatalog.getModelIdsByType(nodeType);
 export const getModelInfo = (modelId: string) => modelCatalog.getModelInfo(modelId);
+export const getModelReasoningEffortParam = (modelId: string) => modelCatalog.getModelReasoningEffortParam(modelId);
+export const getAgentReasoningDefault = (modelId: string) => modelCatalog.getAgentReasoningDefault(modelId);
 export const isModelForType = (nodeType: string | undefined, modelId: string) => modelCatalog.isModelForType(String(nodeType || ''), modelId);
 export const getAllModelNames = () => modelCatalog.getAllModelNames();
 export const resolveModelModeConfig = (modelId: string, inputRoles?: string[], requestedMode?: string) =>

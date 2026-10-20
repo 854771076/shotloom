@@ -1,6 +1,7 @@
 import { createTauriApi } from './tauriApi';
 import { withBuiltInSkills, withoutBuiltInSkills } from './builtInSkills';
 import { withBuiltInRecipes, withoutBuiltInRecipes } from './builtInRecipes';
+import { defaultGenerationModel } from '@/utils/defaultGenerationModels';
 
 // 浏览器替身把项目、素材和设置都存成 localStorage 里的 JSON，结构与桌面实现
 // 一样是松散记录；项目树节点按 kind 区分，形状不固定，只按键值记录传递。
@@ -316,9 +317,9 @@ function createBrowserFallback() {
         agentAutoEval: true,
         agentAutoLayout: true,
         agentCanRunNodes: false,
-        agentPreferredTextModel: 'gpt-5.4',
-        agentPreferredImageModel: 'gpt-image-2',
-          agentPreferredVideoModel: 'grok-imagine-video',
+        agentPreferredTextModel: defaultGenerationModel('textGeneration'),
+        agentPreferredImageModel: defaultGenerationModel('imageGeneration'),
+          agentPreferredVideoModel: defaultGenerationModel('videoGeneration'),
           runtimeProtection: {
             healthIntervalMs: 10000, failureThreshold: 3, failureWindowMs: 300000,
             circuitCooldownMs: 120000, stallWarningMs: 180000, hardCapMs: 1800000,
@@ -352,9 +353,9 @@ function createBrowserFallback() {
           agentAutoEval: current.agentAutoEval !== false,
           agentAutoLayout: current.agentAutoLayout !== false,
           agentCanRunNodes: current.agentCanRunNodes === true,
-          agentPreferredTextModel: current.agentPreferredTextModel || 'gpt-5.4',
-          agentPreferredImageModel: current.agentPreferredImageModel || 'gpt-image-2',
-          agentPreferredVideoModel: current.agentPreferredVideoModel || 'grok-imagine-video',
+          agentPreferredTextModel: current.agentPreferredTextModel || defaultGenerationModel('textGeneration'),
+          agentPreferredImageModel: current.agentPreferredImageModel || defaultGenerationModel('imageGeneration'),
+          agentPreferredVideoModel: current.agentPreferredVideoModel || defaultGenerationModel('videoGeneration'),
           runtimeProtection: current.runtimeProtection || {
             healthIntervalMs: 10000, failureThreshold: 3, failureWindowMs: 300000,
             circuitCooldownMs: 120000, stallWarningMs: 180000, hardCapMs: 1800000,

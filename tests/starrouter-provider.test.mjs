@@ -55,6 +55,11 @@ test('StarRouter 内置目录覆盖文本、图片、视频和音频生成', () 
   for (const model of byType.audioGeneration) {
     const mode = model.modes[0];
     assert.equal(mode.endpoint.path, '/audio/speech');
+    // StarRouter 把 OpenAI 风格的 response_format 原样映射成 MiniMax 的 output_format，
+    // `mp3` 会被上游判 2013 invalid params；只有 hex/url 合法，且 hex 由网关解码后
+    // 仍以二进制 audio/mpeg 返回，所以请求发 output_format=hex、结果按二进制解析。
+    assert.equal(mode.requestTemplate.output_format, 'hex');
+    assert.equal(mode.requestTemplate.response_format, undefined);
     assert.deepEqual(mode.resultBody, {
       encoding: 'binary', mimeType: 'audio/mpeg', fileExtension: 'mp3',
     });
@@ -75,6 +80,33 @@ test('StarRouter GPT 5.5 使用官方上下文、输出长度和推理强度', (
     ['关闭', '低', '中', '高', '极高']);
   assert.equal(mode.requestTemplate.reasoning_effort, '{{params.reasoningEffort}}');
   assert.deepEqual(mode.agent.requestOptions, { reasoningEffort: 'none' });
+});
+
+test('StarRouter 文本模型的推理档位只写中转站实测接受的枚举', () => {
+  // 2026-10-19 用非法取值逐个探过 starrouter.io：端点回吐的合法值才写进目录，其余一律不声明。
+  const measured = {
+    'starrouter-gpt-5.4': ['low', 'medium', 'high', 'xhigh'],
+    'starrouter-deepseek-v4-pro': ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'ultra', 'max'],
+    'starrouter-qwen3.6-plus': ['none', 'minimal', 'low', 'medium', 'high', 'xhigh'],
+    'starrouter-glm-5.2': ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'],
+    'starrouter-grok-4.3': ['none', 'minimal', 'low', 'medium', 'high', 'xhigh'],
+  };
+  for (const [id, values] of Object.entries(measured)) {
+    const mode = catalogJson.models.find((candidate) => candidate.id === id).modes[0];
+    const param = mode.params.find((item) => item.key === 'reasoningEffort');
+    assert.deepEqual(param.options, values, id);
+    assert.equal(param.default, 'medium', id);
+    assert.deepEqual(Object.keys(param.optionLabels), values, `${id} 每个档位都要有中文名`);
+    assert.equal(mode.requestTemplate.reasoning_effort, '{{params.reasoningEffort}}');
+    assert.ok(mode.capabilities.includes('reasoning'), `${id} 声明了档位就要同时向模型声明会推理`);
+  }
+  // kimi-k3 对 reasoning_effort 不做任何校验（连非法值都返回 200），claude-opus-4-8 当前没有可用渠道，
+  // 两者都测不出真实档位，目录里就不许有这个开关。
+  for (const id of ['starrouter-kimi-k3', 'starrouter-claude-opus-4-8']) {
+    const mode = catalogJson.models.find((candidate) => candidate.id === id).modes[0];
+    assert.equal(mode.params.find((item) => item.key === 'reasoningEffort'), undefined, id);
+    assert.equal(mode.requestTemplate.reasoning_effort, undefined, id);
+  }
 });
 
 test('StarRouter Grok 图片模型只公开已验证可用的文生图协议', () => {

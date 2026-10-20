@@ -1,6 +1,7 @@
 import { reactive, toRaw } from '@/store/domainReactivity';
 import { desktopApi } from '@/services/desktopApi';
 import { normalizeCanvasActionShortcuts } from '@/utils/canvasActionShortcuts';
+import { defaultGenerationModel } from '@/utils/defaultGenerationModels';
 import { clonePlainData } from '@/utils/plainDataClone.ts';
 import { getModelIdsByType } from '@/domain/catalog/ModelCatalog';
 import { normalizeProviderConfigs } from '@/domain/provider/ProviderConfig';
@@ -43,9 +44,11 @@ export const settingsStore = reactive({
   // 审批策略（服务层唯一判定）：'ask' 可以请求用户裁决；'never' 无人值守，需要审批的操作一律自动拒绝。
   // 它独立于 agentShellApproval：后者是"哪些操作要问"，前者是"到底还问不问"。
   agentApprovalPolicy: 'ask',
-  agentPreferredTextModel: 'gpt-5.4',
-  agentPreferredImageModel: 'gpt-image-2',
-  agentPreferredVideoModel: 'grok-imagine-video',
+  // 思考程度只保存用户选的档位名；是否可用由模型目录声明的档位决定，'' 表示跟随模型默认。
+  agentReasoningEffort: '',
+  agentPreferredTextModel: defaultGenerationModel('textGeneration'),
+  agentPreferredImageModel: defaultGenerationModel('imageGeneration'),
+  agentPreferredVideoModel: defaultGenerationModel('videoGeneration'),
   canvasActionShortcuts: normalizeCanvasActionShortcuts(),
   layoutAlgorithm: 'grid-aligned', updatedAt: '',
   runtimeProtection: {
@@ -91,15 +94,15 @@ function normalizeTokenGroups(tokenGroups: unknown): TokenGroup[] {
 
 function normalizePreferredTextModel(value: unknown) {
   const model = typeof value === 'string' ? value.trim() : '';
-  return getModelIdsByType('textGeneration').includes(model) ? model : 'gpt-5.4';
+  return getModelIdsByType('textGeneration').includes(model) ? model : defaultGenerationModel('textGeneration');
 }
 function normalizePreferredImageModel(value: unknown) {
   const model = typeof value === 'string' ? value.trim() : '';
-  return getModelIdsByType('imageGeneration').includes(model) ? model : 'gpt-image-2';
+  return getModelIdsByType('imageGeneration').includes(model) ? model : defaultGenerationModel('imageGeneration');
 }
 function normalizePreferredVideoModel(value: unknown) {
   const model = typeof value === 'string' ? value.trim() : '';
-  return getModelIdsByType('videoGeneration').includes(model) ? model : 'grok-imagine-video';
+  return getModelIdsByType('videoGeneration').includes(model) ? model : defaultGenerationModel('videoGeneration');
 }
 
 function toPlainSettings(patch: AnyRecord = {}) {
@@ -118,6 +121,7 @@ function toPlainSettings(patch: AnyRecord = {}) {
     agentCanRunNodes: rawStore.agentCanRunNodes,
     agentShellApproval: rawStore.agentShellApproval,
     agentApprovalPolicy: rawStore.agentApprovalPolicy,
+    agentReasoningEffort: rawStore.agentReasoningEffort,
     agentPreferredTextModel: rawStore.agentPreferredTextModel,
     agentPreferredImageModel: rawStore.agentPreferredImageModel,
     agentPreferredVideoModel: rawStore.agentPreferredVideoModel,
@@ -148,6 +152,9 @@ function applySettings(settings: AnyRecord) {
   settingsStore.agentCanRunNodes = settings.agentCanRunNodes === true;
   settingsStore.agentShellApproval = settings.agentShellApproval === 'ask' ? 'ask' : 'full';
   settingsStore.agentApprovalPolicy = settings.agentApprovalPolicy === 'never' ? 'never' : 'ask';
+  settingsStore.agentReasoningEffort = typeof settings.agentReasoningEffort === 'string'
+    ? settings.agentReasoningEffort.trim()
+    : '';
   settingsStore.agentPreferredTextModel = normalizePreferredTextModel(settings.agentPreferredTextModel);
   settingsStore.agentPreferredImageModel = normalizePreferredImageModel(settings.agentPreferredImageModel);
   settingsStore.agentPreferredVideoModel = normalizePreferredVideoModel(settings.agentPreferredVideoModel);

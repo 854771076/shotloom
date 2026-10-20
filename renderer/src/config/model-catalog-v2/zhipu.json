@@ -2,11 +2,11 @@
   "provider": "zhipu",
   "models": [
     {
-      "id": "glm-5.2",
-      "name": "GLM 5.2",
+      "id": "glm-5.3",
+      "name": "GLM 5.3",
       "provider": "zhipu",
       "type": "textGeneration",
-      "sortOrder": 12,
+      "sortOrder": 11,
       "enabled": true,
       "defaultMode": "text-generation",
       "modes": [

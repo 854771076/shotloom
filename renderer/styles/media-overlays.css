@@ -130,8 +130,10 @@
   user-select: text;
 }
 
-.media-viewer-stage img,
-.media-viewer-stage video {
+/* 只约束舞台直接展示的那张媒体：文本界面把编辑器和 Agent 面板放在同一个舞台里，
+   后代选择器会把面板内的标识和缩略图一起压成 0 尺寸。 */
+.media-viewer-stage > img,
+.media-viewer-stage > video {
   position: relative;
   z-index: 1;
   max-width: calc(100% - 44px);
@@ -142,13 +144,13 @@
   box-shadow: var(--shadow-modal);
 }
 
-.media-viewer-stage img {
+.media-viewer-stage > img {
   transform-origin: center;
   transition: transform var(--duration-fast) var(--ease-sheet);
   will-change: transform;
 }
 
-.media-viewer-stage.panning img { transition: none; }
+.media-viewer-stage.panning > img { transition: none; }
 
 .media-viewer-hint {
   display: flex;
@@ -224,8 +226,8 @@
   box-shadow: var(--overlay-cast);
 }
 .media-viewer-backdrop:not(.is-text) .media-viewer-stage::before { display: none; }
-.media-viewer-backdrop:not(.is-text) .media-viewer-stage img,
-.media-viewer-backdrop:not(.is-text) .media-viewer-stage video {
+.media-viewer-backdrop:not(.is-text) .media-viewer-stage > img,
+.media-viewer-backdrop:not(.is-text) .media-viewer-stage > video {
   max-width: calc(100% - 64px);
   max-height: calc(100% - 64px);
   border-radius: var(--radius);
@@ -255,6 +257,8 @@
   /* 文本界面是内容区里的工作面：通栏工具条 + 铺满剩余高度的列，不压暗、不画卡片。
      列分配只在这里声明一次，工具条与舞台共用。 */
   --viewer-columns: minmax(0, 1fr);
+  /* 助手列宽由界面上的分隔条拖动后经内联变量覆盖；这里只声明默认值。 */
+  --text-agent-panel-width: 380px;
   color: var(--type-primary);
   grid-template-rows: 46px minmax(0, 1fr);
   background: var(--surface);
@@ -264,10 +268,10 @@
   --viewer-columns: minmax(0, 1fr) 286px;
 }
 .media-viewer-backdrop.is-text.is-agent-open {
-  --viewer-columns: minmax(0, 1fr) minmax(300px, 380px);
+  --viewer-columns: minmax(0, 1fr) var(--text-agent-panel-width);
 }
 .media-viewer-backdrop.is-text.is-history-open.is-agent-open {
-  --viewer-columns: minmax(0, 1fr) 286px minmax(300px, 380px);
+  --viewer-columns: minmax(0, 1fr) 286px var(--text-agent-panel-width);
 }
 .media-viewer-backdrop.is-text .media-viewer-toolbar {
   margin: 0;
@@ -318,7 +322,8 @@
   box-shadow: none;
   font: var(--text-body-14)/1.8 var(--font-serif);
 }
-.media-viewer-backdrop.is-text .media-viewer-text:empty::before { content: attr(data-placeholder); color: var(--faint); pointer-events: none; }
+/* 富文本编辑器空下来时里面仍有 <p><br></p>，:empty 永远不成立，占位提示必须由草稿是否为空来驱动。 */
+.media-viewer-backdrop.is-text .media-viewer-text[data-empty]::before { content: attr(data-placeholder); color: var(--faint); pointer-events: none; }
 .media-viewer-backdrop.is-text .media-viewer-text :is(h1, h2, h3, p) { margin: 0 0 .65em; }
 .media-viewer-backdrop.is-text .media-viewer-text h1 { font-size: var(--text-display-24); line-height: 1.35; }
 .media-viewer-backdrop.is-text .media-viewer-text h2 { font-size: var(--text-title-20); line-height: 1.4; }
@@ -332,7 +337,27 @@
   box-shadow: none;
 }
 .media-viewer-backdrop.is-text .media-viewer-stage.is-history-open .media-viewer-text { min-width: 0; }
-.text-agent-panel { display: grid; min-width: 0; height: 100%; overflow: hidden; }
+/* --agent-chat-z 是共享面板自带的层级钩子：默认 100 是给画布停靠用的，
+   在文本浮层里必须降回普通层级，否则它会盖住拖动条导致其点不到。 */
+.text-agent-panel { --agent-chat-z: 1; display: grid; min-width: 0; height: 100%; overflow: hidden; }
+/* 编辑器与助手列之间的拖动条：与画布侧的 .forge-workspace-divider 同一套交互契约
+   （9px 命中区、屏幕空间不随缩放、悬停/聚焦才显形、col-resize）。 */
+.text-agent-divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 2;
+  width: 9px;
+  transform: translateX(50%);
+  border: 0;
+  background: transparent;
+  cursor: col-resize;
+  touch-action: none;
+}
+.text-agent-divider::after { content: ""; position: absolute; top: 50%; left: 50%; width: 2px; height: 32px; border-radius: 999px; background: var(--grip-active); opacity: 0; transform: translate(-50%, -50%); transition: opacity var(--duration-fast) var(--ease-std); }
+.text-agent-divider:hover::after,
+.text-agent-divider:focus-visible::after { opacity: 1; }
+.text-agent-divider:focus-visible { outline: none; }
 .text-version-panel { display: flex; flex-direction: column; min-width: 0; height: 100%; overflow: hidden; border-left: 1px solid var(--line-solid); color: var(--type-primary); background: var(--surface); font-size: var(--text-body-12); line-height: var(--text-body-12--line-height); }
 .text-version-heading { display: flex; justify-content: space-between; align-items: baseline; padding: 17px 16px 12px; }
 .text-version-heading strong { font-size: var(--text-body-13); }
@@ -408,6 +433,8 @@
   }
   .media-viewer-backdrop.is-text .text-version-panel,
   .media-viewer-backdrop.is-text .text-agent-panel { border-left: 0; border-top: 1px solid var(--line-solid); }
+  /* 列已改为上下堆叠，横向拖动条没有对应的轨道。 */
+  .media-viewer-backdrop.is-text .text-agent-divider { display: none; }
   .text-editor-formatting button:nth-of-type(2),
   .text-editor-formatting button:nth-of-type(3),
   .text-editor-formatting button:last-of-type { display: none; }
@@ -416,8 +443,8 @@
 
 .media-viewer-fade-enter-active,
 .media-viewer-fade-leave-active { transition: opacity var(--duration-base) var(--ease-std); }
-.media-viewer-fade-enter-active .media-viewer-stage img,
-.media-viewer-fade-enter-active .media-viewer-stage video { animation: media-viewer-rise var(--duration-enter) var(--ease-sheet); }
+.media-viewer-fade-enter-active .media-viewer-stage > img,
+.media-viewer-fade-enter-active .media-viewer-stage > video { animation: media-viewer-rise var(--duration-enter) var(--ease-sheet); }
 .media-viewer-fade-enter-from,
 .media-viewer-fade-leave-to { opacity: 0; }
 

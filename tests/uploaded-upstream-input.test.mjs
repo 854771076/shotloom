@@ -27,7 +27,7 @@ function fixture(uploadedFile, inputRole = 'auto') {
     id: 'target',
     type: 'imageGeneration',
     title: '下游图片',
-    model: 'gpt-image-2',
+    model: 'gpt-image-2.5-sunburst',
     prompt: '测试',
     config: {},
   };
@@ -92,7 +92,7 @@ test('文本节点只把模型结果或手写内容作为上游，不泄漏自�
     id: 'target',
     type: 'imageGeneration',
     title: '下游图片',
-    model: 'gpt-image-2',
+    model: 'gpt-image-2.5-sunburst',
     prompt: '生成配图',
     config: {},
   };
@@ -122,7 +122,7 @@ test('只有提示词而没有正文的文本节点不能作为上游结果', ()
     id: 'target',
     type: 'imageGeneration',
     title: '下游图片',
-    model: 'gpt-image-2',
+    model: 'gpt-image-2.5-sunburst',
     prompt: '生成配图',
     config: {},
   };
