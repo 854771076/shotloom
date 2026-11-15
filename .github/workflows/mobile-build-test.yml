@@ -57,6 +57,8 @@ jobs:
           java-version: "17"
       - uses: android-actions/setup-android@v3
         if: matrix.mobile == 'android'
+        with:
+          packages: platform-tools
       - name: Install Android SDK and NDK
         if: matrix.mobile == 'android'
         run: >
