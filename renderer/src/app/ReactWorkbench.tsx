@@ -109,6 +109,7 @@ export function ReactWorkbench() {
     if (navigationStatus !== 'ready') return;
     const ready = () => {
       if (appRoute === 'creation' && !document.querySelector('.react-flow__viewport')) return;
+      performance.mark('shotloom-workspace-ready');
       window.ReactNativeWebView?.postMessage(JSON.stringify({ type: 'workspace-ready' }));
       observer.disconnect();
     };
@@ -179,13 +180,15 @@ export function ReactWorkbench() {
         return;
       }
       document.documentElement.lang = settingsStore.locale;
+      const embeddedProject = cloudEnabled && new URLSearchParams(location.search).get('native') === 'embedded' && new URLSearchParams(location.search).has('project');
       await Promise.all([
         loadGlobalSkills(),
         loadGlobalRecipes(),
         loadRecentProjects(),
-        initializeResourceLibraries(),
+        // Asset references must be ready before reconciling the requested project.
+        initializeResourceLibraries().then(() => embeddedProject ? loadBoundWindowProject() : undefined),
       ]);
-      await loadBoundWindowProject();
+      if (!embeddedProject) await loadBoundWindowProject();
       if (cancelled) return;
       if (requestedRoute) navigateToRoute(requestedRoute, { notify: false });
       setNavigationStatus('ready');

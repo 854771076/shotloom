@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { NativeApi } from '../src/api';
+import { NativeApi, createNativeApi } from '../src/api';
 import { nativeRequestAllowed, type NativeRequest } from '../../../shared/nativeBridge';
 
 test('native requests only expose the user-facing API, never admin, relay or arbitrary URLs', () => {
@@ -15,6 +15,33 @@ test('native requests only expose the user-facing API, never admin, relay or arb
   assert.equal(nativeRequestAllowed('PUT', '/settings'), false);
   for (const path of ['/catalog/recipes', '/catalog/assets', '/catalog/skills?userId=other', '/catalog/skills/../settings']) assert.equal(nativeRequestAllowed('PUT', path), false);
   for (const [method, path] of [['GET', '/admin/feedback'], ['POST', '/relay/chat/completions'], ['GET', 'https://attacker.example/feedback'], ['GET', '//attacker.example'], ['GET', '/feedback/../admin'], ['GET', '/feedback?redirect=evil'], ['DELETE', '/feedback'], ['GET', '/auth/account?redirect=evil'], ['GET', '/auth/usage?access_token=secret'], ['GET', '/library-folders?parentId=other'], ['DELETE', '/library-folders'], ['POST', '/auth/topup']]) assert.equal(nativeRequestAllowed(method!, path!), false);
+});
+
+test('HTTP transport sends native credentials directly, reports expiry, and ignores late replies after disconnect', async () => {
+  const original = globalThis.fetch;
+  let expired = 0, id = 0;
+  const api = createNativeApi('https://cloud.example', 'native-token', () => String(++id), () => expired++);
+  const replies: ((response: Response) => void)[] = [];
+  globalThis.fetch = async (input, init) => {
+    assert.match(String(input), /^https:\/\/cloud.example\/api\//);
+    assert.equal(init?.credentials, 'omit');
+    assert.equal((init?.headers as Record<string, string>).Authorization, 'Bearer native-token');
+    return new Promise(resolve => replies.push(resolve));
+  };
+  try {
+    const first = api.request('/projects');
+    replies.shift()!(Response.json({ success: true, data: [{ id: 'fixture' }] }));
+    assert.deepEqual(await first, [{ id: 'fixture' }]);
+    const failed = api.request('/auth/me');
+    replies.shift()!(Response.json({ success: false, message: 'Expired' }, { status: 401 }));
+    await assert.rejects(failed, /Expired/); assert.equal(expired, 1);
+    const late = api.request('/auth/me');
+    api.disconnect(); await assert.rejects(late, /interrupted/);
+    replies.shift()!(Response.json({ success: false, message: 'Expired' }, { status: 401 }));
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(expired, 1, 'an old session cannot expire a new one');
+    await assert.rejects(api.request('/relay/chat/completions', 'POST'), /unavailable/);
+  } finally { api.disconnect(); globalThis.fetch = original; }
 });
 test('native request replies correlate by ID, propagate errors and reject on disconnect', async () => {
   const sent: NativeRequest[] = [];

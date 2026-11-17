@@ -1,12 +1,12 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, BackHandler, FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, RefreshControl, ScrollView, StatusBar, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, AppState, BackHandler, FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable, RefreshControl, ScrollView, StatusBar, Text, TextInput, View } from 'react-native';
 import { NavigationContainer, useFocusEffect } from '@react-navigation/native';
 import { createNativeStackNavigator, type NativeStackScreenProps } from '@react-navigation/native-stack';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { randomUUID } from 'expo-crypto';
-import { NativeApi } from './api';
-import { isSessionSource } from './sessionSource';
+import { NativeApi, createNativeApi } from './api';
+import { restoreSession, clearSession, login, workspaceSource, type NativeSession } from './session';
 import { SvgXml } from 'react-native-svg';
 import { colors, styles, Icon, IconButton, Button as Action } from './ui';
 import { noProjectIllustration } from './illustration';
@@ -23,6 +23,7 @@ const Stack = createNativeStackNavigator<Routes>();
 const SettingsChanged = createContext({ revision: 0, changed: () => {} });
 const PageActive = createContext(true);
 const ApiContext = createContext<NativeApi | null>(null);
+const SessionContext = createContext<(NativeSession & { expire: () => void }) | null>(null);
 function useApi() { const value = useContext(ApiContext); if (!value) throw new Error('Session unavailable'); return value; }
 const errorText = (value: unknown) => value instanceof Error ? value.message : String(value);
 const date = (value: string) => new Date(value).toLocaleString(language);
@@ -242,6 +243,7 @@ function Notifications({ navigation }: NativeStackScreenProps<Routes, 'Notificat
 }
 function WebContent({ params }: { params: Routes['Workspace'] }) {
   const api = useApi();
+  const session = useContext(SessionContext)!;
   const webview = useRef<WebView>(null);
   const { revision } = useContext(SettingsChanged);
   const [ready, setReady] = useState(false);
@@ -254,12 +256,32 @@ function WebContent({ params }: { params: Routes['Workspace'] }) {
   if (params.panel) query.set('panel', params.panel);
   if (params.folder) query.set('folder', params.folder);
   query.set('native', 'embedded');
+  const target = `${origin}/?${query}`;
+  const [source, setSource] = useState<Awaited<ReturnType<typeof workspaceSource>>>();
+  const document = useRef({ target: '', retry: -1 });
+  useEffect(() => {
+    let active = true;
+    const recovering = Boolean(webview.current && document.current.target === target && document.current.retry === retry);
+    if (!recovering) { setSource(undefined); setReady(false); }
+    setError('');
+    void workspaceSource(origin, session.token, target).then(value => {
+      if (!active) return;
+      if (recovering) {
+        // Refresh HttpOnly cookies in place so reauthentication preserves unsaved canvas state.
+        webview.current?.injectJavaScript(`(async()=>{if(location.origin!==${JSON.stringify(origin)})return;try{const r=await fetch(${JSON.stringify(value.uri)},{method:'POST',credentials:'include',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:${JSON.stringify(value.body)}});if(!r.ok)throw new Error('HTTP '+r.status);window.dispatchEvent(new Event('focus'));}catch(e){window.ReactNativeWebView?.postMessage(JSON.stringify({type:'workspace-session-error',error:String(e.message||e)}));}})();true;`);
+      } else {
+        document.current = { target, retry }; setSource(value);
+      }
+    })
+      .catch(cause => { if (active) { setError(errorText(cause)); if (cause.status === 401 || cause.code === 'ACCOUNT_CHANGED') session.expire(); } });
+    return () => { active = false; };
+  }, [session.token, target, retry]);
   // The workspace can report display readiness, but has no API/tool request bridge.
   const injected = `window.__SHOTLOOM_MOBILE__ = true; try { localStorage.setItem('shotloom:locale', ${JSON.stringify(language)}); } catch {} document.documentElement.dataset.nativeEmbedded='true'; true;`;
   return <View style={styles.screen}>{error && <ErrorNotice text={error} retry={() => { setError(''); setReady(false); setRetry(value => value + 1); }} />}
-    <WebView ref={webview} key={retry} source={{ uri: `${origin}/?${query}` }} style={[styles.screen, !ready && !error && { opacity: 0 }]} sharedCookiesEnabled thirdPartyCookiesEnabled={false} contentInsetAdjustmentBehavior="never"
-      onMessage={event => { try { if (new URL(event.nativeEvent.url).origin !== origin) return; const value = JSON.parse(event.nativeEvent.data); if (value.type === 'workspace-ready' || value.type === 'workspace-blocked') setReady(true); else if (value.type === 'workspace-mutated') api.invalidate(); } catch {} }}
-      mixedContentMode="never" setSupportMultipleWindows={false} injectedJavaScriptBeforeContentLoaded={injected} onLoadStart={event => { try { const url = new URL(event.nativeEvent.url); setReady(url.origin !== origin || url.searchParams.get('native') !== 'embedded'); } catch { setReady(true); } }} onError={event => setError(event.nativeEvent.description)} onHttpError={event => setError(`HTTP ${event.nativeEvent.statusCode}`)} />
+    {source && <WebView ref={webview} key={retry} source={source} style={[styles.screen, !ready && !error && { opacity: 0 }]} sharedCookiesEnabled thirdPartyCookiesEnabled={false} contentInsetAdjustmentBehavior="never" automaticallyAdjustContentInsets={false} contentInset={{ top: 0, bottom: 0, left: 0, right: 0 }}
+      onMessage={event => { try { if (new URL(event.nativeEvent.url).origin !== origin) return; const value = JSON.parse(event.nativeEvent.data); if (value.type === 'workspace-ready' || value.type === 'workspace-blocked') { setReady(true); if (value.status === 'login' || value.status === 'account') session.expire(); } else if (value.type === 'workspace-session-error') setError(String(value.error)); else if (value.type === 'workspace-mutated') api.invalidate(); } catch {} }}
+      mixedContentMode="never" setSupportMultipleWindows={false} injectedJavaScriptBeforeContentLoaded={injected} onError={event => setError(event.nativeEvent.description)} onHttpError={event => setError(`HTTP ${event.nativeEvent.statusCode}`)} />}
     {!ready && !error && <View style={[styles.empty, { position: 'absolute', inset: 0, backgroundColor: colors.background }]}><ActivityIndicator color={colors.accent} /><Text style={styles.secondary}>{params.id ? local('正在打开画布…', 'Opening canvas…') : local('正在打开页面…', 'Opening page…')}</Text></View>}
   </View>;
 }
@@ -272,34 +294,64 @@ function Workspace({ route }: NativeStackScreenProps<Routes, 'Workspace'>) {
   return <SafeAreaView edges={route.params.id ? ['top', 'bottom'] : ['bottom']} style={styles.screen}><WebContent params={route.params} /></SafeAreaView>;
 }
 export default function App() {
-  const webview = useRef<WebView>(null);
-  const sessionDocument = useRef(`${origin}/native`);
-  const user = useRef<string | null>(null);
+  const [session, setSession] = useState<NativeSession | null>(null);
   const loggingOut = useRef(false);
+  const signingIn = useRef(false);
+  const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [settingsRevision, setSettingsRevision] = useState(0);
   const changed = useCallback(() => setSettingsRevision(value => value + 1), []);
   const [opened, setOpened] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
   const [failure, setFailure] = useState('');
-  const api = useMemo(() => new NativeApi(request => {
-    if (!webview.current) throw new Error('Session unavailable');
-    webview.current.injectJavaScript(`window.__shotloomNativeRequest?.(${JSON.stringify(request)}); true;`);
-  }, randomUUID), []);
-  useEffect(() => () => api.disconnect(), [api]);
-  const finishLogout = () => {
-    api.invalidate(); loggingOut.current = false; user.current = null; setOpened(false); setAuthenticated(false); setFailure('');
-    webview.current?.reload();
+  const api = useMemo(() => {
+    if (!session) return null;
+    const value = createNativeApi(origin, session.token, randomUUID, () => { value.pause(); setAuthenticated(false); });
+    return value;
+  }, [session]);
+  useEffect(() => {
+    let active = true;
+    void restoreSession(origin).then(value => { if (active) setSession(value); })
+      .catch(cause => { if (active) setFailure(errorText(cause)); }).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
+  useEffect(() => {
+    if (!api || !session) return;
+    let active = true;
+    setLoading(true);
+    void Promise.all([api.request<{ id: string }>('/auth/me'), api.read<{ locale?: string }>('/settings/mobile').catch(() => null)]).then(([user, preferences]) => {
+      if (!active) return;
+      if (user.id !== session.userId) throw new Error(t('cloud.login.accountChanged'));
+      if (preferences?.locale) setLanguage(preferences.locale);
+      setAuthenticated(true); setOpened(true); setFailure('');
+    }).catch(cause => { if (active) { setAuthenticated(false); setFailure(errorText(cause)); } })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; api.invalidate(); api.disconnect(); };
+  }, [api, session]);
+  const signIn = async () => {
+    if (signingIn.current) return;
+    signingIn.current = true; setBusy(true); setFailure('');
+    try {
+      const value = await login(origin, opened ? session?.userId : undefined);
+      if (value) setSession(value);
+    } catch (cause) { setFailure(errorText(cause)); }
+    finally { signingIn.current = false; setBusy(false); }
   };
   const logout = async () => {
-    if (loggingOut.current) return;
-    loggingOut.current = true; setFailure('');
-    try { await api.request('/auth/logout', 'POST'); if (loggingOut.current) finishLogout(); }
-    catch (cause) { if (loggingOut.current) setFailure(errorText(cause)); }
-    finally { loggingOut.current = false; }
+    if (loggingOut.current || !api) return;
+    loggingOut.current = true; setBusy(true); setFailure('');
+    try {
+      api.disconnect(); api.resume();
+      try { await api.request('/auth/logout', 'POST'); }
+      catch (cause) { if (![401, 403].includes((cause as { status?: number }).status || 0)) throw cause; }
+      await clearSession(origin);
+      api.invalidate(); api.disconnect(); setSession(null); setOpened(false); setAuthenticated(false);
+    } catch (cause) { setFailure(errorText(cause)); }
+    finally { loggingOut.current = false; setBusy(false); }
   };
-  return <SafeAreaProvider><View style={styles.screen}><ApiContext.Provider value={api}><SettingsChanged.Provider value={{ revision: settingsRevision, changed }}><LogoutContext.Provider value={() => void logout()}>
-    {authenticated && failure ? <ErrorNotice text={failure} retry={() => { setFailure(''); webview.current?.reload(); }} /> : null}
-    {opened && <NavigationContainer linking={{ prefixes: ['shotloom-preview://'], config: { screens: { Feedback: 'feedback/:id', Notifications: 'notifications' } } }}>
+  return <SafeAreaProvider><View style={styles.screen}><ApiContext.Provider value={api}><SessionContext.Provider value={session ? { ...session, expire: () => { api?.pause(); setAuthenticated(false); } } : null}><SettingsChanged.Provider value={{ revision: settingsRevision, changed }}><LogoutContext.Provider value={() => void logout()}>
+    {authenticated && failure ? <ErrorNotice text={failure} /> : null}
+    {opened && <View style={styles.screen} pointerEvents={authenticated ? 'auto' : 'none'} accessibilityElementsHidden={!authenticated} importantForAccessibility={authenticated ? 'auto' : 'no-hide-descendants'}><NavigationContainer linking={{ prefixes: ['shotloom-preview://'], config: { screens: { Feedback: 'feedback/:id', Notifications: 'notifications' } } }}>
       <Stack.Navigator screenOptions={{ headerBackButtonDisplayMode: 'minimal', contentStyle: styles.screen, headerShadowVisible: false, headerStyle: { backgroundColor: colors.background }, headerTintColor: colors.text, headerTitleStyle: { fontSize: 16, fontWeight: '500' } }}>
         <Stack.Screen name="Home" component={Home} options={{ headerShown: false }} />
         <Stack.Screen name="Settings" component={Settings} options={{ title: t('account.settings') }} />
@@ -309,32 +361,17 @@ export default function App() {
         <Stack.Screen name="Notifications" component={Notifications} options={{ title: t('support.notifications') }} />
         <Stack.Screen name="Workspace" component={Workspace} options={({ route }) => ({ title: route.params.name, headerShown: !route.params.id })} />
       </Stack.Navigator>
-    </NavigationContainer>}
-    <View style={authenticated ? styles.hiddenBridge : styles.loginBridge} pointerEvents={authenticated ? 'none' : 'auto'} accessibilityElementsHidden={authenticated} importantForAccessibility={authenticated ? 'no-hide-descendants' : 'auto'}>
-      <SafeAreaView style={styles.screen}>
-        {failure && <ErrorNotice text={failure} retry={() => { setFailure(''); webview.current?.reload(); }} />}
-        <WebView ref={webview} source={{ uri: `${origin}/native` }} sharedCookiesEnabled thirdPartyCookiesEnabled={false} mixedContentMode="never" setSupportMultipleWindows={false}
-          onLoadStart={event => { sessionDocument.current = event.nativeEvent.url; api.pause(); }} onError={event => { api.pause(); setFailure(event.nativeEvent.description); }}
-          onHttpError={event => { api.pause(); setFailure(`HTTP ${event.nativeEvent.statusCode}`); if (event.nativeEvent.statusCode === 401) setAuthenticated(false); }}
-          onMessage={event => {
-            // OAuth provider pages and workspace content never get native bridge privileges.
-            if (!isSessionSource(event.nativeEvent.url, sessionDocument.current, origin)) return;
-            try {
-              const value = JSON.parse(event.nativeEvent.data);
-              if (value.type === 'ready' && typeof value.userId === 'string') {
-                if (user.current && user.current !== value.userId) { setFailure(t('cloud.login.accountChanged')); api.pause(); setAuthenticated(false); return; }
-                setLanguage(value.locale);
-                user.current = value.userId; api.resume(); setOpened(true); setAuthenticated(true); setFailure('');
-              } else if (value.type === 'login') {
-                // Session expiry may reach native before the logout request's reply.
-                if (loggingOut.current) finishLogout();
-                setAuthenticated(false); api.pause();
-              }
-              else if (value.type === 'error') { api.pause(); setFailure(typeof value.error === 'string' ? value.error : local('连接失败，请重试。', 'Connection failed. Please retry.')); }
-              else if (value.type === 'response' && typeof value.id === 'string') api.receive(value);
-            } catch { setFailure(local('会话响应无效，请重试。', 'Invalid session response. Please retry.')); }
-          }} />
-      </SafeAreaView>
-    </View>
-  </LogoutContext.Provider></SettingsChanged.Provider></ApiContext.Provider></View></SafeAreaProvider>;
+    </NavigationContainer></View>}
+    {!authenticated && <SafeAreaView style={styles.loginBridge}><ScrollView contentContainerStyle={[styles.list, { justifyContent: 'center' }]}>
+      <View style={[styles.row, { padding: 28, gap: 24 }]}>
+        <View style={styles.inline}><Image source={require('../assets/shotloom-logo.png')} style={{ width: 44, height: 44, borderRadius: 12 }} /><Text style={styles.heading}>Shotloom</Text></View>
+        <Text style={styles.heading}>{t('cloud.login.title')}</Text>
+        <Text style={styles.secondary}>{opened ? local('登录已过期，请使用原账号继续。', 'Your session expired. Sign in with the same account to continue.') : t('cloud.login.description')}</Text>
+        {failure ? <Text accessibilityRole="alert" style={styles.error}>{failure}</Text> : null}
+        {(loading || busy) && <ActivityIndicator color={colors.accent} />}
+        <Action title={busy ? t('cloud.login.loading') : t('cloud.login.action')} disabled={loading || busy} onPress={() => void signIn()} />
+        {opened && <Action title={t('cloud.logout')} ghost disabled={loading || busy} onPress={() => void logout()} />}
+      </View>
+    </ScrollView></SafeAreaView>}
+  </LogoutContext.Provider></SettingsChanged.Provider></SessionContext.Provider></ApiContext.Provider></View></SafeAreaProvider>;
 }

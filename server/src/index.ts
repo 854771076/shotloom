@@ -15,6 +15,7 @@ import { env } from "./env";
 import { HttpError } from "./lib/errors";
 import { envelope } from "./lib/respond";
 import type { AppEnv } from "./lib/types";
+import { nativeSession } from './lib/nativeAuth';
 
 export const app = new Hono<AppEnv>();
 
@@ -25,7 +26,8 @@ app.use("/api/*", async (c, next) => {
   c.header("X-Content-Type-Options", "nosniff");
   if (!["GET", "HEAD", "OPTIONS"].includes(c.req.method)) {
     const origin = c.req.header("origin");
-    if ((!origin || origin !== new URL(env.FRONTEND_URL).origin) && !nativeRelaySession(c)) {
+    const handoff = !origin && ['/api/auth/native/exchange', '/api/auth/native/workspace'].includes(c.req.path) && c.req.method === 'POST';
+    if ((!origin || origin !== new URL(env.FRONTEND_URL).origin) && !nativeRelaySession(c) && !nativeSession(c) && !handoff) {
       return c.json({ success: false, message: "请求来源无效", data: null }, 403);
     }
   }

@@ -42,10 +42,11 @@ export class NativeApi {
   receive(reply: NativeReply) {
     this.queued.delete(reply.id);
     const pending = this.pending.get(reply.id);
-    if (!pending) return;
+    if (!pending) return false;
     clearTimeout(pending.timer); this.pending.delete(reply.id);
     if (reply.error) pending.reject(Object.assign(new Error(reply.error), { status: reply.status }));
     else pending.resolve(reply.data);
+    return true;
   }
   private dispatch(request: NativeRequest) {
     try { this.send(request); }
@@ -60,4 +61,31 @@ export class NativeApi {
   disconnect() {
     for (const [id] of this.pending) this.receive({ type: 'response', id, error: 'Connection interrupted. Please retry.' });
   }
+}
+
+export async function nativeFetch<T>(origin: string, path: string, method = 'GET', value?: unknown, token?: string): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 30000);
+  try {
+    const response = await fetch(`${origin}/api${path}`, {
+      method, credentials: 'omit', signal: controller.signal,
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(value === undefined ? {} : { 'Content-Type': 'application/json' }) },
+      ...(value === undefined ? {} : { body: JSON.stringify(value) }),
+    });
+    const result = await response.json();
+    if (!response.ok || result.success !== true) throw Object.assign(new Error(result.message || `HTTP ${response.status}`), { status: response.status, code: result.code });
+    return result.data as T;
+  } finally { clearTimeout(timer); }
+}
+
+export function createNativeApi(origin: string, token: string, uuid: () => string, expired: () => void): NativeApi {
+  const api = new NativeApi(request => {
+    void nativeFetch(origin, request.path, request.method, request.value, token)
+      .then(data => api.receive({ type: 'response', id: request.id, data }))
+      .catch(error => {
+        if (api.receive({ type: 'response', id: request.id, error: error.message, status: error.status })
+          && (error.status === 401 || error.code === 'ACCOUNT_CHANGED')) expired();
+      });
+  }, uuid);
+  return api;
 }

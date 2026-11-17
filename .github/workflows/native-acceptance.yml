@@ -65,6 +65,7 @@ jobs:
       - uses: reactivecircus/android-emulator-runner@v2
         env:
           TEST_SESSION_COOKIE: ${{ secrets.SHOTLOOM_ACCEPTANCE_SESSION }}
+          TEST_NATIVE_SESSION: ${{ secrets.SHOTLOOM_ACCEPTANCE_NATIVE_SESSION }}
           BASELINE_RUN: ${{ inputs.baseline_run }}
         with:
           api-level: 35

@@ -16,13 +16,15 @@ npm --prefix mobile/native run android
 
 `EXPO_PUBLIC_CLOUD_URL` 必须是完整 HTTPS origin，不能包含路径。开发构建也允许 HTTP；真机访问开发服务时使用设备可访问的局域网地址。iOS 构建在安装 Xcode 的 macOS 上运行 `npm --prefix mobile/native run ios`。首次生成原生工程后，日常调试可执行 `npm --prefix mobile/native start`。
 
-使用前先部署带 `/native` 会话页面及反馈／通知接口的前端、服务端，并应用支持反馈／通知的数据库迁移。仅安装客户端不会自动部署这些服务。
+使用前先部署带原生会话接口及反馈／通知接口的前端、服务端，并应用支持反馈／通知的数据库迁移。原生会话改造不需要新增数据库迁移；仅安装客户端不会自动部署这些服务。新增 WebBrowser / SecureStore 原生模块后需要重新生成并编译安装包，旧 APK 无法仅靠网页更新获得这些能力。
 
 ## 会话与边界
 
-登录在同一云端 origin 的 WebView 内完成，持久 HttpOnly 会话 Cookie 由 WebView 管理。隐藏的会话页面仅代理明确允许的用户侧接口，原生界面通过请求 ID 接收结果；不会把服务端密钥或 OAuth token 交给客户端。
+登录首页使用原生组件，点击登录打开系统浏览器完成 Supabase / new-api 授权，通过固定的 `shotloom-preview://auth/callback` 返回。App 校验 state，并用本机持有的随机 verifier 换取 Shotloom 会话凭据，保存到 Expo SecureStore。后续原生页面直接请求 API，不挂载隐藏的会话 WebView，不接收服务端密钥或 OAuth token。现有 Supabase OAuth 回调地址保持 `/api/auth/callback`。
 
-原生端只接受来自配置 origin 的 `/native` 页面消息。管理接口、模型调用和任意外部 URL 均不在桥接允许列表中。切换账号会被拒绝，需先明确退出；登录过期时覆盖登录页，保留已挂载页面与表单输入。同一提交重试复用请求 ID。
+原生凭据的服务端权限沿用 `shared/nativeBridge.ts` 的用户接口允许列表。管理接口、模型调用和任意外部 URL 均不开放。画布首次打开时，通过短时一次性 POST 交接码建立 HttpOnly Cookie；长期原生凭据不进入 WebView URL、页面脚本或消息。恢复登录会在原画布文档中更新 Cookie，保留页面状态。切换账号需先明确退出；过期时原生登录层覆盖已挂载页面和表单，重新授权必须匹配原账号。退出撤销服务端会话并清除安全存储和缓存。
+
+交接码有效期为 60 秒，一次消费后失效。当前交接码存放在单个 API 进程内，重启后需要重试登录；部署多个 API worker 前须迁移到共享原子存储。普通会话仍沿用现有数据库会话、30 天期限及服务端 token 刷新机制。
 
 原生业务数据仍由服务端持久化，React 状态只保存页面投影和未提交输入。列表使用 FlatList 和服务端分页；已访问的标签保留页面和输入状态；用户数据使用当前登录会话内的 60 秒内存缓存，并合并同时读取。过期后返回页面会更新，手动下拉刷新和恢复前台会强制更新，原生写入及画布成功写入会清理缓存；退出登录清空缓存。鉴权检查不使用页面缓存。
 
@@ -36,7 +38,9 @@ npm --prefix mobile/native test
 npm --prefix mobile/native run bundle:check
 ```
 
-协议测试覆盖请求允许列表、响应关联、错误传播和断线清理；服务端测试使用 PGlite 的真实 Postgres 引擎验证反馈、后台回复、站内通知、权限隔离与事务回滚。Hermes bundle 成功不能替代原生编译或真机验收。
+协议测试覆盖请求允许列表、原生 HTTP 认证、OAuth state / PKCE、安全存储、授权取消、账号隔离、退出和画布会话恢复；服务端测试覆盖真实路由的授权回调、交接码消费、防重放、权限与会话撤销，并使用 PGlite 的真实 Postgres 引擎验证反馈、后台回复、站内通知、权限隔离与事务回滚。Hermes bundle 成功不能替代原生编译或真机验收。
+
+新客户端的 Android 自动验收还需 `SHOTLOOM_ACCEPTANCE_NATIVE_SESSION` secret，内容为同一隔离测试会话的 `{ "token": "<Shotloom 原生凭据>", "userId": "<测试用户 UUID>" }`；与已有 `SHOTLOOM_ACCEPTANCE_SESSION` Cookie 对应同一服务端会话。凭据须由服务端创建，不能使用 new-api OAuth token。仅测试 APK 将它写入目标系统安全存储，正式 App 不提供测试登录入口。原生会话不再运行旧隐藏 WebView 的 CDP 重载和网络计数测试，相应行为由组件及 HTTP 回归测试覆盖；模拟器流程仍检查原生页面和实际画布。真实系统浏览器 OAuth 仍需单独真机验收。
 
 发布前须在 Android/iOS 真机验证登录与会话恢复、账号切换、退出、通知链接、返回手势、键盘安全区域、前后台切换、弱网重试，以及工程在 WebView 中的保存与恢复。当前环境未进行真机验收，也未测得启动、滚动和内存性能基线。
 
