@@ -107,6 +107,8 @@ jobs:
             acceptance/session-*.xml
             acceptance/session-reload-cdp.txt
             acceptance/android-settings*.png
+            acceptance/android-home*.png
+            acceptance/home-large.xml
             acceptance/settings*.xml
             acceptance/pages-*.json
             acceptance/pages-cdp.txt

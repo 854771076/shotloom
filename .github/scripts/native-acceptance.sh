@@ -327,4 +327,20 @@ adb shell input swipe 380 1250 380 550 500
 wait_for_ui settings-large-models 'Default models'
 adb exec-out screencap -p > acceptance/android-settings-english-large-models.png
 ! grep 'android.webkit.WebView' acceptance/settings-large-models.xml
+adb shell input keyevent 4
+wait_for_ui home-large 'My account'
+adb exec-out screencap -p > acceptance/android-home-english-large.png
+python3 - <<'PY_TABS'
+import re, xml.etree.ElementTree as ET
+labels = {'Project library', 'Project canvas', 'Skills', 'My account'}
+tops = {}
+for node in ET.parse('acceptance/home-large.xml').iter('node'):
+    label = node.get('content-desc', '')
+    if label not in labels: continue
+    icon = next((child for child in node.iter('node') if child.get('class') == 'com.horcrux.svg.SvgView'), None)
+    if icon is not None: tops[label] = list(map(int, re.findall(r'\d+', icon.get('bounds', ''))))[1]
+assert set(tops) == labels, tops
+assert max(tops.values()) - min(tops.values()) <= 1, tops
+print('English large-font tab icons aligned:', tops)
+PY_TABS
 adb shell settings put system font_scale 1.0
