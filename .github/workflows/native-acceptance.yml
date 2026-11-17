@@ -51,7 +51,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           BASELINE_RUN: ${{ inputs.baseline_run }}
-          LAYOUT_ONLY: ${{ inputs.layout_only }}
         run: gh run download "$BASELINE_RUN" --repo "$GITHUB_REPOSITORY" --name Shotloom-Android-Preview --dir baseline
       - name: Enable KVM
         run: sudo chmod 666 /dev/kvm
@@ -71,6 +70,7 @@ jobs:
         env:
           TEST_SESSION_COOKIE: ${{ secrets.SHOTLOOM_ACCEPTANCE_SESSION }}
           TEST_NATIVE_SESSION: ${{ secrets.SHOTLOOM_ACCEPTANCE_NATIVE_SESSION }}
+          LAYOUT_ONLY: ${{ inputs.layout_only }}
           BASELINE_RUN: ${{ inputs.baseline_run }}
         with:
           api-level: 35
