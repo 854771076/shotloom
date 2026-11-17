@@ -77,7 +77,7 @@ export const styles = StyleSheet.create({
   description: { minHeight: 120 }, notice: { padding: 16, gap: 8 }, error: { color: '#c8443c', fontSize: 14, lineHeight: 21 },
   empty: { flexGrow: 1, paddingVertical: 32, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center', gap: 12 },
   tabs: { flexDirection: 'row', gap: 8, paddingHorizontal: 12, paddingVertical: 4, borderTopWidth: 1, borderColor: colors.line, backgroundColor: colors.surface },
-  tab: { flex: 1, minWidth: 0, minHeight: 56, paddingVertical: 6, paddingHorizontal: 4, gap: 4, alignItems: 'center', justifyContent: 'center', borderRadius: 10.2 },
+  tab: { flex: 1, minWidth: 0, minHeight: 56, paddingVertical: 6, paddingHorizontal: 4, gap: 4, alignItems: 'center', justifyContent: 'flex-start', borderRadius: 10.2 },
   tabActive: { backgroundColor: colors.wash },
   tabText: { fontSize: 12, lineHeight: 18, color: colors.muted, textAlign: 'center', flexShrink: 1 },
   tabTextActive: { color: colors.accent, fontWeight: '600' },
