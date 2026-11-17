@@ -1,21 +1,74 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readSource } from './helpers/sourceContract.mjs';
+import { createRendererEnv } from './helpers/rendererSsr.mjs';
 
-test('embedded project starts reading while unrelated libraries are still loading', async () => {
+function startup(dependencies, search = '?native=embedded&project=fixture', cloudEnabled = true) {
   const source = readSource('renderer/src/app/ReactWorkbench.tsx');
-  const start = source.indexOf('\n', source.indexOf('document.documentElement.lang = settingsStore.locale;'));
-  const end = source.indexOf('if (cancelled) return;', start);
+  const start = source.indexOf('      const embeddedProject =');
+  const end = source.indexOf('      if (cancelled) return;', start);
+  const context = { ...dependencies, cloudEnabled, location: { search }, settingsStore: { locale: 'en-US' }, getLocale: () => 'en-US', document: { documentElement: {} } };
+  const run = new (Object.getPrototypeOf(async function () {}).constructor)(...Object.keys(context), source.slice(start, end));
+  return run(...Object.values(context));
+}
+
+test('embedded canvas loads preferences and catalogs concurrently without duplicate library reads', async () => {
   const calls = [];
   let release;
-  const library = new Promise(resolve => { release = resolve; });
-  const names = ['loadGlobalSkills', 'loadGlobalRecipes', 'loadRecentProjects', 'initializeResourceLibraries', 'loadBoundWindowProject', 'location', 'cloudEnabled'];
-  const run = new (Object.getPrototypeOf(async function () {}).constructor)(...names, source.slice(start, end));
-  const pending = run(...names.slice(0, 5).map(name => async () => { calls.push(name); if (name === 'loadBoundWindowProject' || name === 'initializeResourceLibraries') return; await library; }), { search: '?native=embedded&project=fixture' }, true);
+  const gate = new Promise(resolve => { release = resolve; });
+  const names = ['loadAppSettings', 'loadGlobalSkills', 'loadGlobalRecipes', 'loadRecentProjects', 'initializeResourceLibraries', 'loadBoundWindowProject'];
+  const pending = startup(Object.fromEntries(names.map(name => [name, async () => { calls.push(name); await gate; return true; }])));
   await new Promise(resolve => setImmediate(resolve));
-  const projectStarted = calls.includes('loadBoundWindowProject');
+  const parallel = [...calls];
   release();
   await pending;
-  assert.ok(projectStarted, 'project read was blocked on skills, recipes and library reads');
+  assert.deepEqual(parallel.sort(), ['loadAppSettings', 'loadGlobalRecipes', 'loadGlobalSkills']);
   assert.equal(calls.filter(name => name === 'loadBoundWindowProject').length, 1);
+  assert.ok(!calls.includes('loadRecentProjects'), 'opening the project already refreshes the project library');
+  assert.ok(!calls.includes('initializeResourceLibraries'), 'project reconciliation already awaits a fresh asset catalog');
+});
+
+test('missing embedded project still refreshes the library', async () => {
+  const calls = [];
+  const names = ['loadAppSettings', 'loadGlobalSkills', 'loadGlobalRecipes', 'loadRecentProjects', 'initializeResourceLibraries', 'loadBoundWindowProject'];
+  await startup(Object.fromEntries(names.map(name => [name, async () => { calls.push(name); return false; }])));
+  assert.ok(calls.indexOf('loadRecentProjects') > calls.indexOf('loadBoundWindowProject'));
+});
+
+test('ordinary web and desktop startup retain library initialization before opening a project', async () => {
+  for (const cloud of [true, false]) {
+    const calls = [];
+    const names = ['loadAppSettings', 'loadGlobalSkills', 'loadGlobalRecipes', 'loadRecentProjects', 'initializeResourceLibraries', 'loadBoundWindowProject'];
+    await startup(Object.fromEntries(names.map(name => [name, async () => { calls.push(name); }])), '?route=projects', cloud);
+    assert.equal(calls[0], 'loadAppSettings');
+    assert.equal(calls.at(-1), 'loadBoundWindowProject');
+    assert.equal(calls.length, names.length);
+  }
+});
+
+test('bound project opening waits for the asset catalog before reconciling references', async () => {
+  const env = await createRendererEnv({ storage: new Map(), withWindow: true });
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  let opening;
+  try {
+    const { desktopApi } = await env.load('services/desktopApi');
+    const { loadBoundWindowProject, store } = await env.load('store/projectStore');
+    const { localAssetLibrary } = await env.load('store/localAssetLibraryStore');
+    const project = { id: 'project', schema: 'shotloom-project', schemaVersion: 2, name: 'Project', nodes: [], edges: [], materials: [{ id: 'material', storageScope: 'library', localLibraryMaterialId: 'library-material' }], assets: [], tasks: [] };
+    const catalog = { assets: [{ id: 'asset', materialId: 'library-material' }], materials: [], references: [{ id: 'reference', projectKey: 'project', projectName: 'Project', materialId: 'material', libraryMaterialId: 'library-material', assetId: 'asset' }] };
+    let catalogReads = 0, finished = false;
+    desktopApi.project.getWindowProjectDir = async () => 'browser/projects/project';
+    desktopApi.project.readFile = async () => structuredClone(project);
+    desktopApi.localAssets.getCatalog = async () => { catalogReads++; await gate; return structuredClone(catalog); };
+    desktopApi.localAssets.setCatalog = async value => value;
+    opening = loadBoundWindowProject().then(value => { finished = true; return value; });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(finished, false, 'canvas must not become ready with an unloaded catalog');
+    release();
+    assert.equal(await opening, true);
+    assert.equal(catalogReads, 1);
+    assert.equal(store.project.id, project.id);
+    assert.equal(localAssetLibrary.catalog.references[0].id, 'reference');
+  } finally { release(); await opening; await env.dispose(); }
 });

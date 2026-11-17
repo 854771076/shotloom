@@ -174,7 +174,12 @@ export function ReactWorkbench() {
       if (desktopApi.platform !== "browser") {
         void startHarnessIntegration().catch(error => showToast(String(error)));
       }
-      await loadAppSettings();
+      const embeddedProject = cloudEnabled && new URLSearchParams(location.search).get('native') === 'embedded' && new URLSearchParams(location.search).has('project');
+      if (embeddedProject) {
+        await Promise.all([loadAppSettings(), loadGlobalSkills(), loadGlobalRecipes()]);
+      } else {
+        await loadAppSettings();
+      }
       if (settingsStore.accountSyncError) showToast(settingsStore.accountSyncError);
       if (settingsStore.locale !== getLocale()) {
         window.localStorage.setItem(LOCALE_STORAGE_KEY, settingsStore.locale);
@@ -182,15 +187,13 @@ export function ReactWorkbench() {
         return;
       }
       document.documentElement.lang = settingsStore.locale;
-      const embeddedProject = cloudEnabled && new URLSearchParams(location.search).get('native') === 'embedded' && new URLSearchParams(location.search).has('project');
-      await Promise.all([
-        loadGlobalSkills(),
-        loadGlobalRecipes(),
-        loadRecentProjects(),
-        // Asset references must be ready before reconciling the requested project.
-        initializeResourceLibraries().then(() => embeddedProject ? loadBoundWindowProject() : undefined),
-      ]);
-      if (!embeddedProject) await loadBoundWindowProject();
+      if (embeddedProject) {
+        // Opening already awaits a fresh asset catalog and refreshes the project library.
+        if (!await loadBoundWindowProject()) await loadRecentProjects();
+      } else {
+        await Promise.all([loadGlobalSkills(), loadGlobalRecipes(), loadRecentProjects(), initializeResourceLibraries()]);
+        await loadBoundWindowProject();
+      }
       if (cancelled) return;
       if (requestedRoute) navigateToRoute(requestedRoute, { notify: false });
       setNavigationStatus('ready');
