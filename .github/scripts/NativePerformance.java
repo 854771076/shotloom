@@ -102,7 +102,7 @@ public final class NativePerformance extends Instrumentation {
                     long started=SystemClock.elapsedRealtime();
                     Intent login=getContext().getPackageManager().getLaunchIntentForPackage("com.shotloom.app.preview");
                     login.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);getContext().startActivity(login);
-                    waitReady("使用 new-api 登录");
+                    waitReady("Sign in with new-api");
                     pages.put(new JSONObject().put("page","login_native").put("round",round).put("ms",SystemClock.elapsedRealtime()-started));
                 }
                 report.put("pages",pages).put("apis",apis).put("failure",JSONObject.NULL);
