@@ -64,6 +64,15 @@ test('returning to the same canvas preserves the WebView instead of rechecking l
   const search=tree.root.findAllByType('TextInput' as any)[0]!;
   await act(async()=>search.props.onChangeText('Fixture'));
   await open();assert.equal(state.mounts,1);
+  const workspace=()=>tree.root.findAllByType('WebView' as any).find(x=>x.props.source.uri.includes('project='))!;
+  const hidden=()=>workspace().props.style.some((value: {opacity?: number})=>value?.opacity===0);
+  await act(async()=>workspace().props.onMessage({nativeEvent:{url:'https://shotloom.0xfiang.com',data:JSON.stringify({type:'workspace-ready'})}}));
+  assert.equal(hidden(),false,'actual workspace readiness reveals the canvas');
+  await act(async()=>workspace().props.onLoadStart({nativeEvent:{url:workspace().props.source.uri,loading:false}}));
+  assert.equal(hidden(),false,'Android history.replaceState must not cover an already ready canvas');
+  await act(async()=>workspace().props.onLoadStart({nativeEvent:{url:workspace().props.source.uri,loading:true}}));
+  assert.equal(hidden(),true,'real document navigation still waits for actual workspace readiness');
+  await act(async()=>workspace().props.onMessage({nativeEvent:{url:'https://shotloom.0xfiang.com',data:JSON.stringify({type:'workspace-ready'})}}));
   await act(async()=>{if(!state.back?.())state.goBack();});
   assert.equal(tree.root.findAllByType('TextInput' as any)[0]!.props.value,'Fixture','project search survives the tab roundtrip');
   await open();
