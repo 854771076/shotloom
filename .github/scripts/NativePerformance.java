@@ -54,6 +54,14 @@ public final class NativePerformance extends Instrumentation {
         for(int i=1;i<=12;i++){SystemClock.sleep(16);pointer(370,1250-i*50,MotionEvent.ACTION_MOVE,down);}
         pointer(370,650,MotionEvent.ACTION_UP,down); SystemClock.sleep(250);
     }
+    private void accountTop() {
+        for(int pass=0;pass<3;pass++) {
+            long down=SystemClock.uptimeMillis();pointer(370,400,MotionEvent.ACTION_DOWN,down);
+            for(int i=1;i<=12;i++){SystemClock.sleep(16);pointer(370,400+i*65,MotionEvent.ACTION_MOVE,down);}
+            pointer(370,1180,MotionEvent.ACTION_UP,down);SystemClock.sleep(150);
+        }
+        SystemClock.sleep(150);
+    }
     private void click(String label) throws Exception {
         AccessibilityNodeInfo node=null;
         for(int i=0;i<5;i++){ node=find(ui.getRootInActiveWindow(),label);if(node!=null)break;swipe(); }
@@ -71,14 +79,14 @@ public final class NativePerformance extends Instrumentation {
         for(int i=0;i<5;i++){node=find(ui.getRootInActiveWindow(),target);if(node!=null)break;swipe();}
         if(node==null)throw new Exception("Target missing: "+target);
         long start=SystemClock.elapsedRealtime();click(target);waitReady(ready);
-        JSONObject row=new JSONObject().put("page",name).put("round",round).put("ms",SystemClock.elapsedRealtime()-start);
+        JSONObject row=new JSONObject().put("page",name).put("round",round).put("ms",SystemClock.elapsedRealtime()-start).put("atMs",SystemClock.elapsedRealtime());
         if(name.equals("account"))row.put("upstreamError",find(ui.getRootInActiveWindow(),"Could not load your balance. Please try again.")!=null);
         pages.put(row);
         SystemClock.sleep(120);
     }
     private void api(String path,int round) throws Exception {
         long start=SystemClock.elapsedRealtime();HttpURLConnection conn=(HttpURLConnection)new URL("https://shotloom.0xfiang.com/api"+path).openConnection();
-        conn.setRequestProperty("Authorization","Bearer "+args.getString("token"));conn.setConnectTimeout(30000);conn.setReadTimeout(30000);
+        if(path.startsWith("/project/"))conn.setRequestProperty("Cookie",args.getString("cookie"));else conn.setRequestProperty("Authorization","Bearer "+args.getString("token"));conn.setConnectTimeout(30000);conn.setReadTimeout(30000);
         int status=conn.getResponseCode();long headers=SystemClock.elapsedRealtime();int bytes=0;
         InputStream stream=status>=400?conn.getErrorStream():conn.getInputStream();
         if(stream!=null){byte[] buffer=new byte[8192];int n;while((n=stream.read(buffer))!=-1)bytes+=n;stream.close();}
@@ -99,11 +107,11 @@ public final class NativePerformance extends Instrumentation {
                 page("skills","Skills","Native Acceptance Skill",round);
                 page("projects","Project library","Android Canvas Acceptance",round);
                 page("account","My account","Available credits",round);
-                page("notifications","Notifications","All messages",round);back();waitReady("Available credits");
-                page("settings","Settings","Preferences",round);back();waitReady("Available credits");
+                page("notifications","Notifications","All messages",round);back();accountTop();waitReady("Available credits");
+                page("settings","Settings","Preferences",round);back();accountTop();waitReady("Available credits");
                 page("feedback_compose","Feedback and reports","Description",round);
                 page("feedback_records","My records","Latency_test_record",round);
-                page("feedback_detail","Latency_test_record","Replies",round);back();back();back();waitReady("Available credits");
+                page("feedback_detail","Latency_test_record","Replies",round);back();back();back();accountTop();waitReady("Available credits");
                 page("projects","Project library","Android Canvas Acceptance",round);
                 page("canvas","Android Canvas Acceptance","100%",round);
                 page("projects","Project library","Android Canvas Acceptance",round);

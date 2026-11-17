@@ -15,7 +15,7 @@ project=$(printf '%s' "$TEST_FIXTURE" | python3 -c 'import json,sys;print(json.l
 feedback=$(printf '%s' "$TEST_FIXTURE" | python3 -c 'import json,sys;print(json.load(sys.stdin)["feedbackId"])')
 adb shell getprop ro.build.fingerprint > perf/device.txt
 for run in 1 2 3; do
-  adb shell am instrument -w -e token "$token" -e projectId "$project" -e feedbackId "$feedback" com.shotloom.performance/com.shotloom.performance.NativePerformance > /tmp/performance-output.txt
+  adb shell am instrument -w -e token "$token" -e cookie "$TEST_SESSION_COOKIE" -e projectId "$project" -e feedbackId "$feedback" com.shotloom.performance/com.shotloom.performance.NativePerformance > /tmp/performance-output.txt
   python3 - "$run" <<'PY'
 import json,sys
 text=open('/tmp/performance-output.txt').read()
