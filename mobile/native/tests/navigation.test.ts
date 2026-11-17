@@ -16,7 +16,7 @@ exports.FlatList=({data=[],renderItem,ListHeaderComponent,ListEmptyComponent,...
 exports.ScrollView='ScrollView'; exports.RefreshControl='RefreshControl';
 exports.Modal=({visible,children})=>visible?React.createElement('Modal',null,children):null;
 exports.StyleSheet={create:x=>x,absoluteFillObject:{}}; exports.Platform={OS:'android'};
-exports.AppState={addEventListener:()=>({remove(){}})};
+state.foreground=new Set();exports.AppState={currentState:'active',addEventListener:(_,fn)=>{state.foreground.add(fn);return {remove(){state.foreground.delete(fn)}}}};
 exports.BackHandler={addEventListener:(_,fn)=>{state.back=fn;return {remove(){if(state.back===fn)state.back=null}}}};
 exports.Alert={alert(){}};
 exports.WebView=React.forwardRef((props,ref)=>{React.useEffect(()=>{if(props.source?.uri?.includes('project='))state.mounts++;},[]);React.useImperativeHandle(ref,()=>({injectJavaScript(script){state.send?.(script)},reload(){state.reload?.()}}));return React.createElement('WebView',props)});
@@ -31,6 +31,7 @@ exports.createNativeStackNavigator=()=>({Screen:()=>null,Navigator:({children})=
 }});
 exports.NativeApi=class {cache=new Map();cached(path){return this.cache.get(path)} invalidate(){this.cache.clear()} async read(path,force){if(!force&&this.cache.has(path))return this.cache.get(path);const value=await this.request(path);this.cache.set(path,value);return value} disconnect(){} pause(){} resume(){} receive(){} async request(path,method='GET',value){state.requests.push(path);if(state.failLogout&&path==='/auth/logout')throw new Error('Logout failed');if(path==='/auth/me')return {id:state.session.userId};if(method!=='GET')state.writes.push({path,method,value});if(path==='/settings/mobile'){if(state.failSave&&method==='PATCH')throw new Error('Save unavailable');if(method==='PATCH')Object.assign(state.settings,value);return {...state.settings};}if(path==='/models')return {publications:[]};if(path==='/projects')return [{id:'22222222-2222-4222-8222-222222222222',name:'Fixture project'}];if(path==='/library-folders')return [];if(path.startsWith('/catalog/'))return {skills:[]};return {items:[],total:0,unread:0,asOf:'2026-11-16T00:00:00Z'}}};
 exports.createNativeApi=(_origin,_token,_uuid,expired)=>{state.expire=expired;return new exports.NativeApi()};
+const request=exports.NativeApi.prototype.request;exports.NativeApi.prototype.request=async function(...args){await state.beforeRequest?.(...args);return request.apply(this,args)};
 exports.restoreSession=async()=>state.session;exports.clearSession=async()=>{state.session=null};exports.login=async(_origin,expected)=>{state.logins++;if(state.cancel)return null;if(expected&&expected!==state.loginUser)throw new Error('Account changed');return state.session={token:'fresh-token',userId:state.loginUser}};
 exports.workspaceSource=async(_origin,_token,redirect)=>({uri:redirect,method:'POST',body:'code=one-time'});
 exports.getDocumentAsync=async()=>({canceled:true});exports.isAvailableAsync=async()=>true;exports.shareAsync=async()=>{};
@@ -68,6 +69,25 @@ test('native login has no WebView, supports cancellation, and restores a stored 
     assert.ok(tree.root.findAllByType('Pressable' as any).some(x => x.props.accessibilityRole === 'tab'));
     assert.equal(tree.root.findAllByType('WebView' as any).length, 0, 'native pages have no hidden session WebView');
   } finally { await act(async () => tree.unmount()); }
+});
+
+test('slow preferences do not block home; tab switches reuse the profile and foreground verifies it', async () => {
+  const App = await loadApp();
+  const state = (globalThis as any).__nativeUi;
+  let release!: () => void;
+  const settings = new Promise<void>(resolve => { release = resolve; });
+  state.beforeRequest = (path: string) => path === '/settings/mobile' ? settings : undefined;
+  let tree!: ReturnType<typeof create>;
+  await act(async () => { tree = create(React.createElement(App)); });
+  try {
+    const tabs = () => tree.root.findAllByType('Pressable' as any).filter(x => x.props.accessibilityRole === 'tab');
+    assert.equal(tabs().length, 4, 'nonessential preferences must not gate the project page');
+    for (const index of [3, 0, 3]) await act(async () => tabs()[index]!.props.onPress());
+    assert.equal(state.requests.filter((path: string) => path === '/auth/me').length, 1);
+    await act(async () => { for (const listener of [...state.foreground] as ((value: string) => void)[]) listener('background'); });
+    await act(async () => { for (const listener of [...state.foreground] as ((value: string) => void)[]) listener('active'); });
+    assert.ok(state.requests.filter((path: string) => path === '/auth/me').length > 1, 'foreground still checks the actual session');
+  } finally { await act(async () => { release(); }); await act(async () => tree.unmount()); }
 });
 
 test('project search and the same canvas survive tab roundtrips without creating a session WebView', async () => {

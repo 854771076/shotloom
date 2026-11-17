@@ -3,22 +3,34 @@ import { nativeRequestAllowed, type NativeReply, type NativeRequest } from '../.
 export class NativeApi {
   private cache = new Map<string, { value: unknown; expires: number }>();
   private reads = new Map<string, Promise<unknown>>();
-  private generation = 0;
   private pending = new Map<string, { resolve: (value: unknown) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>();
   private suspended = false;
   private queued = new Map<string, NativeRequest>();
   constructor(private send: (request: NativeRequest) => void, private uuid: () => string) {}
   cached<T>(path: string): T | undefined { return this.cache.get(path)?.value as T | undefined; }
-  invalidate() { this.generation++; this.cache.clear(); this.reads.clear(); }
+  invalidate(paths?: string[]) {
+    for (const key of new Set([...this.cache.keys(), ...this.reads.keys()])) {
+      const path = key.split('?')[0]!;
+      if (!paths || paths.some(prefix => path === prefix || path.startsWith(`${prefix}/`))) {
+        this.cache.delete(key); this.reads.delete(key);
+      }
+    }
+  }
+  invalidateWrite(path: string) {
+    if (path.startsWith('/notifications/')) this.invalidate(['/notifications']);
+    else if (path === '/feedback') this.invalidate(['/feedback', '/notifications']);
+    else if (path === '/library-folders') this.invalidate(['/library-folders', '/projects']);
+    else if (path.startsWith('/project/')) this.invalidate(['/projects']);
+    else if (path === '/catalog/skills' || path === '/settings/mobile') this.invalidate([path]);
+    else this.invalidate();
+  }
   read<T>(path: string, force = false): Promise<T> {
-    if (path === '/auth/me') return this.request<T>(path);
     const cached = this.cache.get(path);
-    if (!force && cached && cached.expires > Date.now()) return Promise.resolve(cached.value as T);
+    if (path !== '/auth/me' && !force && cached && cached.expires > Date.now()) return Promise.resolve(cached.value as T);
     const pending = this.reads.get(path);
     if (pending) return pending as Promise<T>;
-    const generation = this.generation;
     const request = this.request<T>(path).then(value => {
-      if (generation === this.generation) {
+      if (this.reads.get(path) === request) {
         if (this.cache.size >= 64) this.cache.delete(this.cache.keys().next().value!);
         this.cache.set(path, { value, expires: Date.now() + 60000 });
       }
@@ -29,7 +41,7 @@ export class NativeApi {
   }
   request<T>(path: string, method = 'GET', value?: unknown): Promise<T> {
     if (!nativeRequestAllowed(method, path)) return Promise.reject(new Error('Request is unavailable'));
-    if (method !== 'GET') this.invalidate();
+    if (method !== 'GET') this.invalidateWrite(path);
     const id = this.uuid();
     const response = new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => { this.pending.delete(id); this.queued.delete(id); reject(new Error('Connection timed out. Please retry.')); }, 30000);
@@ -37,7 +49,7 @@ export class NativeApi {
       const request = { id, method, path, ...(value === undefined ? {} : { value }) };
       if (this.suspended) this.queued.set(id, request); else this.dispatch(request);
     });
-    return method === 'GET' ? response : response.then(value => { this.invalidate(); return value; });
+    return method === 'GET' ? response : response.finally(() => this.invalidateWrite(path));
   }
   receive(reply: NativeReply) {
     this.queued.delete(reply.id);
@@ -86,7 +98,7 @@ export function createNativeApi(origin: string, token: string, uuid: () => strin
         if (!api.receive({ type: 'response', id: request.id, error: error.message, status: error.status })) return;
         if (error.code === 'ACCOUNT_CHANGED' || (error.status === 401 && request.path === '/auth/me')) expired();
         // An upstream service can reject its token while the application session is still valid.
-        else if (error.status === 401) void api.request('/auth/me').catch(() => {});
+        else if (error.status === 401) void api.read('/auth/me').catch(() => {});
       });
   }, uuid);
   return api;

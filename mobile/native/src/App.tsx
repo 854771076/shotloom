@@ -35,18 +35,26 @@ function useRemote<T>(path: string) {
   const api = useApi();
   const pageActive = useContext(PageActive);
   const force = useRef(false);
+  const showRefresh = useRef(false);
   const [data, setData] = useState<T | undefined>(() => api.cached<T>(path));
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => api.cached(path) === undefined);
   const [revision, setRevision] = useState(0);
-  const refresh = useCallback(() => { force.current = true; setRevision(value => value + 1); }, []);
+  const refresh = useCallback(() => { force.current = true; showRefresh.current = true; setRevision(value => value + 1); }, []);
   useFocusEffect(useCallback(() => {
     if (!pageActive) return;
     let active = true;
     const bypass = force.current; force.current = false;
-    setLoading(api.cached(path) === undefined || bypass); setError('');
-    void api.read<T>(path, bypass).then(value => { if (active) setData(value); }).catch(cause => { if (active) setError(errorText(cause)); }).finally(() => { if (active) setLoading(false); });
-    const subscription = AppState.addEventListener('change', state => { if (state === 'active') refresh(); });
+    const cached = api.cached<T>(path);
+    setLoading(cached === undefined || showRefresh.current); showRefresh.current = false; setError('');
+    if (cached !== undefined) setData(cached);
+    const read = path === '/auth/me' && cached !== undefined && !bypass ? Promise.resolve(cached) : api.read<T>(path, bypass);
+    void read.then(value => { if (active) setData(value); }).catch(cause => { if (active) setError(errorText(cause)); }).finally(() => { if (active) setLoading(false); });
+    let previousState = AppState.currentState;
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active' && previousState !== 'active') { force.current = true; setRevision(value => value + 1); }
+      previousState = state;
+    });
     return () => { active = false; subscription.remove(); };
   }, [api, path, revision, refresh, pageActive]));
   return { data, error, loading, refresh };
@@ -280,7 +288,7 @@ function WebContent({ params }: { params: Routes['Workspace'] }) {
   const injected = `window.__SHOTLOOM_MOBILE__ = true; try { localStorage.setItem('shotloom:locale', ${JSON.stringify(language)}); } catch {} document.documentElement.dataset.nativeEmbedded='true'; true;`;
   return <View style={styles.screen}>{error && <ErrorNotice text={error} retry={() => { setError(''); setReady(false); setRetry(value => value + 1); }} />}
     {source && <WebView ref={webview} key={retry} source={source} style={[styles.screen, !ready && !error && { opacity: 0 }]} sharedCookiesEnabled thirdPartyCookiesEnabled={false} contentInsetAdjustmentBehavior="never" automaticallyAdjustContentInsets={false} contentInset={{ top: 0, bottom: 0, left: 0, right: 0 }}
-      onMessage={event => { try { if (new URL(event.nativeEvent.url).origin !== origin) return; const value = JSON.parse(event.nativeEvent.data); if (value.type === 'workspace-ready' || value.type === 'workspace-blocked') { setReady(true); if (value.status === 'login' || value.status === 'account') session.expire(); } else if (value.type === 'workspace-session-error') setError(String(value.error)); else if (value.type === 'workspace-mutated') api.invalidate(); } catch {} }}
+      onMessage={event => { try { if (new URL(event.nativeEvent.url).origin !== origin) return; const value = JSON.parse(event.nativeEvent.data); if (value.type === 'workspace-ready' || value.type === 'workspace-blocked') { setReady(true); if (value.status === 'login' || value.status === 'account') session.expire(); } else if (value.type === 'workspace-session-error') setError(String(value.error)); else if (value.type === 'workspace-mutated') api.invalidateWrite(typeof value.path === 'string' ? value.path : ''); } catch {} }}
       mixedContentMode="never" setSupportMultipleWindows={false} injectedJavaScriptBeforeContentLoaded={injected} onError={event => setError(event.nativeEvent.description)} onHttpError={event => setError(`HTTP ${event.nativeEvent.statusCode}`)} />}
     {!ready && !error && <View style={[styles.empty, { position: 'absolute', inset: 0, backgroundColor: colors.background }]}><ActivityIndicator color={colors.accent} /><Text style={styles.secondary}>{params.id ? local('正在打开画布…', 'Opening canvas…') : local('正在打开页面…', 'Opening page…')}</Text></View>}
   </View>;
@@ -319,15 +327,17 @@ export default function App() {
     if (!api || !session) return;
     let active = true;
     setLoading(true);
-    void Promise.all([api.request<{ id: string }>('/auth/me'), api.read<{ locale?: string }>('/settings/mobile').catch(() => null)]).then(([user, preferences]) => {
+    void api.read<{ locale?: string }>('/settings/mobile').then(preferences => {
+      if (active && preferences.locale) { setLanguage(preferences.locale); changed(); }
+    }).catch(() => {});
+    void api.read<{ id: string }>('/auth/me').then(user => {
       if (!active) return;
       if (user.id !== session.userId) throw new Error(t('cloud.login.accountChanged'));
-      if (preferences?.locale) setLanguage(preferences.locale);
       setAuthenticated(true); setOpened(true); setFailure('');
     }).catch(cause => { if (active) { setAuthenticated(false); setFailure(errorText(cause)); } })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; api.invalidate(); api.disconnect(); };
-  }, [api, session]);
+  }, [api, session, changed]);
   const signIn = async () => {
     if (signingIn.current) return;
     signingIn.current = true; setBusy(true); setFailure('');

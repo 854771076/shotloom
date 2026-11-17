@@ -93,10 +93,38 @@ test('read cache coalesces pages, refreshes explicitly, expires, and cannot be r
   assert.equal(api.cached('/notifications'), undefined);
   const auth = api.read('/auth/me'); reply({ id: 'user' }); await auth;
   const nextAuth = api.read('/auth/me'); assert.equal(sent.at(-1)!.path, '/auth/me'); reply({ id: 'user' }); await nextAuth;
+  const projects = api.read('/projects'); reply(['fresh']); await projects;
   const writing = api.request('/notifications/read-all', 'PUT'); reply(null); await writing;
-  assert.equal(api.cached('/projects'), undefined, 'writes invalidate related page projections');
+  assert.deepEqual(api.cached('/projects'), ['fresh'], 'notification writes preserve unrelated project projections');
+  api.invalidate(['/projects']);
   const failed = api.read('/projects'); api.receive({ type:'response', id:sent.at(-1)!.id, error:'Unavailable', status:503 });
   await assert.rejects(failed, /Unavailable/); assert.equal(api.cached('/projects'), undefined);
+});
+
+test('targeted invalidation fences stale reads without discarding unrelated in-flight work', async () => {
+  const sent: NativeRequest[] = []; let id = 0;
+  const api = new NativeApi(request => sent.push(request), () => String(++id));
+  const reply = (path: string, data: unknown) => api.receive({ type: 'response', id: sent.findLast(request => request.path === path)!.id, data });
+  const project = api.read('/projects');
+  const inbox = api.read('/notifications?offset=0&limit=1');
+  const write = api.request('/notifications/read-all', 'PUT', {});
+  reply('/notifications?offset=0&limit=1', { unread: 1 }); await inbox;
+  assert.equal(api.cached('/notifications?offset=0&limit=1'), undefined);
+  reply('/projects', ['kept']); await project;
+  reply('/notifications/read-all', null); await write;
+  assert.deepEqual(api.cached('/projects'), ['kept']);
+  const settings = api.read('/settings/mobile'); reply('/settings/mobile', { locale: 'en-US' }); await settings;
+  const saving = api.request('/catalog/skills', 'PUT', { skills: [] }); reply('/catalog/skills', null); await saving;
+  assert.deepEqual(api.cached('/settings/mobile'), { locale: 'en-US' });
+  api.invalidateWrite('/project/fixture');
+  assert.equal(api.cached('/projects'), undefined);
+  assert.deepEqual(api.cached('/settings/mobile'), { locale: 'en-US' }, 'canvas saves preserve settings');
+  const me = api.read('/auth/me'); reply('/auth/me', { id: 'one' }); await me;
+  assert.deepEqual(api.cached('/auth/me'), { id: 'one' }, 'verified profile is available for display');
+  const checking = api.read('/auth/me'); const concurrent = api.read('/auth/me');
+  assert.equal(sent.filter(request => request.path === '/auth/me').length, 2, 'auth checks bypass TTL but coalesce in flight');
+  reply('/auth/me', { id: 'one' }); await Promise.all([checking, concurrent]);
+  api.invalidate(); assert.equal(api.cached('/auth/me'), undefined);
 });
 
 test('upstream 401 verifies the application session without retrying writes or expiring a valid login', async () => {
