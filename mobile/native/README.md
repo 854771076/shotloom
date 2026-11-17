@@ -87,3 +87,7 @@ APK：`https://shotloom.0xfiang.com/downloads/Shotloom-Preview-20261117-native-0
 内嵌画布使用 `native=embedded` 的布局模式，由原生容器管理安全区和底部导航，网页不再预留隐藏顶栏。首次打开以原生等待提示覆盖鉴权和工作区准备过程，收到实际页面就绪才展示；失败和登录失效仍显示真实恢复页面。同一画布在标签切换时保留 WebView。首次启动、切换工程、进程重启仍需要加载。
 
 按用户要求，APP 与 Web 设置中的问题诊断和诊断包导出功能已移除。
+
+0.9.6 最终签名构建 `44051393528` 与固定构建验收 `44053336173` 通过。Android 的网页内部地址更新不会重新显示画布等待层；真实文档重载仍等待就绪。页面缓存、设置实际保存、鉴权重连/401、画布缩放/拖动和视口保留均通过同一 APK 验证，临时会话已撤销。APK SHA-256：`65ea04518701a7c2521240895b878e8545bbe6b1695feda36540d9421d642b28`。具体范围和限制见功能文档 0.9.6 记录。
+
+APK：`https://shotloom.0xfiang.com/downloads/Shotloom-Preview-20261117-native-096.apk`；验收包：`https://shotloom.0xfiang.com/downloads/Shotloom-Acceptance-20261117-native-096.zip`。ZIP SHA-256：`593760fc6850bddbe6fa161f101e8a9173a44033611c9f3f532deb9a6cffff23`。验收包只包含正式 APK、版本/签名/校验信息、验收说明、实际截图及检测结果，不含测试 APK、会话凭据和日志。
