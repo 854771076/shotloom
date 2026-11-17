@@ -88,7 +88,11 @@ test('native exchange, scoped API access, workspace cookies and logout use the s
     const ticketResponse = await request('/api/auth/native/workspace-ticket', 'POST', { redirect: '/?project=fixture&native=embedded' }, token);
     assert.equal(ticketResponse.status, 200);
     const workspaceCode = (await ticketResponse.json()).data.code;
-    const source = () => app.request('/api/auth/native/workspace', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ code: workspaceCode }).toString() });
+    assert.equal((await request('/api/settings/mobile', 'PATCH', { locale: 'en-US' }, token, 'null')).status, 403);
+    assert.equal((await request('/api/auth/native/exchange', 'POST', { code, verifier }, undefined, 'null')).status, 403);
+    assert.equal((await request('/api/auth/native/workspace', 'POST', { code: workspaceCode }, undefined, 'https://attacker.example')).status, 403);
+    assert.equal((await app.request('/api/auth/native/workspace', { method: 'POST', headers: { origin: 'null', 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ code: 'x'.repeat(43) }).toString() })).status, 401);
+    const source = () => app.request('/api/auth/native/workspace', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', origin: 'null' }, body: new URLSearchParams({ code: workspaceCode }).toString() });
     const workspace = await source();
     assert.equal(workspace.status, 303);
     assert.equal(workspace.headers.get('location'), 'http://localhost:5173/?project=fixture&native=embedded');

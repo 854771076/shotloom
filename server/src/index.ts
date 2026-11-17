@@ -26,7 +26,9 @@ app.use("/api/*", async (c, next) => {
   c.header("X-Content-Type-Options", "nosniff");
   if (!["GET", "HEAD", "OPTIONS"].includes(c.req.method)) {
     const origin = c.req.header("origin");
-    const handoff = !origin && ['/api/auth/native/exchange', '/api/auth/native/workspace'].includes(c.req.path) && c.req.method === 'POST';
+    // Android's initial WebView POST has an opaque origin; its one-time code authorizes only this handoff.
+    const handoff = c.req.method === 'POST' && ((!origin && c.req.path === '/api/auth/native/exchange')
+      || ((!origin || origin === 'null') && c.req.path === '/api/auth/native/workspace'));
     if ((!origin || origin !== new URL(env.FRONTEND_URL).origin) && !nativeRelaySession(c) && !nativeSession(c) && !handoff) {
       return c.json({ success: false, message: "请求来源无效", data: null }, 403);
     }

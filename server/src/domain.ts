@@ -224,7 +224,7 @@ domainApp.put("/settings/token-group", async (c) => {
 // ---------------------------------------------------------------------------
 // 目录（skills / recipes / assets / materials）
 // ---------------------------------------------------------------------------
-domainApp.get("/catalog/:kind", async (c) => {
+domainApp.get("/catalog/:kind", async (c): Promise<Response> => {
   const userId = c.get("userId");
   const kind = parseOrBadRequest(kindSchema, c.req.param("kind"));
   const catalog = await store.loadCatalog(userId, kind, CATALOG_FALLBACKS[kind] ?? {});
