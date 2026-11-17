@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+trap 'adb exec-out screencap -p > perf/failure.png' ERR
 adb shell wm size 750x1624
 adb shell wm density 320
 adb shell settings put global private_dns_mode off

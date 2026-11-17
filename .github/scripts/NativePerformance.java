@@ -113,6 +113,8 @@ public final class NativePerformance extends Instrumentation {
                 page("feedback_records","My records","Latency_test_record",round);
                 page("feedback_detail","Latency_test_record","Replies",round);back();back();back();accountTop();waitReady("Available credits");
                 page("projects","Project library","Android Canvas Acceptance",round);
+            }
+            for(int round=0;round<5;round++) {
                 page("canvas","Android Canvas Acceptance","100%",round);
                 page("projects","Project library","Android Canvas Acceptance",round);
             }
