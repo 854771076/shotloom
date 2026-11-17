@@ -6,6 +6,10 @@ on:
         description: Measure delivered APK page and API latency
         type: boolean
         default: false
+      performance_login_only:
+        description: Measure only the native login homepage without authorizing
+        type: boolean
+        default: false
       preview_run:
         description: 'Signed preview build run to verify; empty selects the latest completed build'
         required: false
@@ -190,6 +194,7 @@ jobs:
           TEST_SESSION_COOKIE: ${{ secrets.SHOTLOOM_ACCEPTANCE_SESSION }}
           TEST_NATIVE_SESSION: ${{ secrets.SHOTLOOM_ACCEPTANCE_NATIVE_SESSION }}
           TEST_FIXTURE: ${{ secrets.SHOTLOOM_PERFORMANCE_FIXTURE }}
+          LOGIN_ONLY: ${{ inputs.performance_login_only }}
         with:
           api-level: 35
           system-image-api-level: 35-ext15

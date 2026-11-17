@@ -8,6 +8,19 @@ adb shell settings put system font_scale 1.0
 adb install acceptance/Shotloom-Preview.apk
 adb install acceptance/Shotloom-Session-Test.apk
 adb install perf/measure.apk
+if [ "${LOGIN_ONLY:-false}" = true ]; then
+  adb shell am instrument -w -e mode login com.shotloom.performance/com.shotloom.performance.NativePerformance > /tmp/performance-output.txt
+  python3 - <<'PY'
+import json
+text=open('/tmp/performance-output.txt').read()
+line=next(s.split('PERFORMANCE_JSON ',1)[1] for s in text.splitlines() if 'PERFORMANCE_JSON ' in s)
+result=json.loads(line)
+assert len(result['pages'])==3 and result['failure'] is None
+with open('perf/results-login.json','w') as f: json.dump(result,f,indent=2)
+print('Native login cold launch:',[r['ms'] for r in result['pages']])
+PY
+  exit 0
+fi
 native_session=$(printf '%s' "$TEST_NATIVE_SESSION" | base64 -w0)
 adb shell am instrument -w -e cookie "$TEST_SESSION_COOKIE" -e sessionBase64 "$native_session" com.shotloom.acceptance/com.shotloom.acceptance.SessionInstrumentation > /tmp/session-seeded.txt
 grep -q 'Test session installed' /tmp/session-seeded.txt

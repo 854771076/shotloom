@@ -96,6 +96,18 @@ public final class NativePerformance extends Instrumentation {
         Bundle result=new Bundle();JSONObject report=new JSONObject();String failure=null;
         try {
             ui=getUiAutomation();
+            if("login".equals(args.getString("mode"))) {
+                for(int round=0;round<3;round++) {
+                    try(InputStream clear=new android.os.ParcelFileDescriptor.AutoCloseInputStream(ui.executeShellCommand("pm clear com.shotloom.app.preview"))) {while(clear.read()!=-1) {}}
+                    long started=SystemClock.elapsedRealtime();
+                    Intent login=getContext().getPackageManager().getLaunchIntentForPackage("com.shotloom.app.preview");
+                    login.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);getContext().startActivity(login);
+                    waitReady("使用 new-api 登录");
+                    pages.put(new JSONObject().put("page","login_native").put("round",round).put("ms",SystemClock.elapsedRealtime()-started));
+                }
+                report.put("pages",pages).put("apis",apis).put("failure",JSONObject.NULL);
+                result.putString("stream","PERFORMANCE_JSON "+report.toString()+"\n");finish(-1,result);return;
+            }
             ui.executeShellCommand("am force-stop com.shotloom.app.preview").close();SystemClock.sleep(300);
             long start=SystemClock.elapsedRealtime();
             Intent launch=getContext().getPackageManager().getLaunchIntentForPackage("com.shotloom.app.preview");
