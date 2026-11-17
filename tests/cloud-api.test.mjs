@@ -23,6 +23,10 @@ test('upstream account and model failures preserve stored preferences and allow 
     assert.deepEqual(settings.upstreamModels, []);
     assert.ok(Object.values(settings.providerConfigs).every(provider => !provider.allowedModelIds.length));
     assert.equal(expired, 0);
+    const { loadAppSettings, settingsStore } = await env.load('store/settingsStore');
+    await loadAppSettings();
+    assert.equal(settingsStore.agentCanRunNodes, false);
+    assert.match(settingsStore.accountSyncError, /Gateway authorization unavailable/);
     globalThis.fetch = async () => Response.json({ success: false, message: 'Preferences unavailable' }, { status: 503 });
     await assert.rejects(api.settings.get(), /Preferences unavailable/, 'stored preferences remain required');
   } finally { globalThis.fetch = originalFetch; await env.dispose(); }
