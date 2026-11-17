@@ -225,7 +225,7 @@ function Notifications({ navigation }: NativeStackScreenProps<Routes, 'Notificat
   };
   return <SafeAreaView edges={['bottom']} style={styles.screen}>
     <View style={styles.inboxHead}><Text style={styles.secondary}>{local('处理进度与后台回复，都在这里。', 'Follow updates and replies here.')}</Text>
-      <View style={styles.between}><View style={styles.inline}><Text style={styles.title}>{local('全部消息', 'All messages')}</Text>{data ? <View style={styles.inboxCount}><Text style={styles.small}>{data.total}</Text></View> : null}</View>
+      <View style={styles.inboxToolbar}><View style={styles.inline}><Text style={styles.title}>{local('全部消息', 'All messages')}</Text>{data ? <View style={styles.inboxCount}><Text style={styles.small}>{data.total}</Text></View> : null}</View>
         <View style={styles.inline}>{data?.unread ? <Pressable accessibilityRole="button" accessibilityLabel={t('support.readAll')} disabled={busy} onPress={() => void run(async () => { await api.request('/notifications/read-all', 'PUT', { asOf: data.asOf }); })} style={({ pressed }) => [styles.inboxTextAction, pressed && styles.pressed, busy && styles.disabled]}><Icon name="check" size={16} color={colors.accent} /><Text style={styles.inboxActionText}>{t('support.readAll')}</Text></Pressable> : null}<IconButton name="refresh" label={t('support.refresh')} disabled={loading || busy} onPress={refresh} /></View>
       </View>{data?.unread ? <Text style={styles.small}>{local(`${data.unread} 条未读`, `${data.unread} unread`)}</Text> : null}
     </View>
