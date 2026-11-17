@@ -311,6 +311,9 @@ adb exec-out screencap -p > acceptance/android-canvas-reopen.png
 adb shell input keyevent 4
 tap_text '^我的$|^My account$'
 adb shell input swipe 380 500 380 1350 500
+sleep 1
+adb shell input swipe 380 1250 380 700 500
+sleep 2
 tap_text '^设置$|^Settings$'
 wait_for_ui settings-english '偏好设置|Preferences'
 tap_text '^English$'
