@@ -160,10 +160,15 @@ jobs:
       - name: Download delivered release and compile external measurement APK
         env:
           GH_TOKEN: ${{ github.token }}
+          PREVIEW_RUN: ${{ inputs.preview_run }}
         run: |
           set -euo pipefail
           mkdir -p acceptance perf/classes perf/dex
-          gh run download 44067880610 --name Shotloom-Android-Preview --dir acceptance
+          run="${PREVIEW_RUN:-44067880610}"
+          gh run view "$run" --repo "$GITHUB_REPOSITORY" --json headSha,conclusion > perf/preview-source.json
+          jq -e '.conclusion == "success"' perf/preview-source.json
+          gh run download "$run" --repo "$GITHUB_REPOSITORY" --name Shotloom-Android-Preview --dir acceptance
+          grep -Fx "Commit: $(jq -r .headSha perf/preview-source.json)" acceptance/build.txt
           (cd acceptance && sha256sum --check SHA256SUMS)
           platform="$ANDROID_HOME/platforms/android-35/android.jar"
           tools="$ANDROID_HOME/build-tools/35.0.0"
