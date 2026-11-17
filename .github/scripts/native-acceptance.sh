@@ -321,6 +321,13 @@ wait_for_ui settings-english 'Preferences'
 adb exec-out screencap -p > acceptance/android-settings-english.png
 adb shell settings put system font_scale 1.3
 sleep 2
+# Android recreates the activity for font-scale changes; reopen the screen after session restoration.
+wait_for_ui font-restarted 'Project library'
+tap_text '^My account$'
+wait_for_ui account-large 'Available credits'
+adb shell input swipe 380 1300 380 550 500
+sleep 2
+tap_text '^Settings'
 wait_for_ui settings-large 'Preferences'
 adb exec-out screencap -p > acceptance/android-settings-english-large.png
 adb shell input swipe 380 1250 380 550 500
