@@ -100,8 +100,7 @@ public final class NativePerformance extends Instrumentation {
                 for(int round=0;round<3;round++) {
                     try(InputStream clear=new android.os.ParcelFileDescriptor.AutoCloseInputStream(ui.executeShellCommand("pm clear com.shotloom.app.preview"))) {while(clear.read()!=-1) {}}
                     long started=SystemClock.elapsedRealtime();
-                    Intent login=getContext().getPackageManager().getLaunchIntentForPackage("com.shotloom.app.preview");
-                    login.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);getContext().startActivity(login);
+                    try(InputStream launched=new android.os.ParcelFileDescriptor.AutoCloseInputStream(ui.executeShellCommand("am start -W -n com.shotloom.app.preview/.MainActivity"))) {while(launched.read()!=-1) {}}
                     waitReady("Sign in with new-api");
                     pages.put(new JSONObject().put("page","login_native").put("round",round).put("ms",SystemClock.elapsedRealtime()-started));
                 }
@@ -133,7 +132,7 @@ public final class NativePerformance extends Instrumentation {
         } catch(Exception error) {failure=error.getMessage();}
         try {
             String[] paths={"/auth/me","/projects","/library-folders","/catalog/skills","/auth/account","/auth/usage?page=1&page_size=10","/notifications?offset=0&limit=1","/notifications?offset=0&limit=20","/settings/mobile","/models","/feedback?offset=0&limit=20","/feedback/"+args.getString("feedbackId"),"/project/"+args.getString("projectId")};
-            for(int round=0;round<5;round++)for(String path:paths)api(path,round);
+            if(!"login".equals(args.getString("mode")))for(int round=0;round<5;round++)for(String path:paths)api(path,round);
             report.put("pages",pages).put("apis",apis).put("failure",failure==null?JSONObject.NULL:failure).put("pollIntervalMs",25);
             result.putString("stream","PERFORMANCE_JSON "+report.toString()+"\n");
         }catch(Exception error){result.putString("stream","PERFORMANCE_FAILED "+error.getMessage()+"\n");failure=error.getMessage();}

@@ -15,8 +15,8 @@ import json
 text=open('/tmp/performance-output.txt').read()
 line=next(s.split('PERFORMANCE_JSON ',1)[1] for s in text.splitlines() if 'PERFORMANCE_JSON ' in s)
 result=json.loads(line)
-assert len(result['pages'])==3 and result['failure'] is None
 with open('perf/results-login.json','w') as f: json.dump(result,f,indent=2)
+assert len(result['pages'])==3 and result['failure'] is None, result['failure']
 print('Native login cold launch:',[r['ms'] for r in result['pages']])
 PY
   exit 0
