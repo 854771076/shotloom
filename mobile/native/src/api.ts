@@ -83,8 +83,10 @@ export function createNativeApi(origin: string, token: string, uuid: () => strin
     void nativeFetch(origin, request.path, request.method, request.value, token)
       .then(data => api.receive({ type: 'response', id: request.id, data }))
       .catch(error => {
-        if (api.receive({ type: 'response', id: request.id, error: error.message, status: error.status })
-          && (error.status === 401 || error.code === 'ACCOUNT_CHANGED')) expired();
+        if (!api.receive({ type: 'response', id: request.id, error: error.message, status: error.status })) return;
+        if (error.code === 'ACCOUNT_CHANGED' || (error.status === 401 && request.path === '/auth/me')) expired();
+        // An upstream service can reject its token while the application session is still valid.
+        else if (error.status === 401) void api.request('/auth/me').catch(() => {});
       });
   }, uuid);
   return api;

@@ -98,3 +98,32 @@ test('read cache coalesces pages, refreshes explicitly, expires, and cannot be r
   const failed = api.read('/projects'); api.receive({ type:'response', id:sent.at(-1)!.id, error:'Unavailable', status:503 });
   await assert.rejects(failed, /Unavailable/); assert.equal(api.cached('/projects'), undefined);
 });
+
+test('upstream 401 verifies the application session without retrying writes or expiring a valid login', async () => {
+  const original = globalThis.fetch;
+  let expired = 0, id = 0;
+  const api = createNativeApi('https://cloud.example', 'token', () => String(++id), () => expired++);
+  const paths: string[] = [];
+  let sessionStatus = 200;
+  globalThis.fetch = async input => {
+    const path = new URL(String(input)).pathname; paths.push(path);
+    return path === '/api/auth/me' && sessionStatus === 200
+      ? Response.json({ success: true, data: { id: 'user' } })
+      : Response.json({ success: false, message: 'Unauthorized' }, { status: path === '/api/auth/me' ? sessionStatus : 401 });
+  };
+  try {
+    await assert.rejects(api.request('/models'), /Unauthorized/);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(expired, 0);
+    assert.deepEqual(paths, ['/api/models', '/api/auth/me']);
+    sessionStatus = 503;
+    await assert.rejects(api.request('/feedback', 'POST', { description: 'draft' }));
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(expired, 0);
+    assert.equal(paths.filter(path => path === '/api/feedback').length, 1);
+    sessionStatus = 401;
+    await assert.rejects(api.request('/models'));
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(expired, 1);
+  } finally { api.disconnect(); globalThis.fetch = original; }
+});
