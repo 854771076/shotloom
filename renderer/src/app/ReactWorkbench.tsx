@@ -122,6 +122,7 @@ export function ReactWorkbench() {
     if (new URLSearchParams(location.search).get('native') !== 'embedded') return;
     const refreshSettings = () => {
       void loadAppSettings().then(async () => {
+        if (settingsStore.accountSyncError) showToast(settingsStore.accountSyncError);
         if (settingsStore.locale !== getLocale()) {
           if (hasOpenProject() && !await flushAutoSave()) return;
           window.localStorage.setItem(LOCALE_STORAGE_KEY, settingsStore.locale);
@@ -174,6 +175,7 @@ export function ReactWorkbench() {
         void startHarnessIntegration().catch(error => showToast(String(error)));
       }
       await loadAppSettings();
+      if (settingsStore.accountSyncError) showToast(settingsStore.accountSyncError);
       if (settingsStore.locale !== getLocale()) {
         window.localStorage.setItem(LOCALE_STORAGE_KEY, settingsStore.locale);
         window.location.reload();

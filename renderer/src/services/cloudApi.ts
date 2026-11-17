@@ -1,6 +1,6 @@
 import type { createTauriApi } from './tauriApi';
 import type { ModelPublication } from '../../../shared/modelPublications';
-import { cloudOrigin, cloudRequest, cloudUserHeaders } from './cloudRequest';
+import { cloudOrigin, cloudRequest, cloudUserHeaders, verifyCloudSession } from './cloudRequest';
 import { mediaFileUrl } from '../utils/mediaFileUrl';
 import { mediaExtension, MEDIA_MIME_BY_EXTENSION } from '../utils/mediaType';
 import { withBuiltInSkills, withoutBuiltInSkills } from './builtInSkills';
@@ -206,7 +206,7 @@ export function createCloudApi(local: PlatformApi): PlatformApi {
       ...(payload === undefined ? {} : { body: payload }),
       signal,
     });
-    if (response.status === 401) window.dispatchEvent(new Event('shotloom-session-expired'));
+    if (response.status === 401 || response.status === 409) await verifyCloudSession();
     if (!response.ok) throw new Error(modelResponseError(parseModelResponseText(await response.text()), response.status));
     if (onTextDelta && response.body && response.headers.get('content-type')?.includes('text/event-stream')) {
       const protocol = String(body.__agentProtocol || 'openai-chat-completions');
@@ -239,17 +239,19 @@ export function createCloudApi(local: PlatformApi): PlatformApi {
   };
   const catalog = (kind: string) => cloudRequest<RecordValue>(`/catalog/${kind}`);
   const settings = async () => {
+    const errors: string[] = [];
+    const unavailable = (cause: unknown) => { errors.push(cause instanceof Error ? cause.message : String(cause)); return null; };
     const [{ getProviderAdapters }, value, account, models, { getCatalogModels, modelCatalog }, { parseUpstreamModels }, { compilePublication }] = await Promise.all([
-      import('../domain/provider/adapters'), cloudRequest<RecordValue>('/settings'), cloudRequest<RecordValue>('/auth/account'),
-      cloudRequest<{ publications: ModelPublication[]; upstreamModels: unknown }>('/models'), import('../domain/catalog/ModelCatalog'),
+      import('../domain/provider/adapters'), cloudRequest<RecordValue>('/settings'), cloudRequest<RecordValue>('/auth/account').catch(unavailable),
+      cloudRequest<{ publications: ModelPublication[]; upstreamModels: unknown }>('/models').catch(unavailable), import('../domain/catalog/ModelCatalog'),
       import('../domain/provider/UpstreamModels'),
       import('../../../shared/modelPublications'),
     ]);
-    const upstreamModels = parseUpstreamModels(models.upstreamModels);
-    modelCatalog.replacePublishedModels(models.publications.map(compilePublication).filter(model => model !== null) as import('../domain/catalog/ModelCatalog').CatalogModel[]);
+    const upstreamModels = models ? parseUpstreamModels(models.upstreamModels) : [];
+    modelCatalog.replacePublishedModels((models?.publications || []).map(compilePublication).filter(model => model !== null) as import('../domain/catalog/ModelCatalog').CatalogModel[]);
     const available = new Set(upstreamModels.map(model => model.id));
-    return { ...value, projectRootDir: root, apiKeyValid: true,
-      rawQuota: Number(account.app_quota || 0), usedQuota: Number(account.app_used_quota || 0),
+    return { ...value, projectRootDir: root, apiKeyValid: errors.length === 0, accountSyncError: errors.join('\n'),
+      rawQuota: Number(account?.app_quota || 0), usedQuota: Number(account?.app_used_quota || 0),
       upstreamModels,
       providerConfigs: Object.fromEntries(getProviderAdapters().map(adapter => [adapter.id, {
         apiKey: '', baseUrl: adapter.baseUrl, serverManaged: true,

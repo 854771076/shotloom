@@ -24,7 +24,7 @@ function expireSession() {
   window.dispatchEvent(new Event('shotloom-session-expired'));
 }
 
-function verifySession(): Promise<void> {
+export function verifyCloudSession(): Promise<void> {
   if (sessionCheck) return sessionCheck;
   const version = sessionVersion;
   const check = (async () => {
@@ -50,7 +50,7 @@ export async function cloudRequest<T>(path: string, method = 'GET', value?: unkn
   const result = await response.json() as { success: boolean; message: string; data: T };
   if (version === sessionVersion && response.status === 401) {
     if (path === '/auth/me') expireSession();
-    else await verifySession();
+    else await verifyCloudSession();
   }
   if (version === sessionVersion && response.status === 409 && (result as { code?: string }).code === 'ACCOUNT_CHANGED') expireSession();
   if (version === sessionVersion && path === '/auth/me' && response.ok && result.success) sessionExpired = false;

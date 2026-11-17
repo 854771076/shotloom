@@ -2,6 +2,54 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createRendererEnv } from './helpers/rendererSsr.mjs';
 
+test('upstream account and model failures preserve stored preferences and allow workspace initialization', async () => {
+  const env = await createRendererEnv({ storageMode: 'cloud', withWindow: true });
+  const originalFetch = globalThis.fetch;
+  let expired = 0;
+  window.dispatchEvent = () => { expired++; return true; };
+  globalThis.fetch = async url => {
+    if (url === '/api/settings') return Response.json({ success: true, data: { locale: 'en-US', agentCanRunNodes: false } });
+    if (url === '/api/auth/me') return Response.json({ success: true, data: { id: 'user' } });
+    return Response.json({ success: false, message: 'Gateway authorization unavailable' }, { status: url === '/api/models' ? 401 : 502 });
+  };
+  try {
+    const { createCloudApi } = await env.load('services/cloudApi');
+    const api = createCloudApi({ project: {}, file: {}, settings: {} });
+    const settings = await api.settings.get();
+    assert.equal(settings.locale, 'en-US');
+    assert.equal(settings.agentCanRunNodes, false);
+    assert.equal(settings.apiKeyValid, false);
+    assert.match(settings.accountSyncError, /Gateway authorization unavailable/);
+    assert.deepEqual(settings.upstreamModels, []);
+    assert.ok(Object.values(settings.providerConfigs).every(provider => !provider.allowedModelIds.length));
+    assert.equal(expired, 0);
+    globalThis.fetch = async () => Response.json({ success: false, message: 'Preferences unavailable' }, { status: 503 });
+    await assert.rejects(api.settings.get(), /Preferences unavailable/, 'stored preferences remain required');
+  } finally { globalThis.fetch = originalFetch; await env.dispose(); }
+});
+
+test('model relay and agent connection errors verify the application session before expiring it', async () => {
+  const env = await createRendererEnv({ storageMode: 'cloud', withWindow: true });
+  const originalFetch = globalThis.fetch;
+  let expired = 0, checked = 0;
+  window.dispatchEvent = () => { expired++; return true; };
+  globalThis.fetch = async url => {
+    if (url === '/api/auth/me') { checked++; return Response.json({ success: true, data: { id: 'user' } }); }
+    if (url === '/api/agent/connect') return Response.json({ success: true, data: { id: 'connection' } });
+    return Response.json({ success: false, message: 'Upstream unavailable' }, { status: 401 });
+  };
+  try {
+    const { createCloudApi } = await env.load('services/cloudApi');
+    const api = createCloudApi({ project: {}, file: {}, settings: {} });
+    await assert.rejects(api.model.chatCompletion({ model: 'fixture', messages: [] }));
+    assert.equal(expired, 0, 'a model token failure cannot expire the application');
+    const { connectCloudHarness } = await env.load('app/agent-session/cloudHarnessTransport');
+    await assert.rejects(connectCloudHarness());
+    assert.equal(expired, 0);
+    assert.equal(checked, 2);
+  } finally { globalThis.fetch = originalFetch; await env.dispose(); }
+});
+
 test('cloud settings install published upstream models as the runtime catalog without persisting server configuration', async () => {
   const env = await createRendererEnv({ storageMode: 'cloud' });
   const originalFetch = globalThis.fetch;
