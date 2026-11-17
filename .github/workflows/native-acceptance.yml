@@ -10,6 +10,10 @@ on:
         description: 'Optional old preview run to reproduce the login hang before upgrading'
         required: false
         default: ''
+      layout_only:
+        description: 'Verify native settings and English large-font layout on the pinned APK'
+        type: boolean
+        default: false
 permissions:
   contents: read
   actions: read
@@ -47,6 +51,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           BASELINE_RUN: ${{ inputs.baseline_run }}
+          LAYOUT_ONLY: ${{ inputs.layout_only }}
         run: gh run download "$BASELINE_RUN" --repo "$GITHUB_REPOSITORY" --name Shotloom-Android-Preview --dir baseline
       - name: Enable KVM
         run: sudo chmod 666 /dev/kvm
