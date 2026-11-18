@@ -23,6 +23,7 @@ export default defineConfig({
     },
   },
   build: {
+    manifest: true,
     outDir: path.join(rootDir, 'dist', 'renderer'),
     emptyOutDir: true,
     // 桌面端从本地磁盘加载 dist/renderer，百万字节级的 vendor chunk 不是网络问题；
