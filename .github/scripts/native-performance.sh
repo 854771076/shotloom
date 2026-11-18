@@ -5,6 +5,14 @@ adb shell wm size 750x1624
 adb shell wm density 320
 adb shell settings put global private_dns_mode off
 adb shell settings put system font_scale 1.0
+expected_dns=$(python3 -c "import socket; print(socket.gethostbyname('shotloom.0xfiang.com'))")
+for attempt in {1..24}; do
+  device_dns=$(adb shell ping -c 1 -W 1 shotloom.0xfiang.com 2>&1 || true)
+  if [[ "$device_dns" == *"$expected_dns"* ]]; then break; fi
+  sleep 2
+done
+printf '%s\n' "$device_dns" > perf/device-dns.txt
+[[ "$device_dns" == *"$expected_dns"* ]]
 adb install acceptance/Shotloom-Preview.apk
 adb install acceptance/Shotloom-Session-Test.apk
 adb install perf/measure.apk
@@ -35,7 +43,7 @@ import json,sys
 text=open('/tmp/performance-output.txt').read()
 line=next((s.split('PERFORMANCE_JSON ',1)[1] for s in text.splitlines() if 'PERFORMANCE_JSON ' in s),None)
 if line is None:
- print('\n'.join(s for s in text.splitlines() if s.startswith(('INSTRUMENTATION_RESULT:', 'INSTRUMENTATION_FAILED:'))))
+ print('\n'.join(s for s in text.splitlines() if s.startswith(('INSTRUMENTATION_RESULT:', 'INSTRUMENTATION_FAILED:')) or 'PERFORMANCE_FAILED' in s))
  raise SystemExit('Measurement output missing')
 result=json.loads(line)
 with open('perf/results-'+sys.argv[1]+'.json','w') as f: json.dump(result,f,indent=2)

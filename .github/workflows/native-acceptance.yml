@@ -215,6 +215,7 @@ jobs:
           path: |
             perf/results*.json
             perf/device.txt
+            perf/device-dns.txt
             perf/failure.png
             perf/dns.log
           retention-days: 14
