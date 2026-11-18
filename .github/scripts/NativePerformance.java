@@ -124,11 +124,16 @@ public final class NativePerformance extends Instrumentation {
         pages.put(new JSONObject().put("page",name).put("round",0).put("ms",SystemClock.elapsedRealtime()-start).put("kind","interaction"));SystemClock.sleep(120);
     }
     private boolean enabled(AccessibilityNodeInfo root,String label){AccessibilityNodeInfo n=find(root,label);return n!=null&&n.isEnabled()&&!spinning(root);}
+    private AccessibilityNodeInfo findSwitch(AccessibilityNodeInfo node,String label) {
+        if(node==null)return null;
+        if(node.isVisibleToUser()&&String.valueOf(node.getClassName()).contains("Switch")&&label.contentEquals(node.getContentDescription()==null?"":node.getContentDescription()))return node;
+        for(int i=0;i<node.getChildCount();i++){AccessibilityNodeInfo hit=findSwitch(node.getChild(i),label);if(hit!=null)return hit;}return null;
+    }
     private void changeSwitch(String name,String label) throws Exception {
         currentAction=name;
-        AccessibilityNodeInfo node=locate(label);final boolean before=node.isChecked();long start=SystemClock.elapsedRealtime();tapNode(node);
-        until(root->{AccessibilityNodeInfo n=find(root,label);return n!=null&&(!n.isEnabled()||spinning(root));});
-        until(root->{AccessibilityNodeInfo n=find(root,label);return n!=null&&n.isChecked()!=before&&n.isEnabled()&&!spinning(root);});
+        AccessibilityNodeInfo node=null;for(int i=0;i<7;i++){node=findSwitch(ui.getRootInActiveWindow(),label);if(node!=null)break;swipe();}if(node==null)throw new Exception("Switch missing: "+label);final boolean before=node.isChecked();long start=SystemClock.elapsedRealtime();tapNode(node);
+        until(root->{AccessibilityNodeInfo n=findSwitch(root,label);return n!=null&&(!n.isEnabled()||spinning(root));});
+        until(root->{AccessibilityNodeInfo n=findSwitch(root,label);return n!=null&&n.isChecked()!=before&&n.isEnabled()&&!spinning(root);});
         pages.put(new JSONObject().put("page",name).put("round",0).put("ms",SystemClock.elapsedRealtime()-start).put("kind","interaction"));SystemClock.sleep(120);
     }
     private void measuredBack(String name,String ready) throws Exception {
