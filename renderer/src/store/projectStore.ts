@@ -859,14 +859,16 @@ async function applyOpenedProject(result: AnyRecord) {
   if (restoration.failures.length) {
     showErrorMessage(t('project.restoreFailed', { count: restoration.failures.length }), t('project.restorePartial'));
   }
-  await desktopApi.recent.add({
+  const recent = desktopApi.recent.add({
     name: store.project.name,
     folderName: store.project.library?.name || '',
     seriesName: store.project.series?.name || '',
     filePath: store.filePath,
     projectDir: store.projectDir,
-  });
-  await loadRecentProjects();
+  }).then(() => loadRecentProjects());
+  if (cloudEnabled && new URLSearchParams(window.location.search).get('native') === 'embedded') {
+    void recent.catch((cause: unknown) => showErrorMessage(String(cause)));
+  } else await recent;
   persistSession();
   showToast(t('project.opened'), 'success');
   return true;

@@ -24,6 +24,7 @@ const SettingsChanged = createContext({ revision: 0, changed: () => {} });
 const PageActive = createContext(true);
 const ApiContext = createContext<NativeApi | null>(null);
 const SessionContext = createContext<(NativeSession & { expire: () => void }) | null>(null);
+const WorkspaceCookieReady = createContext(false);
 function useApi() { const value = useContext(ApiContext); if (!value) throw new Error('Session unavailable'); return value; }
 const errorText = (value: unknown) => value instanceof Error ? value.message : String(value);
 const date = (value: string) => new Date(value).toLocaleString(language);
@@ -149,9 +150,9 @@ function Home({ navigation }: NativeStackScreenProps<Routes, 'Home'>) {
     { id: 'account', label: t('account.title'), icon: 'user' },
   ];
   return <SafeAreaView style={styles.screen}><StatusBar barStyle="dark-content" backgroundColor={colors.background} /><View style={styles.grow}>
-    {visited.includes('projects') && <View style={[styles.screen, tab !== 'projects' && styles.parkedWorkspace]}><PageActive.Provider value={tab === 'projects'}><Projects navigation={navigation} onOpen={open} /></PageActive.Provider></View>}
-    {visited.includes('account') && <View style={[styles.screen, tab !== 'account' && styles.parkedWorkspace]}><PageActive.Provider value={tab === 'account'}><Account navigation={navigation} /></PageActive.Provider></View>}
-    {visited.includes('skills') && <View style={[styles.screen, tab !== 'skills' && styles.parkedWorkspace]}><NativeSkills api={api} active={tab === 'skills'} /></View>}
+    {visited.includes('projects') && <View style={[styles.screen, tab !== 'projects' && styles.parkedWorkspace]} pointerEvents={tab === 'projects' ? 'auto' : 'none'} accessibilityElementsHidden={tab !== 'projects'} importantForAccessibility={tab === 'projects' ? 'auto' : 'no-hide-descendants'}><PageActive.Provider value={tab === 'projects'}><Projects navigation={navigation} onOpen={open} /></PageActive.Provider></View>}
+    {visited.includes('account') && <View style={[styles.screen, tab !== 'account' && styles.parkedWorkspace]} pointerEvents={tab === 'account' ? 'auto' : 'none'} accessibilityElementsHidden={tab !== 'account'} importantForAccessibility={tab === 'account' ? 'auto' : 'no-hide-descendants'}><PageActive.Provider value={tab === 'account'}><Account navigation={navigation} /></PageActive.Provider></View>}
+    {visited.includes('skills') && <View style={[styles.screen, tab !== 'skills' && styles.parkedWorkspace]} pointerEvents={tab === 'skills' ? 'auto' : 'none'} accessibilityElementsHidden={tab !== 'skills'} importantForAccessibility={tab === 'skills' ? 'auto' : 'no-hide-descendants'}><NativeSkills api={api} active={tab === 'skills'} /></View>}
     {currentProject && <View style={[styles.screen, tab !== 'creation' && styles.parkedWorkspace]} pointerEvents={tab === 'creation' ? 'auto' : 'none'} accessibilityElementsHidden={tab !== 'creation'} importantForAccessibility={tab === 'creation' ? 'auto' : 'no-hide-descendants'}><WebContent key={currentProject.id} params={currentProject} /></View>}
   </View><View accessibilityRole="tablist" style={styles.tabs}>{tabs.map(item => <Pressable key={item.id} accessibilityRole="tab" accessibilityState={{ selected: tab === item.id, disabled: item.id === 'creation' && !currentProject }} disabled={item.id === 'creation' && !currentProject} onPress={() => { if (item.id === 'creation') { if (currentProject) open(currentProject); } else setTab(item.id); }} style={({ pressed }) => [styles.tab, tab === item.id && styles.tabActive, item.id === 'creation' && !currentProject && styles.disabled, pressed && styles.pressed]}><Icon name={item.icon} color={tab === item.id ? colors.accent : colors.muted} /><Text style={[styles.tabText, tab === item.id && styles.tabTextActive]}>{item.label}</Text></Pressable>)}</View></SafeAreaView>;
 }
@@ -249,9 +250,34 @@ function Notifications({ navigation }: NativeStackScreenProps<Routes, 'Notificat
     {(data?.total || 0) > 20 && <View style={styles.pager}><Action ghost title={local('上一页', 'Previous')} disabled={!page || loading || busy} onPress={() => setPage(value => value - 1)} /><Text style={styles.small}>{page + 1} / {Math.ceil((data?.total || 0) / 20)}</Text><Action ghost title={local('下一页', 'Next')} disabled={loading || busy || (page + 1) * 20 >= (data?.total || 0)} onPress={() => setPage(value => value + 1)} /></View>}
   </SafeAreaView>;
 }
+function WorkspaceSession({ session, children }: { session: NativeSession; children: React.ReactNode }) {
+  const [source, setSource] = useState<Awaited<ReturnType<typeof workspaceSource>>>();
+  const [readyToken, setReadyToken] = useState('');
+  useEffect(() => {
+    let active = true;
+    setSource(undefined); setReadyToken('');
+    // Warm only the cookie store and WebView engine; this page contains no workspace or account data.
+    const timer = setTimeout(() => { active = false; setSource(undefined); }, 15000);
+    void workspaceSource(origin, session.token, `${origin}/?native=prewarm`).then(value => { if (active) setSource(value); }).catch(() => {});
+    return () => { active = false; clearTimeout(timer); };
+  }, [session.token]);
+  return <WorkspaceCookieReady.Provider value={readyToken === session.token}>{children}
+    {source && <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}>
+      <WebView source={source} sharedCookiesEnabled thirdPartyCookiesEnabled={false} mixedContentMode="never" setSupportMultipleWindows={false}
+        onMessage={event => {
+          try {
+            if (new URL(event.nativeEvent.url).origin !== origin) return;
+            const value = JSON.parse(event.nativeEvent.data);
+            if (value.type === 'workspace-session-ready' && value.userId === session.userId) { setReadyToken(session.token); setSource(undefined); }
+          } catch { /* A failed warmup falls back to the normal one-time handoff. */ }
+        }} onError={() => setSource(undefined)} onHttpError={() => setSource(undefined)} />
+    </View>}
+  </WorkspaceCookieReady.Provider>;
+}
 function WebContent({ params }: { params: Routes['Workspace'] }) {
   const api = useApi();
   const session = useContext(SessionContext)!;
+  const cookieReady = useContext(WorkspaceCookieReady);
   const webview = useRef<WebView>(null);
   const { revision } = useContext(SettingsChanged);
   const [ready, setReady] = useState(false);
@@ -265,13 +291,18 @@ function WebContent({ params }: { params: Routes['Workspace'] }) {
   if (params.folder) query.set('folder', params.folder);
   query.set('native', 'embedded');
   const target = `${origin}/?${query}`;
-  const [source, setSource] = useState<Awaited<ReturnType<typeof workspaceSource>>>();
+  const [source, setSource] = useState<Awaited<ReturnType<typeof workspaceSource>> | { uri: string }>();
+  const reuseCookie = useRef(cookieReady);
   const document = useRef({ target: '', retry: -1 });
   useEffect(() => {
     let active = true;
     const recovering = Boolean(webview.current && document.current.target === target && document.current.retry === retry);
     if (!recovering) { setSource(undefined); setReady(false); }
     setError('');
+    if (!recovering && reuseCookie.current && retry === 0) {
+      document.current = { target, retry }; setSource({ uri: target });
+      return () => { active = false; };
+    }
     void workspaceSource(origin, session.token, target).then(value => {
       if (!active) return;
       if (recovering) {
@@ -288,7 +319,8 @@ function WebContent({ params }: { params: Routes['Workspace'] }) {
   const injected = `window.__SHOTLOOM_MOBILE__ = true; try { localStorage.setItem('shotloom:locale', ${JSON.stringify(language)}); } catch {} document.documentElement.dataset.nativeEmbedded='true'; true;`;
   return <View style={styles.screen}>{error && <ErrorNotice text={error} retry={() => { setError(''); setReady(false); setRetry(value => value + 1); }} />}
     {source && <WebView ref={webview} key={retry} source={source} style={[styles.screen, !ready && !error && { opacity: 0 }]} sharedCookiesEnabled thirdPartyCookiesEnabled={false} contentInsetAdjustmentBehavior="never" automaticallyAdjustContentInsets={false} contentInset={{ top: 0, bottom: 0, left: 0, right: 0 }}
-      onMessage={event => { try { if (new URL(event.nativeEvent.url).origin !== origin) return; const value = JSON.parse(event.nativeEvent.data); if (value.type === 'workspace-ready' || value.type === 'workspace-blocked') { setReady(true); if (value.status === 'login' || value.status === 'account') session.expire(); } else if (value.type === 'workspace-session-error') setError(String(value.error)); else if (value.type === 'workspace-mutated') api.invalidateWrite(typeof value.path === 'string' ? value.path : ''); } catch {} }}
+      injectedJavaScriptObject={{ userId: session.userId, locale: language }}
+      onMessage={event => { try { if (new URL(event.nativeEvent.url).origin !== origin) return; const value = JSON.parse(event.nativeEvent.data); if (value.type === 'workspace-blocked' && value.status === 'login' && reuseCookie.current && retry === 0 && !ready) { reuseCookie.current = false; setRetry(value => value + 1); return; } if (value.type === 'workspace-ready' || value.type === 'workspace-blocked') { setReady(true); if (value.status === 'login' || value.status === 'account') session.expire(); } else if (value.type === 'workspace-session-error') setError(String(value.error)); else if (value.type === 'workspace-mutated') api.invalidateWrite(typeof value.path === 'string' ? value.path : ''); } catch {} }}
       mixedContentMode="never" setSupportMultipleWindows={false} injectedJavaScriptBeforeContentLoaded={injected} onError={event => setError(event.nativeEvent.description)} onHttpError={event => setError(`HTTP ${event.nativeEvent.statusCode}`)} />}
     {!ready && !error && <View style={[styles.empty, { position: 'absolute', inset: 0, backgroundColor: colors.background }]}><ActivityIndicator color={colors.accent} /><Text style={styles.secondary}>{params.id ? local('正在打开画布…', 'Opening canvas…') : local('正在打开页面…', 'Opening page…')}</Text></View>}
   </View>;
@@ -361,7 +393,7 @@ export default function App() {
   };
   return <SafeAreaProvider><View style={styles.screen}><ApiContext.Provider value={api}><SessionContext.Provider value={session ? { ...session, expire: () => { api?.pause(); setAuthenticated(false); } } : null}><SettingsChanged.Provider value={{ revision: settingsRevision, changed }}><LogoutContext.Provider value={() => void logout()}>
     {authenticated && failure ? <ErrorNotice text={failure} /> : null}
-    {opened && <View style={styles.screen} pointerEvents={authenticated ? 'auto' : 'none'} accessibilityElementsHidden={!authenticated} importantForAccessibility={authenticated ? 'auto' : 'no-hide-descendants'}><NavigationContainer linking={{ prefixes: ['shotloom-preview://'], config: { screens: { Feedback: 'feedback/:id', Notifications: 'notifications' } } }}>
+    {opened && session && <WorkspaceSession session={session}><View style={styles.screen} pointerEvents={authenticated ? 'auto' : 'none'} accessibilityElementsHidden={!authenticated} importantForAccessibility={authenticated ? 'auto' : 'no-hide-descendants'}><NavigationContainer linking={{ prefixes: ['shotloom-preview://'], config: { screens: { Feedback: 'feedback/:id', Notifications: 'notifications' } } }}>
       <Stack.Navigator screenOptions={{ headerBackButtonDisplayMode: 'minimal', contentStyle: styles.screen, headerShadowVisible: false, headerStyle: { backgroundColor: colors.background }, headerTintColor: colors.text, headerTitleStyle: { fontSize: 16, fontWeight: '500' } }}>
         <Stack.Screen name="Home" component={Home} options={{ headerShown: false }} />
         <Stack.Screen name="Settings" component={Settings} options={{ title: t('account.settings') }} />
@@ -371,7 +403,7 @@ export default function App() {
         <Stack.Screen name="Notifications" component={Notifications} options={{ title: t('support.notifications') }} />
         <Stack.Screen name="Workspace" component={Workspace} options={({ route }) => ({ title: route.params.name, headerShown: !route.params.id })} />
       </Stack.Navigator>
-    </NavigationContainer></View>}
+    </NavigationContainer></View></WorkspaceSession>}
     {!authenticated && <SafeAreaView style={styles.loginBridge}><ScrollView contentContainerStyle={[styles.list, { justifyContent: 'center' }]}>
       <View style={[styles.row, { padding: 28, gap: 24 }]}>
         <View style={styles.inline}><Image source={require('../assets/shotloom-logo.png')} style={{ width: 44, height: 44, borderRadius: 12 }} /><Text style={styles.heading}>Shotloom</Text></View>

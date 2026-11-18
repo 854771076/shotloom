@@ -19,7 +19,7 @@ exports.StyleSheet={create:x=>x,absoluteFillObject:{}}; exports.Platform={OS:'an
 state.foreground=new Set();exports.AppState={currentState:'active',addEventListener:(_,fn)=>{state.foreground.add(fn);return {remove(){state.foreground.delete(fn)}}}};
 exports.BackHandler={addEventListener:(_,fn)=>{state.back=fn;return {remove(){if(state.back===fn)state.back=null}}}};
 exports.Alert={alert(){}};
-exports.WebView=React.forwardRef((props,ref)=>{React.useEffect(()=>{if(props.source?.uri?.includes('project='))state.mounts++;},[]);React.useImperativeHandle(ref,()=>({injectJavaScript(script){state.send?.(script)},reload(){state.reload?.()}}));return React.createElement('WebView',props)});
+exports.WebView=React.forwardRef((props,ref)=>{React.useEffect(()=>{if(props.source?.uri?.includes('project='))state.mounts++;if(props.source?.uri?.includes('native=prewarm')&&!state.holdWarmup)props.onMessage({nativeEvent:{url:props.source.uri,data:JSON.stringify({type:'workspace-session-ready',userId:state.session.userId})}});},[]);React.useImperativeHandle(ref,()=>({injectJavaScript(script){state.send?.(script)},reload(){state.reload?.()}}));return React.createElement('WebView',props)});
 exports.SafeAreaProvider=exports.SafeAreaView=({children,...props})=>React.createElement('View',props,children);
 exports.SvgXml='SvgXml'; exports.getLocales=()=>[{languageCode:'en'}]; exports.randomUUID=()=> '11111111-1111-4111-8111-111111111111';
 exports.NavigationContainer=({children})=>children; exports.useFocusEffect=fn=>React.useEffect(fn,[fn]);
@@ -33,7 +33,7 @@ exports.NativeApi=class {cache=new Map();cached(path){return this.cache.get(path
 exports.createNativeApi=(_origin,_token,_uuid,expired)=>{state.expire=expired;return new exports.NativeApi()};
 const request=exports.NativeApi.prototype.request;exports.NativeApi.prototype.request=async function(...args){await state.beforeRequest?.(...args);return request.apply(this,args)};
 exports.restoreSession=async()=>state.session;exports.clearSession=async()=>{state.session=null};exports.login=async(_origin,expected)=>{state.logins++;if(state.cancel)return null;if(expected&&expected!==state.loginUser)throw new Error('Account changed');return state.session={token:'fresh-token',userId:state.loginUser}};
-exports.workspaceSource=async(_origin,_token,redirect)=>({uri:redirect,method:'POST',body:'code=one-time'});
+exports.workspaceSource=async(_origin,_token,redirect)=>{(state.handoffs??=[]).push(redirect);return {uri:redirect,method:'POST',body:'code=one-time'}};
 exports.getDocumentAsync=async()=>({canceled:true});exports.isAvailableAsync=async()=>true;exports.shareAsync=async()=>{};
 exports.File=class {};exports.Paths={cache:'cache'};
 `;
@@ -110,16 +110,39 @@ test('project search and the same canvas survive tab roundtrips without creating
     const workspace = tree.root.findAllByType('WebView' as any)[0]!;
     assert.equal(workspace.props.automaticallyAdjustContentInsets, false, 'native safe area owns the inset');
     assert.deepEqual(workspace.props.contentInset, { top: 0, bottom: 0, left: 0, right: 0 });
-    assert.equal(workspace.props.source.method, 'POST');
+    assert.equal(workspace.props.source.method, undefined, 'a warmed cookie opens the document directly');
+    assert.equal(state.handoffs.length, 1, 'one session handoff was performed before opening the canvas');
+    assert.deepEqual(workspace.props.injectedJavaScriptObject, { userId: 'fixture-user', locale: 'en-US' });
     assert.equal(JSON.stringify(workspace.props.source).includes('fixture-token'), false);
     let restoration = '';
     state.send = (script: string) => { restoration = script; };
+    await act(async () => workspace.props.onMessage({ nativeEvent: { url: workspace.props.source.uri, data: JSON.stringify({ type: 'workspace-ready' }) } }));
     await act(async () => workspace.props.onMessage({ nativeEvent: { url: workspace.props.source.uri, data: JSON.stringify({ type: 'workspace-blocked', status: 'login' }) } }));
     const signIn = tree.root.findAllByType('Pressable' as any).find(x => x.findAllByType('Text' as any).some(t => t.props.children === 'Sign in with new-api'))!;
     await act(async () => signIn.props.onPress());
     assert.equal(state.mounts, 1, 'reauthentication keeps the loaded canvas document and its unsaved state');
     assert.match(restoration, /credentials:'include'/);
     assert.equal(restoration.includes('fresh-token'), false, 'persistent credentials never enter page JavaScript');
+  } finally { await act(async () => tree.unmount()); }
+});
+
+test('a missing warmed cookie falls back once to the authenticated POST handoff', async () => {
+  const App = await loadApp();
+  let tree!: ReturnType<typeof create>;
+  await act(async () => { tree = create(React.createElement(App)); });
+  const state = (globalThis as any).__nativeUi;
+  try {
+    const card = tree.root.findAllByType('Pressable' as any).find(x => x.findAllByType('Text' as any).some(t => t.props.children === 'Fixture project'))!;
+    await act(async () => card.props.onPress());
+    const before = tree.root.findAllByType('WebView' as any)[0]!;
+    assert.equal(before.props.source.method, undefined);
+    await act(async () => before.props.onMessage({ nativeEvent: { url: before.props.source.uri, data: JSON.stringify({ type: 'workspace-blocked', status: 'login' }) } }));
+    const after = tree.root.findAllByType('WebView' as any)[0]!;
+    assert.equal(after.props.source.method, 'POST');
+    assert.equal(state.handoffs.length, 2);
+    assert.equal(state.logins, 0, 'lost cookies must not reopen OAuth');
+    await act(async () => after.props.onMessage({ nativeEvent: { url: after.props.source.uri, data: JSON.stringify({ type: 'workspace-blocked', status: 'login' }) } }));
+    assert.equal(state.handoffs.length, 2, 'revoked sessions cannot create a retry loop');
   } finally { await act(async () => tree.unmount()); }
 });
 

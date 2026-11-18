@@ -203,9 +203,16 @@ authApp.post('/native/workspace', async c => {
   const body = await c.req.parseBody();
   if (typeof body.code !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(body.code)) throw badRequest('工作区凭据无效');
   const ticket = consumeNativeTicket(body.code, 'workspace');
-  if (ticket.kind !== 'workspace' || !await loadSession(ticket.sessionId)) throw unauthorized();
+  if (ticket.kind !== 'workspace') throw unauthorized();
+  const session = await loadSession(ticket.sessionId);
+  if (!session) throw unauthorized();
   issueSessionCookie(c, ticket.sessionId);
   c.header('Referrer-Policy', 'no-referrer');
+  c.header('Cache-Control', 'no-store');
+  if (new URL(ticket.redirect).searchParams.get('native') === 'prewarm') {
+    const message = JSON.stringify({ type: 'workspace-session-ready', userId: session.userId }).replace(/</g, '\\u003c');
+    return c.html(`<!doctype html><html><head><meta name="viewport" content="width=device-width"></head><body><script>window.ReactNativeWebView?.postMessage(JSON.stringify(${message}));</script></body></html>`);
+  }
   return c.redirect(ticket.redirect, 303);
 });
 

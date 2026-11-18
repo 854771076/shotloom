@@ -98,6 +98,17 @@ test('native exchange, scoped API access, workspace cookies and logout use the s
     assert.equal(workspace.headers.get('location'), 'http://localhost:5173/?project=fixture&native=embedded');
     assert.ok(workspace.headers.getSetCookie().some(cookie => cookie.startsWith(`shotloom_session=${sessionId}`) && cookie.includes('HttpOnly')));
     assert.equal((await source()).status, 401);
+    const warmTicket = await request('/api/auth/native/workspace-ticket', 'POST', { redirect: '/?native=prewarm' }, token);
+    const warmCode = (await warmTicket.json()).data.code;
+    const warm = await app.request('/api/auth/native/workspace', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', origin: 'null' }, body: new URLSearchParams({ code: warmCode }).toString() });
+    assert.equal(warm.status, 200);
+    assert.equal(warm.headers.get('cache-control'), 'no-store');
+    assert.ok(warm.headers.getSetCookie().some(cookie => cookie.includes('HttpOnly')));
+    const warmHtml = await warm.text();
+    assert.match(warmHtml, /workspace-session-ready/);
+    assert.ok(warmHtml.includes(userId));
+    assert.equal(warmHtml.includes(sessionId), false, 'session credentials stay in HttpOnly cookies');
+    assert.equal(warmHtml.includes('private-provider-token'), false);
     assert.equal((await request('/api/auth/logout', 'POST', undefined, token)).status, 200);
     assert.equal(exists, false);
     assert.equal((await request('/api/auth/me', 'GET', undefined, token)).status, 401);

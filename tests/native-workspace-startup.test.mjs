@@ -12,7 +12,7 @@ function startup(dependencies, search = '?native=embedded&project=fixture', clou
   return run(...Object.values(context));
 }
 
-test('embedded canvas loads preferences and catalogs concurrently without duplicate library reads', async () => {
+test('embedded canvas waits only for preferences and project data before becoming ready', async () => {
   const calls = [];
   let release;
   const gate = new Promise(resolve => { release = resolve; });
@@ -22,10 +22,28 @@ test('embedded canvas loads preferences and catalogs concurrently without duplic
   const parallel = [...calls];
   release();
   await pending;
-  assert.deepEqual(parallel.sort(), ['loadAppSettings', 'loadGlobalRecipes', 'loadGlobalSkills']);
+  assert.deepEqual(parallel, ['loadAppSettings']);
   assert.equal(calls.filter(name => name === 'loadBoundWindowProject').length, 1);
   assert.ok(!calls.includes('loadRecentProjects'), 'opening the project already refreshes the project library');
   assert.ok(!calls.includes('initializeResourceLibraries'), 'project reconciliation already awaits a fresh asset catalog');
+});
+
+test('embedded canvas opens while recent-project bookkeeping is pending', async () => {
+  const env = await createRendererEnv({ storageMode: 'cloud', storage: new Map(), withWindow: true });
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  try {
+    window.location = { search: '?native=embedded&project=fixture' };
+    const { desktopApi } = await env.load('services/desktopApi');
+    const { loadBoundWindowProject } = await env.load('store/projectStore');
+    desktopApi.project.getWindowProjectDir = async () => 'cloud/projects/fixture';
+    desktopApi.project.readFile = async () => ({ schema: 'shotloom-project', schemaVersion: 2, id: 'fixture', nodes: [], edges: [], tasks: [], materials: [], assets: [] });
+    desktopApi.localAssets.getCatalog = async () => ({ assets: [], materials: [], references: [] });
+    desktopApi.recent.add = async () => { await gate; throw new Error('Recent list unavailable'); };
+    assert.equal(await Promise.race([loadBoundWindowProject(), new Promise((_, reject) => setTimeout(() => reject(new Error('Canvas blocked on recent list')), 1000))]), true);
+    release();
+    await new Promise(resolve => setImmediate(resolve));
+  } finally { release(); await env.dispose(); }
 });
 
 test('missing embedded project still refreshes the library', async () => {

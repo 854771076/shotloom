@@ -18,6 +18,31 @@ type RecordValue = Record<string, unknown>;
 type PlatformApi = ReturnType<typeof createTauriApi>;
 const root = 'cloud/projects';
 
+export async function loadCloudPreferences() {
+  return { ...await cloudRequest<RecordValue>('/settings'), projectRootDir: root, apiKeyValid: false };
+}
+
+export async function loadCloudAccountSettings() {
+  const errors: string[] = [];
+  const unavailable = (cause: unknown) => { errors.push(cause instanceof Error ? cause.message : String(cause)); return null; };
+  const [{ getProviderAdapters }, account, models, { getCatalogModels, modelCatalog }, { parseUpstreamModels }, { compilePublication }] = await Promise.all([
+    import('../domain/provider/adapters'), cloudRequest<RecordValue>('/auth/account').catch(unavailable),
+    cloudRequest<{ publications: ModelPublication[]; upstreamModels: unknown }>('/models').catch(unavailable), import('../domain/catalog/ModelCatalog'),
+    import('../domain/provider/UpstreamModels'), import('../../../shared/modelPublications'),
+  ]);
+  const upstreamModels = models ? parseUpstreamModels(models.upstreamModels) : [];
+  modelCatalog.replacePublishedModels((models?.publications || []).map(compilePublication).filter(model => model !== null) as import('../domain/catalog/ModelCatalog').CatalogModel[]);
+  const available = new Set(upstreamModels.map(model => model.id));
+  return {
+    apiKeyValid: errors.length === 0, accountSyncError: errors.join('\n'),
+    rawQuota: Number(account?.app_quota || 0), usedQuota: Number(account?.app_used_quota || 0), upstreamModels,
+    providerConfigs: Object.fromEntries(getProviderAdapters().map(adapter => [adapter.id, {
+      apiKey: '', baseUrl: adapter.baseUrl, serverManaged: true,
+      allowedModelIds: getCatalogModels(adapter.id).filter(model => available.has(model.upstreamModel || model.id)).map(model => model.id),
+    }])),
+  };
+}
+
 export function cloudProjectId(path: string): string {
   const id = path.replace(/\\/g, '/').replace(/\/project\.sqlite$/, '').split('/').at(-1) || '';
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) throw new Error('Invalid cloud project reference');
@@ -239,25 +264,8 @@ export function createCloudApi(local: PlatformApi): PlatformApi {
   };
   const catalog = (kind: string) => cloudRequest<RecordValue>(`/catalog/${kind}`);
   const settings = async () => {
-    const errors: string[] = [];
-    const unavailable = (cause: unknown) => { errors.push(cause instanceof Error ? cause.message : String(cause)); return null; };
-    const [{ getProviderAdapters }, value, account, models, { getCatalogModels, modelCatalog }, { parseUpstreamModels }, { compilePublication }] = await Promise.all([
-      import('../domain/provider/adapters'), cloudRequest<RecordValue>('/settings'), cloudRequest<RecordValue>('/auth/account').catch(unavailable),
-      cloudRequest<{ publications: ModelPublication[]; upstreamModels: unknown }>('/models').catch(unavailable), import('../domain/catalog/ModelCatalog'),
-      import('../domain/provider/UpstreamModels'),
-      import('../../../shared/modelPublications'),
-    ]);
-    const upstreamModels = models ? parseUpstreamModels(models.upstreamModels) : [];
-    modelCatalog.replacePublishedModels((models?.publications || []).map(compilePublication).filter(model => model !== null) as import('../domain/catalog/ModelCatalog').CatalogModel[]);
-    const available = new Set(upstreamModels.map(model => model.id));
-    return { ...value, projectRootDir: root, apiKeyValid: errors.length === 0, accountSyncError: errors.join('\n'),
-      rawQuota: Number(account?.app_quota || 0), usedQuota: Number(account?.app_used_quota || 0),
-      upstreamModels,
-      providerConfigs: Object.fromEntries(getProviderAdapters().map(adapter => [adapter.id, {
-        apiKey: '', baseUrl: adapter.baseUrl, serverManaged: true,
-        allowedModelIds: getCatalogModels(adapter.id).filter(model => available.has(model.upstreamModel || model.id)).map(model => model.id),
-      }])),
-    };
+    const [preferences, account] = await Promise.all([loadCloudPreferences(), loadCloudAccountSettings()]);
+    return { ...preferences, ...account };
   };
   const snapshotPath = (dir: string, node: string) => `/project/${cloudProjectId(dir)}/snapshot/${encodeURIComponent(node)}`;
   const editorPath = (dir: string, node: string, key: string) => `/project/${cloudProjectId(dir)}/editor/${encodeURIComponent(node)}/${encodeURIComponent(key)}`;

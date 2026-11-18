@@ -2,6 +2,38 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createRendererEnv } from './helpers/rendererSsr.mjs';
 
+test('session reads reuse a short memory cache but forced checks detect revocation and account changes', async () => {
+  const env = await createRendererEnv({ withWindow: true });
+  const original = globalThis.fetch;
+  let calls = 0, status = 200, user = 'user';
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  globalThis.fetch = async (_url, init) => {
+    calls++;
+    assert.equal(init.headers['x-shotloom-user'], 'user');
+    await gate;
+    return Response.json({ success: status === 200, data: { id: user } }, { status });
+  };
+  try {
+    const { readCloudSession, bindCloudUser, verifyCloudSession } = await env.load('services/cloudRequest');
+    const events = [];
+    window.dispatchEvent = event => { events.push(event.type); return true; };
+    bindCloudUser('user');
+    const first = readCloudSession(), second = readCloudSession();
+    assert.equal(calls, 1);
+    release();
+    assert.equal((await first).id, 'user'); await second;
+    await readCloudSession();
+    assert.equal(calls, 1);
+    status = 401;
+    await verifyCloudSession();
+    assert.equal(calls, 2, '401 verification bypasses cached success');
+    assert.equal(events.length, 1);
+    status = 200; user = 'other'; bindCloudUser('user');
+    await assert.rejects(readCloudSession(), error => error.code === 'ACCOUNT_CHANGED');
+  } finally { release(); globalThis.fetch = original; await env.dispose(); }
+});
+
 test('upstream failures verify the cookie session once without logging out or replaying writes', async () => {
   const env = await createRendererEnv({ withWindow: true });
   const originalFetch = globalThis.fetch;

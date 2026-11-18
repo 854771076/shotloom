@@ -2,6 +2,35 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createRendererEnv } from './helpers/rendererSsr.mjs';
 
+test('embedded preferences do not wait for upstream services and account refresh preserves edits', async () => {
+  const env = await createRendererEnv({ storageMode: 'cloud', withWindow: true });
+  const original = globalThis.fetch;
+  const calls = [];
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  globalThis.fetch = async url => {
+    calls.push(url);
+    if (url === '/api/settings') return Response.json({ success: true, data: { locale: 'en-US', agentCanRunNodes: false, agentPreferredTextModel: 'custom-model' } });
+    await gate;
+    return Response.json({ success: true, data: url === '/api/models' ? { publications: [], upstreamModels: [] } : { app_quota: 123 } });
+  };
+  try {
+    const { loadAppSettings, refreshCloudAccountSettings, settingsStore } = await env.load('store/settingsStore');
+    await Promise.race([loadAppSettings({ preferencesOnly: true }), new Promise((_, reject) => setTimeout(() => reject(new Error('Preferences are blocked by upstream requests')), 1000))]);
+    assert.deepEqual(calls, ['/api/settings']);
+    assert.equal(settingsStore.agentPreferredTextModel, 'custom-model');
+    assert.equal(settingsStore.apiKeyValid, false, 'generation stays unavailable until model authorization is loaded');
+    const pending = refreshCloudAccountSettings();
+    settingsStore.agentCanRunNodes = true;
+    release();
+    await pending;
+    assert.equal(settingsStore.agentCanRunNodes, true, 'late account responses cannot overwrite user edits');
+    assert.equal(settingsStore.agentPreferredTextModel, 'custom-model');
+    assert.equal(settingsStore.rawQuota, 123);
+    assert.equal(calls.filter(url => url === '/api/settings').length, 1);
+  } finally { release(); globalThis.fetch = original; await env.dispose(); }
+});
+
 test('upstream account and model failures preserve stored preferences and allow workspace initialization', async () => {
   const env = await createRendererEnv({ storageMode: 'cloud', withWindow: true });
   const originalFetch = globalThis.fetch;

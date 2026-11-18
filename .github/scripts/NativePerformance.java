@@ -39,8 +39,12 @@ public final class NativePerformance extends Instrumentation {
         long limit=SystemClock.elapsedRealtime()+60000;
         while(SystemClock.elapsedRealtime()<limit) {
             AccessibilityNodeInfo root=ui.getRootInActiveWindow();
-            AccessibilityNodeInfo balance=find(root,"Refresh balance");
-            if(find(root,label)!=null && !spinning(root) && (!label.equals("Available credits") || (balance!=null && balance.isEnabled())))return;
+            AccessibilityNodeInfo target=find(root,label);
+            if(target!=null && !spinning(root)) {
+                if(!label.equals("Available credits"))return;
+                AccessibilityNodeInfo balance=find(root,"Refresh balance");
+                if(balance!=null && balance.isEnabled())return;
+            }
             SystemClock.sleep(25);
         }
         throw new Exception("Readiness timeout: "+label);
@@ -78,7 +82,9 @@ public final class NativePerformance extends Instrumentation {
         AccessibilityNodeInfo node=null;
         for(int i=0;i<5;i++){node=find(ui.getRootInActiveWindow(),target);if(node!=null)break;swipe();}
         if(node==null)throw new Exception("Target missing: "+target);
-        long start=SystemClock.elapsedRealtime();click(target);waitReady(ready);
+        Rect bounds=new Rect();node.getBoundsInScreen(bounds);
+        long start=SystemClock.elapsedRealtime(),down=SystemClock.uptimeMillis();
+        pointer(bounds.centerX(),bounds.centerY(),MotionEvent.ACTION_DOWN,down);pointer(bounds.centerX(),bounds.centerY(),MotionEvent.ACTION_UP,down);waitReady(ready);
         JSONObject row=new JSONObject().put("page",name).put("round",round).put("ms",SystemClock.elapsedRealtime()-start).put("atMs",SystemClock.elapsedRealtime());
         if(name.equals("account"))row.put("upstreamError",find(ui.getRootInActiveWindow(),"Could not load your balance. Please try again.")!=null);
         pages.put(row);

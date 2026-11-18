@@ -19,7 +19,7 @@ import {
   store,
   touchProject,
 } from "../store/projectStore.ts";
-import { loadAppSettings, settingsStore } from "../store/settingsStore.ts";
+import { loadAppSettings, refreshCloudAccountSettings, settingsStore } from "../store/settingsStore.ts";
 import { loadGlobalRecipes } from "../store/recipesStore.ts";
 import { loadGlobalSkills } from "../store/skillsStore.ts";
 import { resumeRemoteTasks } from "../store/taskStore.ts";
@@ -176,7 +176,7 @@ export function ReactWorkbench() {
       }
       const embeddedProject = cloudEnabled && new URLSearchParams(location.search).get('native') === 'embedded' && new URLSearchParams(location.search).has('project');
       if (embeddedProject) {
-        await Promise.all([loadAppSettings(), loadGlobalSkills(), loadGlobalRecipes()]);
+        await loadAppSettings({ preferencesOnly: true });
       } else {
         await loadAppSettings();
       }
@@ -188,7 +188,7 @@ export function ReactWorkbench() {
       }
       document.documentElement.lang = settingsStore.locale;
       if (embeddedProject) {
-        // Opening already awaits a fresh asset catalog and refreshes the project library.
+        // Only authoritative project data and asset integrity block the canvas.
         if (!await loadBoundWindowProject()) await loadRecentProjects();
       } else {
         await Promise.all([loadGlobalSkills(), loadGlobalRecipes(), loadRecentProjects(), initializeResourceLibraries()]);
@@ -197,6 +197,11 @@ export function ReactWorkbench() {
       if (cancelled) return;
       if (requestedRoute) navigateToRoute(requestedRoute, { notify: false });
       setNavigationStatus('ready');
+      if (embeddedProject) {
+        void Promise.all([loadGlobalSkills(), loadGlobalRecipes(), refreshCloudAccountSettings()]).then(() => {
+          if (!cancelled && settingsStore.accountSyncError) showToast(settingsStore.accountSyncError);
+        }).catch(cause => { if (!cancelled) showErrorMessage(String(cause)); });
+      }
       if (desktopApi.platform !== "browser") {
         const recovery = await invoke<any>("recovery_status").catch(() => null);
         const previous = recovery?.previousUnclean;
