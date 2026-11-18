@@ -34,7 +34,9 @@ for run in 1 2 3; do
 import json,sys
 text=open('/tmp/performance-output.txt').read()
 line=next((s.split('PERFORMANCE_JSON ',1)[1] for s in text.splitlines() if 'PERFORMANCE_JSON ' in s),None)
-if line is None: raise SystemExit('Measurement output missing')
+if line is None:
+ print('\n'.join(s for s in text.splitlines() if s.startswith(('INSTRUMENTATION_RESULT:', 'INSTRUMENTATION_FAILED:'))))
+ raise SystemExit('Measurement output missing')
 result=json.loads(line)
 with open('perf/results-'+sys.argv[1]+'.json','w') as f: json.dump(result,f,indent=2)
 print('Run',sys.argv[1],':',len(result['pages']),'page samples;',len(result['apis']),'API samples; failure:',result['failure'])
