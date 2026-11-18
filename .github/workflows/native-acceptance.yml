@@ -10,6 +10,11 @@ on:
         description: Measure only the native login homepage without authorizing
         type: boolean
         default: false
+      fixture_slot:
+        description: Isolated fixture for paired performance measurements
+        type: choice
+        options: [candidate, control]
+        default: candidate
       preview_run:
         description: 'Signed preview build run to verify; empty selects the latest completed build'
         required: false
@@ -198,16 +203,16 @@ jobs:
           python3 .github/scripts/emulator-dns.py --probe
       - uses: reactivecircus/android-emulator-runner@v2
         env:
-          TEST_SESSION_COOKIE: ${{ secrets.SHOTLOOM_ACCEPTANCE_SESSION }}
-          TEST_NATIVE_SESSION: ${{ secrets.SHOTLOOM_ACCEPTANCE_NATIVE_SESSION }}
-          TEST_FIXTURE: ${{ secrets.SHOTLOOM_PERFORMANCE_FIXTURE }}
+          TEST_SESSION_COOKIE: ${{ inputs.fixture_slot == 'control' && secrets.SHOTLOOM_BASELINE_SESSION || secrets.SHOTLOOM_ACCEPTANCE_SESSION }}
+          TEST_NATIVE_SESSION: ${{ inputs.fixture_slot == 'control' && secrets.SHOTLOOM_BASELINE_NATIVE_SESSION || secrets.SHOTLOOM_ACCEPTANCE_NATIVE_SESSION }}
+          TEST_FIXTURE: ${{ inputs.fixture_slot == 'control' && secrets.SHOTLOOM_BASELINE_FIXTURE || secrets.SHOTLOOM_PERFORMANCE_FIXTURE }}
           LOGIN_ONLY: ${{ inputs.performance_login_only }}
         with:
           api-level: 35
           system-image-api-level: 35-ext15
           arch: x86_64
           target: google_apis
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -dns-server 127.0.0.1
+          emulator-options: -no-window -gpu swiftshader_indirect -feature -Vulkan -no-snapshot -noaudio -no-boot-anim -camera-back none -dns-server 127.0.0.1
           disable-animations: false
           script: bash .github/scripts/native-performance.sh
       - uses: actions/upload-artifact@v4
