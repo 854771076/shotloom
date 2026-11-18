@@ -27,7 +27,8 @@ export function normalizeLocale(value: unknown): Locale {
 export function getLocale(): Locale {
   try {
     if (typeof window !== 'undefined' && new URLSearchParams(window.location?.search).get('native') === 'embedded') {
-      const native = JSON.parse(window.ReactNativeWebView?.injectedObjectJson?.() || 'null');
+      const bridge = (window as Window & { ReactNativeWebView?: { injectedObjectJson?: () => string } }).ReactNativeWebView;
+      const native = JSON.parse(bridge?.injectedObjectJson?.() || 'null');
       if (native?.locale === 'en-US' || native?.locale === 'zh-CN') return native.locale;
     }
     return normalizeLocale(globalThis.localStorage?.getItem(LOCALE_STORAGE_KEY));
