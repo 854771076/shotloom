@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
-trap 'adb exec-out screencap -p > perf/failure.png' ERR
+failure() {
+  local status=$?
+  timeout 10s adb exec-out screencap -p > perf/failure.png || true
+  grep 'MEASURING ' /tmp/performance-output.txt > perf/progress.txt || true
+  free -m > perf/host-state.txt || true
+  df -h /tmp >> perf/host-state.txt || true
+  sudo dmesg | tail -n 60 >> perf/host-state.txt || true
+  return "$status"
+}
+trap failure ERR
 adb shell wm size 750x1624
 adb shell wm density 320
 adb shell settings put global private_dns_mode off

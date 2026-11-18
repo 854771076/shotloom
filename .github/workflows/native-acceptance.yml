@@ -190,6 +190,8 @@ jobs:
           "$tools/apksigner" sign --ks perf/test.jks --ks-pass pass:testpass --key-pass pass:testpass --out perf/measure.apk perf/aligned.apk
       - name: Enable emulator DNS
         run: |
+          free -m > perf/host-capacity.txt
+          df -h /tmp >> perf/host-capacity.txt
           sudo chmod 666 /dev/kvm
           sudo python3 .github/scripts/emulator-dns.py > perf/dns.log 2>&1 &
           for i in {1..15}; do if python3 .github/scripts/emulator-dns.py --probe; then break; fi; sleep 1; done
@@ -218,4 +220,7 @@ jobs:
             perf/device-dns.txt
             perf/failure.png
             perf/dns.log
+            perf/progress.txt
+            perf/host-state.txt
+            perf/host-capacity.txt
           retention-days: 14

@@ -24,6 +24,10 @@ public final class NativePerformance extends Instrumentation {
     private final JSONArray pages = new JSONArray();
     private final JSONArray apis = new JSONArray();
     @Override public void onCreate(Bundle value) { args = value; start(); }
+    private void action(String name) {
+        currentAction=name;
+        Bundle progress=new Bundle();progress.putString("stream","MEASURING "+name+"\n");sendStatus(0,progress);
+    }
     private AccessibilityNodeInfo find(AccessibilityNodeInfo node, String label) {
         if (node == null) return null;
         if (node.isVisibleToUser() && (label.contentEquals(node.getText() == null ? "" : node.getText()) || label.contentEquals(node.getContentDescription() == null ? "" : node.getContentDescription()))) return node;
@@ -79,7 +83,7 @@ public final class NativePerformance extends Instrumentation {
         SystemClock.sleep(200);
     }
     private void page(String name,String target,String ready,int round) throws Exception {
-        currentAction=name;
+        action(name);
         // Locate controls before timing: automated scrolling is outside the page transition.
         AccessibilityNodeInfo node=null;
         for(int i=0;i<5;i++){node=find(ui.getRootInActiveWindow(),target);if(node!=null)break;swipe();}
@@ -118,12 +122,12 @@ public final class NativePerformance extends Instrumentation {
     }
     private void tapNode(AccessibilityNodeInfo node){Rect b=new Rect();node.getBoundsInScreen(b);long t=SystemClock.uptimeMillis();pointer(b.centerX(),b.centerY(),0,t);pointer(b.centerX(),b.centerY(),1,t);}
     private void event(String name,String target,Condition done) throws Exception {
-        currentAction=name;
+        action(name);
         AccessibilityNodeInfo node=locate(target);long start=SystemClock.elapsedRealtime();tapNode(node);until(done);
         pages.put(new JSONObject().put("page",name).put("round",0).put("ms",SystemClock.elapsedRealtime()-start).put("kind","interaction"));SystemClock.sleep(120);
     }
     private void text(String name,String label,String value,Condition done) throws Exception {
-        currentAction=name;
+        action(name);
         AccessibilityNodeInfo node=locate(label);Bundle b=new Bundle();b.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,value);
         long start=SystemClock.elapsedRealtime();if(!node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT,b))throw new Exception("Text entry unavailable: "+label);until(done);
         pages.put(new JSONObject().put("page",name).put("round",0).put("ms",SystemClock.elapsedRealtime()-start).put("kind","interaction"));SystemClock.sleep(120);
@@ -135,14 +139,14 @@ public final class NativePerformance extends Instrumentation {
         for(int i=0;i<node.getChildCount();i++){AccessibilityNodeInfo hit=findSwitch(node.getChild(i),label);if(hit!=null)return hit;}return null;
     }
     private void changeSwitch(String name,String label) throws Exception {
-        currentAction=name;
+        action(name);
         AccessibilityNodeInfo node=null;for(int i=0;i<7;i++){node=findSwitch(ui.getRootInActiveWindow(),label);if(node!=null)break;swipe();}if(node==null)throw new Exception("Switch missing: "+label);final boolean before=node.isChecked();long start=SystemClock.elapsedRealtime();tapNode(node);
         until(root->{AccessibilityNodeInfo n=findSwitch(root,label);return n!=null&&(!n.isEnabled()||spinning(root));});
         until(root->{AccessibilityNodeInfo n=findSwitch(root,label);return n!=null&&n.isChecked()!=before&&n.isEnabled()&&!spinning(root);});
         pages.put(new JSONObject().put("page",name).put("round",0).put("ms",SystemClock.elapsedRealtime()-start).put("kind","interaction"));SystemClock.sleep(120);
     }
     private void measuredBack(String name,String ready) throws Exception {
-        currentAction=name;
+        action(name);
         long start=SystemClock.elapsedRealtime();long now=SystemClock.uptimeMillis();ui.injectInputEvent(new KeyEvent(now,now,0,KeyEvent.KEYCODE_BACK,0),true);ui.injectInputEvent(new KeyEvent(now,now,1,KeyEvent.KEYCODE_BACK,0),true);waitReady(ready.equals("Available credits")?"My account":ready);
         pages.put(new JSONObject().put("page",name).put("round",0).put("ms",SystemClock.elapsedRealtime()-start).put("kind","interaction"));
     }
