@@ -233,12 +233,18 @@ public final class NativePerformance extends Instrumentation {
             launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TASK);getContext().startActivity(launch);
             waitReady("Android Canvas Acceptance");
             pages.put(new JSONObject().put("page","startup_authenticated").put("round",0).put("ms",SystemClock.elapsedRealtime()-start));
-            interactions();
+            if("canvas".equals(args.getString("mode"))) {
+                SystemClock.sleep(60000);
+                page("canvas_enter","Android Canvas Acceptance","100%",0);
+                measuredBack("canvas_back","Search projects");
+                page("canvas_return","Android Canvas Acceptance","100%",1);
+                measuredBack("canvas_return_back","Search projects");
+            } else interactions();
 
         } catch(Throwable error) {failure=error.toString();}
         try {
             String[] paths={"/auth/me","/projects","/library-folders","/catalog/skills","/auth/account","/auth/usage?page=1&page_size=10","/notifications?offset=0&limit=1","/notifications?offset=0&limit=20","/settings/mobile","/models","/feedback?offset=0&limit=20","/feedback/"+args.getString("feedbackId"),"/project/"+args.getString("projectId")};
-            if(!"login".equals(args.getString("mode")))for(int round=0;round<5;round++)for(String path:paths)api(path,round);
+            if(!"login".equals(args.getString("mode"))&&!"canvas".equals(args.getString("mode")))for(int round=0;round<5;round++)for(String path:paths)api(path,round);
             report.put("failedAction",failure==null?JSONObject.NULL:currentAction).put("pages",pages).put("apis",apis).put("failure",failure==null?JSONObject.NULL:failure).put("pollIntervalMs",25);
             result.putString("stream","PERFORMANCE_JSON "+report.toString()+"\n");
         }catch(Exception error){result.putString("stream","PERFORMANCE_FAILED "+error.getMessage()+"\n");failure=error.getMessage();}

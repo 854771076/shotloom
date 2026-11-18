@@ -22,6 +22,10 @@ for attempt in {1..24}; do
 done
 printf '%s\n' "$device_dns" > perf/device-dns.txt
 [[ "$device_dns" == *"$expected_dns"* ]]
+if [ "${CANVAS_PAIR:-false}" = true ]; then
+  bash .github/scripts/native-canvas-pair.sh
+  exit 0
+fi
 adb install acceptance/Shotloom-Preview.apk
 adb install acceptance/Shotloom-Session-Test.apk
 adb install perf/measure.apk
