@@ -275,6 +275,25 @@ test('notification acknowledgements update the visible inbox without a second GE
   } finally { await act(async () => tree.unmount()); }
 });
 
+test('an older inbox refresh cannot overwrite a confirmed read acknowledgement', async () => {
+  const App = await loadApp(); const state = (globalThis as any).__nativeUi;
+  const path = '/notifications?offset=0&limit=20', asOf = '2026-11-18T00:00:00Z';
+  const snapshot = { items: [{ id:'1', feedback_id:'1', body:'Reply', read_at:null, created_at:asOf }], total:1, unread:1, asOf };
+  state.responses = { [path]: snapshot };
+  let tree!: ReturnType<typeof create>;
+  let finish!: (value: typeof snapshot) => void;
+  await act(async () => { tree = create(React.createElement(App)); });
+  try {
+    await act(async () => state.navigate('Notifications'));
+    state.responses[path] = new Promise(resolve => { finish = resolve; });
+    await act(async () => tree.root.findAllByType('FlatList' as any).at(-1)!.props.onRefresh());
+    await act(async () => tree.root.findAllByType('Pressable' as any).find(n => n.props.accessibilityLabel === 'Mark as read')!.props.onPress());
+    await act(async () => finish(snapshot));
+    assert.equal(tree.root.findAllByType('Pressable' as any).some(n => n.props.accessibilityLabel === 'Mark as read'), false);
+    assert.equal(tree.root.findAllByType('Text' as any).some(n => n.props.children === '1 unread'), false);
+  } finally { await act(async () => tree.unmount()); }
+});
+
 test('saving an unchanged native skill closes the editor without any request', async () => {
   const App = await loadApp(); const state = (globalThis as any).__nativeUi;
   state.responses = { '/catalog/skills': { skills: [{ id:'story', name:'Story', description:'Plan', instructions:'Outline', category:'text', version:1, enabled:true }] } };

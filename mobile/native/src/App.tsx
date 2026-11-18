@@ -37,20 +37,23 @@ function useRemote<T>(path: string) {
   const pageActive = useContext(PageActive);
   const force = useRef(false);
   const showRefresh = useRef(false);
+  const dataVersion = useRef(0);
   const [data, setData] = useState<T | undefined>(() => api.cached<T>(path));
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(() => api.cached(path) === undefined);
   const [revision, setRevision] = useState(0);
+  const updateData = useCallback<typeof setData>(value => { dataVersion.current++; setData(value); }, []);
   const refresh = useCallback(() => { force.current = true; showRefresh.current = true; setRevision(value => value + 1); }, []);
   useFocusEffect(useCallback(() => {
     if (!pageActive) return;
     let active = true;
+    const version = dataVersion.current;
     const bypass = force.current; force.current = false;
     const cached = api.cached<T>(path);
     setLoading(cached === undefined || showRefresh.current); showRefresh.current = false; setError('');
     if (cached !== undefined) setData(cached);
     const read = path === '/auth/me' && cached !== undefined && !bypass ? Promise.resolve(cached) : api.read<T>(path, bypass);
-    void read.then(value => { if (active) setData(value); }).catch(cause => { if (active) setError(errorText(cause)); }).finally(() => { if (active) setLoading(false); });
+    void read.then(value => { if (active && version === dataVersion.current) setData(value); }).catch(cause => { if (active && version === dataVersion.current) setError(errorText(cause)); }).finally(() => { if (active) setLoading(false); });
     let previousState = AppState.currentState;
     const subscription = AppState.addEventListener('change', state => {
       if (state === 'active' && previousState !== 'active') { force.current = true; setRevision(value => value + 1); }
@@ -58,7 +61,7 @@ function useRemote<T>(path: string) {
     });
     return () => { active = false; subscription.remove(); };
   }, [api, path, revision, refresh, pageActive]));
-  return { data, error, loading, refresh, setData };
+  return { data, error, loading, refresh, setData: updateData };
 }
 type Project = { id: string; name: string; cloudFolderId?: string | null; updatedAt?: string; nodeCount?: number };
 type Folder = { id: string; parentId: string | null; name: string };
