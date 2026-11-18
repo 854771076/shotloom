@@ -108,3 +108,13 @@ APK：`https://shotloom.0xfiang.com/downloads/Shotloom-Preview-20261117-native-0
 网页与 API 发布号 `20261117-native-097-workspace-origin`。安装包：`https://shotloom.0xfiang.com/downloads/Shotloom-Preview-20261117-native-097.apk`；含同一 APK、签名与版本、截图和画布证据的验收包：`https://shotloom.0xfiang.com/downloads/Shotloom-Acceptance-20261117-native-097.zip`。ZIP SHA-256：`3f27df52adb5d11f2f627d16401a355475b84fdf666efff5da727fc4fb0c352e`。
 
 临时测试用户和会话已删除，撤销已验证，两个 CI 会话密钥已清理。隔离账号无付费网关凭据，模型发现失败使用真实错误处理；只有画布中的额度与模型显示使用浏览器测试数据，鉴权、项目、设置、反馈及通知仍调用真实 API。未验证真机系统浏览器 OAuth、iOS、付费生成及复杂画布内容，不把空画布测试当作全部功能或真机性能验收。
+
+## 0.9.10：会话复用与画布资源预热（2026-11-18）
+
+原生会话验证后在首页后台准备 Web Cookie 和当前版本静态资源。同一账号进入画布复用 Cookie；失效时使用一次性交接回退。Web 的成功会话检查在内存缓存 30 秒，并共享并发请求，强制验证和服务端鉴权继续生效。画布先等待偏好、项目和资源引用，额度、模型与其他目录后台加载。
+
+APK 构建 `44290028970`，版本 0.9.10 / versionCode 11，支持同签名覆盖安装。服务器发布 `20261118-session-preload-101`。完整测量、验证范围及构建依赖临时例外见 [会话与画布启动优化](../../docs/features/native-session-startup-20261118.md)。
+
+从通知进入详情时清除对应反馈缓存，确保后台新回复可见；其他页面缓存继续复用。
+
+固定构建的完整模拟器验收 44292111831 通过，原生 28 项回归通过。最终 APK SHA-256：418e5c420882d426898df608ea9714913e88fb49883a84d84553bf30702c4dde。安装包：https://shotloom.0xfiang.com/downloads/Shotloom-Preview-20261118-native-0910.apk。性能数据来源与两项画布显示夹具的范围见上述报告。
