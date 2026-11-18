@@ -98,6 +98,97 @@ public final class NativePerformance extends Instrumentation {
         if(stream!=null){byte[] buffer=new byte[8192];int n;while((n=stream.read(buffer))!=-1)bytes+=n;stream.close();}
         apis.put(new JSONObject().put("path",path).put("round",round).put("status",status).put("ttfbMs",headers-start).put("totalMs",SystemClock.elapsedRealtime()-start).put("bytes",bytes));conn.disconnect();
     }
+
+    private interface Condition { boolean check(AccessibilityNodeInfo root) throws Exception; }
+    private void until(Condition condition) throws Exception {
+        long limit=SystemClock.elapsedRealtime()+60000;
+        while(SystemClock.elapsedRealtime()<limit){AccessibilityNodeInfo root=ui.getRootInActiveWindow();if(root!=null && condition.check(root))return;SystemClock.sleep(25);}
+        throw new Exception("Interaction condition timed out");
+    }
+    private AccessibilityNodeInfo locate(String label) throws Exception {
+        for(int i=0;i<7;i++){AccessibilityNodeInfo node=find(ui.getRootInActiveWindow(),label);if(node!=null)return node;swipe();}
+        throw new Exception("Interaction target missing: "+label);
+    }
+    private void tapNode(AccessibilityNodeInfo node){Rect b=new Rect();node.getBoundsInScreen(b);long t=SystemClock.uptimeMillis();pointer(b.centerX(),b.centerY(),0,t);pointer(b.centerX(),b.centerY(),1,t);}
+    private void event(String name,String target,Condition done) throws Exception {
+        AccessibilityNodeInfo node=locate(target);long start=SystemClock.elapsedRealtime();tapNode(node);until(done);
+        pages.put(new JSONObject().put("page",name).put("round",0).put("ms",SystemClock.elapsedRealtime()-start).put("kind","interaction"));SystemClock.sleep(120);
+    }
+    private void text(String name,String label,String value,Condition done) throws Exception {
+        AccessibilityNodeInfo node=locate(label);Bundle b=new Bundle();b.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,value);
+        long start=SystemClock.elapsedRealtime();if(!node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT,b))throw new Exception("Text entry unavailable: "+label);until(done);
+        pages.put(new JSONObject().put("page",name).put("round",0).put("ms",SystemClock.elapsedRealtime()-start).put("kind","interaction"));SystemClock.sleep(120);
+    }
+    private boolean enabled(AccessibilityNodeInfo root,String label){AccessibilityNodeInfo n=find(root,label);return n!=null&&n.isEnabled()&&!spinning(root);}
+    private void changeSwitch(String name,String label) throws Exception {
+        AccessibilityNodeInfo node=locate(label);final boolean before=node.isChecked();long start=SystemClock.elapsedRealtime();tapNode(node);
+        until(root->{AccessibilityNodeInfo n=find(root,label);return n!=null&&n.isChecked()!=before&&n.isEnabled()&&!spinning(root);});
+        pages.put(new JSONObject().put("page",name).put("round",0).put("ms",SystemClock.elapsedRealtime()-start).put("kind","interaction"));SystemClock.sleep(120);
+    }
+    private void measuredBack(String name,String ready) throws Exception {
+        long start=SystemClock.elapsedRealtime();long now=SystemClock.uptimeMillis();ui.injectInputEvent(new KeyEvent(now,now,0,KeyEvent.KEYCODE_BACK,0),true);ui.injectInputEvent(new KeyEvent(now,now,1,KeyEvent.KEYCODE_BACK,0),true);waitReady(ready);
+        pages.put(new JSONObject().put("page",name).put("round",0).put("ms",SystemClock.elapsedRealtime()-start).put("kind","interaction"));
+    }
+    private void interactions() throws Exception {
+        page("skills_enter","Skills","Native Acceptance Skill",0);
+        text("skills_search_empty","Search skills","not-existing-audit",r->find(r,"No skills")!=null);
+        text("skills_search_clear","Search skills","",r->find(r,"Native Acceptance Skill")!=null);
+        event("skills_select_all","Select all",r->{AccessibilityNodeInfo n=find(r,"Select all");return n!=null&&n.isChecked();});
+        event("skills_deselect_all","Select all",r->{AccessibilityNodeInfo n=find(r,"Select all");return n!=null&&!n.isChecked();});
+        page("skill_editor_open","Edit skill","Name",0);
+        event("skill_save_unchanged","Save",r->find(r,"Close")==null&&find(r,"Native Acceptance Skill")!=null&&!spinning(r));
+        changeSwitch("skill_disable_save","Enable Native Acceptance Skill");
+        changeSwitch("skill_enable_save","Enable Native Acceptance Skill");
+        page("skill_create_open","New skill","Name",0);
+        event("skill_create_cancel","Close",r->find(r,"Close")==null&&find(r,"Native Acceptance Skill")!=null);
+        page("projects_enter","Project library","Android Canvas Acceptance",0);
+        event("projects_sort_name","Recent",r->find(r,"Name")!=null);
+        event("projects_sort_recent","Name",r->find(r,"Recent")!=null);
+        text("projects_search_empty","Search projects","not-existing-audit",r->find(r,"Android Canvas Acceptance")==null);
+        text("projects_search_clear","Search projects","",r->find(r,"Android Canvas Acceptance")!=null);
+        page("folder_create_open","New folder","Folder name",0);
+        event("folder_create_cancel","Cancel",r->find(r,"Folder name")==null&&find(r,"Android Canvas Acceptance")!=null);
+        page("folder_create_reopen","New folder","Folder name",0);
+        final String folder="Audit-folder-"+System.currentTimeMillis();
+        text("folder_name_input","Folder name",folder,r->{AccessibilityNodeInfo n=find(r,"Folder name");return n!=null&&folder.contentEquals(n.getText());});
+        event("folder_create_submit","Create",r->find(r,"Folder name")==null&&find(r,folder)!=null&&!spinning(r));
+        page("account_enter","My account","Available credits",0);
+        page("settings_enter","Settings","Preferences",0);
+        changeSwitch("settings_eval_toggle_save","Automatic result evaluation");
+        changeSwitch("settings_eval_restore_save","Automatic result evaluation");
+        changeSwitch("settings_layout_toggle_save","Arrange after creation");
+        changeSwitch("settings_layout_restore_save","Arrange after creation");
+        measuredBack("settings_back","Available credits");accountTop();
+        page("notifications_enter","Notifications","All messages",0);
+        if(find(ui.getRootInActiveWindow(),"Mark all as read")!=null){
+            event("notifications_mark_one","Mark as read",r->find(r,"2 unread")!=null&&!spinning(r));
+            event("notifications_mark_all","Mark all as read",r->find(r,"Mark all as read")==null&&!spinning(r));
+        }
+        if(find(ui.getRootInActiveWindow(),"You have a new reply, Audit_reply")!=null){
+            page("notification_open_reply","You have a new reply, Audit_reply","Audit_reply",0);
+            measuredBack("notification_detail_back","All messages");
+        }
+        measuredBack("notifications_back","Available credits");accountTop();
+        page("feedback_enter","Feedback and reports","Description",0);
+        event("feedback_type_open","Type",r->find(r,"Close type selection")!=null);
+        event("feedback_select_report","Report",r->find(r,"Close type selection")==null&&find(r,"Report")!=null);
+        final String description="Interaction-audit-"+System.currentTimeMillis();
+        text("feedback_description_input","Description",description,r->{AccessibilityNodeInfo n=find(r,"Description");return n!=null&&description.contentEquals(n.getText());});
+        event("feedback_report_submit","Submit feedback or report",r->find(r,"Replies")!=null&&find(r,description)!=null&&!spinning(r));
+        measuredBack("feedback_submitted_back","Available credits");accountTop();
+        page("feedback_reenter","Feedback and reports","Description",0);
+        page("feedback_records_enter","My records","Latency_test_record",0);
+        page("feedback_detail_enter","Latency_test_record","Replies",0);
+        measuredBack("feedback_detail_back","Latency_test_record");
+        measuredBack("feedback_records_back","Description");
+        measuredBack("feedback_compose_back","Available credits");accountTop();
+        page("projects_before_canvas","Project library","Android Canvas Acceptance",0);
+        page("canvas_enter","Android Canvas Acceptance","100%",0);
+        measuredBack("canvas_back","Android Canvas Acceptance");
+        page("canvas_return","Android Canvas Acceptance","100%",1);
+        measuredBack("canvas_return_back","Android Canvas Acceptance");
+    }
+
     @Override public void onStart() {
         Bundle result=new Bundle();JSONObject report=new JSONObject();String failure=null;
         try {
@@ -120,21 +211,8 @@ public final class NativePerformance extends Instrumentation {
             launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TASK);getContext().startActivity(launch);
             waitReady("Android Canvas Acceptance");
             pages.put(new JSONObject().put("page","startup_authenticated").put("round",0).put("ms",SystemClock.elapsedRealtime()-start));
-            for(int round=0;round<5;round++) {
-                page("skills","Skills","Native Acceptance Skill",round);
-                page("projects","Project library","Android Canvas Acceptance",round);
-                page("account","My account","Available credits",round);
-                page("notifications","Notifications","All messages",round);back();accountTop();waitReady("Available credits");
-                page("settings","Settings","Preferences",round);back();accountTop();waitReady("Available credits");
-                page("feedback_compose","Feedback and reports","Description",round);
-                page("feedback_records","My records","Latency_test_record",round);
-                page("feedback_detail","Latency_test_record","Replies",round);back();back();back();accountTop();waitReady("Available credits");
-                page("projects","Project library","Android Canvas Acceptance",round);
-            }
-            for(int round=0;round<5;round++) {
-                page("canvas","Android Canvas Acceptance","100%",round);
-                page("projects","Project library","Android Canvas Acceptance",round);
-            }
+            interactions();
+
         } catch(Exception error) {failure=error.getMessage();}
         try {
             String[] paths={"/auth/me","/projects","/library-folders","/catalog/skills","/auth/account","/auth/usage?page=1&page_size=10","/notifications?offset=0&limit=1","/notifications?offset=0&limit=20","/settings/mobile","/models","/feedback?offset=0&limit=20","/feedback/"+args.getString("feedbackId"),"/project/"+args.getString("projectId")};
@@ -145,3 +223,4 @@ public final class NativePerformance extends Instrumentation {
         finish(failure==null?-1:1,result);
     }
 }
+
