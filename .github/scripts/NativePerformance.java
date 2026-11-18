@@ -143,7 +143,7 @@ public final class NativePerformance extends Instrumentation {
     }
     private void measuredBack(String name,String ready) throws Exception {
         currentAction=name;
-        long start=SystemClock.elapsedRealtime();long now=SystemClock.uptimeMillis();ui.injectInputEvent(new KeyEvent(now,now,0,KeyEvent.KEYCODE_BACK,0),true);ui.injectInputEvent(new KeyEvent(now,now,1,KeyEvent.KEYCODE_BACK,0),true);waitReady(ready);
+        long start=SystemClock.elapsedRealtime();long now=SystemClock.uptimeMillis();ui.injectInputEvent(new KeyEvent(now,now,0,KeyEvent.KEYCODE_BACK,0),true);ui.injectInputEvent(new KeyEvent(now,now,1,KeyEvent.KEYCODE_BACK,0),true);waitReady(ready.equals("Available credits")?"My account":ready);
         pages.put(new JSONObject().put("page",name).put("round",0).put("ms",SystemClock.elapsedRealtime()-start).put("kind","interaction"));
     }
     private void interactions() throws Exception {
@@ -182,7 +182,8 @@ public final class NativePerformance extends Instrumentation {
             event("notifications_mark_all","Mark all as read",r->find(r,"Mark all as read")==null&&!spinning(r));
         }
         if(find(ui.getRootInActiveWindow(),"You have a new reply, Audit_reply")!=null){
-            page("notification_open_reply","You have a new reply, Audit_reply","Audit_reply",0);
+            page("notification_open_reply","You have a new reply, Audit_reply","Replies",0);
+            if(find(ui.getRootInActiveWindow(),"Audit_reply")==null)throw new Exception("Expected reply text missing");
             measuredBack("notification_detail_back","All messages");
         }
         measuredBack("notifications_back","Available credits");accountTop();
