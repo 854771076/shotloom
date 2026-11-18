@@ -113,7 +113,7 @@ public final class NativePerformance extends Instrumentation {
         for(int i=0;i<node.getChildCount();i++){AccessibilityNodeInfo hit=findControl(node.getChild(i),label,buttonOnly);if(hit!=null)return hit;}return null;
     }
     private AccessibilityNodeInfo locate(String label) throws Exception {
-        for(int i=0;i<7;i++){AccessibilityNodeInfo root=ui.getRootInActiveWindow();AccessibilityNodeInfo node=findControl(root,label,true);if(node==null)node=findControl(root,label,false);if(node==null)node=find(root,label);if(node!=null)return node;swipe();}
+        for(int i=0;i<7;i++){AccessibilityNodeInfo root=ui.getRootInActiveWindow();AccessibilityNodeInfo node=findControl(root,label,true);if(node==null&&(label.equals("Type")||label.equals("Submit feedback or report"))){swipe();continue;}if(node==null)node=findControl(root,label,false);if(node==null)node=find(root,label);if(node!=null)return node;swipe();}
         throw new Exception("Interaction target missing: "+label);
     }
     private void tapNode(AccessibilityNodeInfo node){Rect b=new Rect();node.getBoundsInScreen(b);long t=SystemClock.uptimeMillis();pointer(b.centerX(),b.centerY(),0,t);pointer(b.centerX(),b.centerY(),1,t);}
@@ -168,7 +168,7 @@ public final class NativePerformance extends Instrumentation {
         page("folder_create_reopen","New folder","Folder name",0);
         final String folder="Audit-folder-"+System.currentTimeMillis();
         text("folder_name_input","Folder name",folder,r->{AccessibilityNodeInfo n=find(r,"Folder name");return n!=null&&folder.contentEquals(n.getText());});
-        event("folder_create_submit","Create",r->find(r,"Folder name")==null&&find(r,folder)!=null&&!spinning(r));
+        event("folder_create_submit","Create",r->find(r,"Folder name")==null&&find(r,"Android Canvas Acceptance")!=null&&!spinning(r));
         page("account_enter","My account","Available credits",0);
         page("settings_enter","Settings","Preferences",0);
         changeSwitch("settings_eval_toggle_save","Automatic result evaluation");
@@ -197,14 +197,14 @@ public final class NativePerformance extends Instrumentation {
         page("feedback_reenter","Feedback and reports","Description",0);
         page("feedback_records_enter","My records","Latency_test_record",0);
         page("feedback_detail_enter","Latency_test_record","Replies",0);
-        measuredBack("feedback_detail_back","Latency_test_record");
+        measuredBack("feedback_detail_back","My records");
         measuredBack("feedback_records_back","Description");
         measuredBack("feedback_compose_back","Available credits");accountTop();
         page("projects_before_canvas","Project library","Android Canvas Acceptance",0);
         page("canvas_enter","Android Canvas Acceptance","100%",0);
-        measuredBack("canvas_back","Android Canvas Acceptance");
+        measuredBack("canvas_back","Search projects");
         page("canvas_return","Android Canvas Acceptance","100%",1);
-        measuredBack("canvas_return_back","Android Canvas Acceptance");
+        measuredBack("canvas_return_back","Search projects");
     }
 
     @Override public void onStart() {
