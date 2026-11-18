@@ -28,7 +28,10 @@ import '../styles/creation-view.css';
 import '../styles/skills.css';
 import '../styles/responsive.css';
 
-if (new URLSearchParams(location.search).get('native') === 'embedded') document.documentElement.dataset.nativeEmbedded = 'true';
+if (new URLSearchParams(location.search).get('native') === 'embedded') {
+  performance.mark('shotloom-renderer-start');
+  document.documentElement.dataset.nativeEmbedded = 'true';
+}
 const nativeBootstrap = readNativeWorkspaceBootstrap();
 if (nativeBootstrap?.locale) {
   try { localStorage.setItem('shotloom:locale', nativeBootstrap.locale); } catch { /* Storage can be unavailable. */ }

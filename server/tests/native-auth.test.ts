@@ -50,7 +50,7 @@ test('native exchange, scoped API access, workspace cookies and logout use the s
     const url = new URL(String(input));
     if (url.pathname.endsWith('/sessions')) {
       if (init?.method === 'DELETE') { exists = false; return new Response(null, { status: 204 }); }
-      return Response.json(exists ? { id: sessionId, user_id: userId, access_token_cipher: encrypt('private-provider-token'), refresh_token_cipher: null, created_at: new Date().toISOString(), expires_at: new Date(Date.now() + 3600000).toISOString() } : null);
+      return Response.json(exists ? { id: sessionId, user_id: userId, owner: { id: userId, sub: '1', username: 'Fixture', email: null }, access_token_cipher: encrypt('private-provider-token'), refresh_token_cipher: null, created_at: new Date().toISOString(), expires_at: new Date(Date.now() + 3600000).toISOString() } : null);
     }
     if (url.pathname.endsWith('/users')) return Response.json({ id: userId, username: 'Fixture' });
     if (url.pathname.endsWith('/rpc/load_catalog')) {

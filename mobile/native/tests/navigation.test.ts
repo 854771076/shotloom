@@ -29,7 +29,7 @@ exports.createNativeStackNavigator=()=>({Screen:()=>null,Navigator:({children})=
  state.navigate=navigation.navigate;state.goBack=navigation.goBack;
  return routes.map((route,index)=>{const spec=specs.find(x=>x.props.name===route.name);return React.createElement(spec.props.component,{key:index,route,navigation})});
 }});
-exports.NativeApi=class {cache=new Map();cached(path){return this.cache.get(path)} invalidate(paths){state.invalidated=paths;for(const key of this.cache.keys())if(!paths||paths.includes(key))this.cache.delete(key)} async read(path,force){if(!force&&this.cache.has(path))return this.cache.get(path);const value=await this.request(path);this.cache.set(path,value);return value} disconnect(){} pause(){} resume(){} receive(){} async request(path,method='GET',value){state.requests.push(path);if(method==='GET'&&state.responses?.[path])return state.responses[path];if(state.failLogout&&path==='/auth/logout')throw new Error('Logout failed');if(path==='/auth/me')return {id:state.session.userId};if(method!=='GET')state.writes.push({path,method,value});if(path==='/settings/mobile'){if(state.failSave&&method==='PATCH')throw new Error('Save unavailable');if(method==='PATCH')Object.assign(state.settings,value);return {...state.settings};}if(path==='/models')return {publications:[]};if(path==='/projects')return [{id:'22222222-2222-4222-8222-222222222222',name:'Fixture project'}];if(path==='/library-folders')return [];if(path.startsWith('/catalog/'))return {skills:[]};return {items:[],total:0,unread:0,asOf:'2026-11-16T00:00:00Z'}}};
+exports.NativeApi=class {cache=new Map();cached(path){return this.cache.get(path)} setCached(path,value){this.cache.set(path,value)} invalidate(paths){state.invalidated=paths;for(const key of this.cache.keys())if(!paths||paths.includes(key))this.cache.delete(key)} async read(path,force){if(!force&&this.cache.has(path))return this.cache.get(path);const value=await this.request(path);this.cache.set(path,value);return value} disconnect(){} pause(){} resume(){} receive(){} async request(path,method='GET',value){state.requests.push(path);if(method==='GET'&&state.responses?.[path])return state.responses[path];if(state.failLogout&&path==='/auth/logout')throw new Error('Logout failed');if(path==='/auth/me')return {id:state.session.userId};if(method!=='GET')state.writes.push({path,method,value});if(method!=='GET'&&state.writeResponses?.[path])return state.writeResponses[path];if(path==='/settings/mobile'){if(state.failSave&&method==='PATCH')throw new Error('Save unavailable');if(method==='PATCH')Object.assign(state.settings,value);return {...state.settings};}if(path==='/models')return {publications:[]};if(path==='/projects')return [{id:'22222222-2222-4222-8222-222222222222',name:'Fixture project'}];if(path==='/library-folders')return [];if(path.startsWith('/catalog/'))return {skills:[]};return {items:[],total:0,unread:0,asOf:'2026-11-16T00:00:00Z'}}};
 exports.createNativeApi=(_origin,_token,_uuid,expired)=>{state.expire=expired;return new exports.NativeApi()};
 const request=exports.NativeApi.prototype.request;exports.NativeApi.prototype.request=async function(...args){await state.beforeRequest?.(...args);return request.apply(this,args)};
 exports.restoreSession=async()=>state.session;exports.clearSession=async()=>{state.session=null};exports.login=async(_origin,expected)=>{state.logins++;if(state.cancel)return null;if(expected&&expected!==state.loginUser)throw new Error('Account changed');return state.session={token:'fresh-token',userId:state.loginUser}};
@@ -146,6 +146,24 @@ test('a missing warmed cookie falls back once to the authenticated POST handoff'
   } finally { await act(async () => tree.unmount()); }
 });
 
+test('a confirmed cookie opens the canvas directly while static downloads are still pending', async () => {
+  const App = await loadApp(); const state = (globalThis as any).__nativeUi;
+  state.holdWarmup = true;
+  let tree!: ReturnType<typeof create>;
+  await act(async () => { tree = create(React.createElement(App)); });
+  try {
+    const warm = tree.root.findAllByType('WebView' as any)[0]!;
+    await act(async () => warm.props.onMessage({ nativeEvent: { url:warm.props.source.uri, data:JSON.stringify({type:'workspace-cookie-ready',userId:'fixture-user'}) } }));
+    assert.equal(tree.root.findAllByType('WebView' as any).length, 1, 'cookie handoff must not cancel pending resource downloads');
+    await act(async () => tree.root.findAllByType('Pressable' as any).find(n => n.findAllByType('Text' as any).some(t => t.props.children === 'Fixture project'))!.props.onPress());
+    const canvas = tree.root.findAllByType('WebView' as any).find(n => n.props.source.uri.includes('project='))!;
+    assert.equal(canvas.props.source.method, undefined);
+    assert.equal(state.handoffs.length, 1);
+    await act(async () => warm.props.onMessage({ nativeEvent: { url:warm.props.source.uri, data:JSON.stringify({type:'workspace-session-ready',userId:'fixture-user',loaded:1,total:2,failed:['assets/missing.js']}) } }));
+    assert.equal(tree.root.findAllByType('WebView' as any).length, 1);
+  } finally { await act(async () => tree.unmount()); }
+});
+
 test('session expiry preserves the workspace, rejects another account, and explicit logout clears it', async () => {
   const App = await loadApp();
   let tree!: ReturnType<typeof create>;
@@ -232,4 +250,63 @@ test('opening an already-read notification refreshes a previously cached feedbac
     assert.equal(state.requests.filter((value: string) => value === path).length, 2);
     assert.ok(tree.root.findAllByType('Text' as any).some(node => node.props.children === 'Current backend reply'));
   } finally { await act(async () => tree.unmount()); }
+});
+test('notification acknowledgements update the visible inbox without a second GET, and failures preserve unread state', async () => {
+  const App = await loadApp(); const state = (globalThis as any).__nativeUi;
+  const path = '/notifications?offset=0&limit=20', asOf = '2026-11-18T00:00:00Z';
+  state.responses = { [path]: { items: [1,2,3].map(id => ({ id: String(id), feedback_id: String(id), body: 'Reply '+id, read_at: null, created_at: asOf })), total: 3, unread: 3, asOf } };
+  let tree!: ReturnType<typeof create>;
+  await act(async () => { tree = create(React.createElement(App)); });
+  await act(async () => state.navigate('Notifications'));
+  const button = (label: string) => tree.root.findAllByType('Pressable' as any).find(n => n.props.accessibilityLabel === label)!;
+  const hasText = (text: string) => tree.root.findAllByType('Text' as any).some(n => n.props.children === text);
+  try {
+    state.beforeRequest = (_path: string, method: string) => { if (method === 'PUT') throw new Error('Save unavailable'); };
+    await act(async () => button('Mark as read').props.onPress());
+    assert.ok(hasText('3 unread'));
+    state.beforeRequest = undefined;
+    await act(async () => button('Mark as read').props.onPress());
+    assert.ok(hasText('2 unread'));
+    assert.equal(state.requests.filter((p: string) => p === path).length, 1);
+    await act(async () => button('Mark all as read').props.onPress());
+    assert.equal(hasText('2 unread'), false);
+    assert.equal(state.requests.filter((p: string) => p === path).length, 1);
+    assert.deepEqual(state.writes.at(-1).value, { asOf });
+  } finally { await act(async () => tree.unmount()); }
+});
+
+test('saving an unchanged native skill closes the editor without any request', async () => {
+  const App = await loadApp(); const state = (globalThis as any).__nativeUi;
+  state.responses = { '/catalog/skills': { skills: [{ id:'story', name:'Story', description:'Plan', instructions:'Outline', category:'text', version:1, enabled:true }] } };
+  let tree!: ReturnType<typeof create>;
+  await act(async () => { tree = create(React.createElement(App)); });
+  try {
+    await act(async () => tree.root.findAllByType('Pressable' as any).filter(n => n.props.accessibilityRole === 'tab')[2]!.props.onPress());
+    await act(async () => tree.root.findAllByType('Pressable' as any).find(n => n.props.accessibilityLabel === 'Edit skill')!.props.onPress());
+    const count = state.requests.length;
+    await act(async () => tree.root.findAllByType('Pressable' as any).find(n => n.findAllByType('Text' as any).some(t => t.props.children === 'Save'))!.props.onPress());
+    assert.equal(tree.root.findAllByType('Modal' as any).length, 0);
+    assert.equal(state.requests.length, count);
+    assert.equal(state.writes.length, 0);
+  } finally { await act(async () => tree.unmount()); }
+});
+
+test('new feedback reuses the confirmed row; a replay with replies still fetches the actual thread', async () => {
+  for (const revision of [1,2]) {
+    const App = await loadApp(); const state = (globalThis as any).__nativeUi;
+    const id = '11111111-1111-4111-8111-111111111111', path = `/feedback/${id}`;
+    const item = { id, user_id:'fixture-user', kind:'feedback', description:'Report', reference:'', status:'pending', revision, created_at:'2026-11-18T00:00:00Z', updated_at:'2026-11-18T00:00:00Z' };
+    state.writeResponses = { '/feedback': item };
+    state.responses = { [path]: { item, replies:[{id:'reply',body:'Existing reply',created_at:item.created_at}] } };
+    let tree!: ReturnType<typeof create>;
+    await act(async () => { tree = create(React.createElement(App)); });
+    await act(async () => state.navigate('Compose'));
+    try {
+      await act(async () => tree.root.findAllByType('TextInput' as any).find(n => n.props.accessibilityLabel === 'Description')!.props.onChangeText('Report'));
+      await act(async () => tree.root.findAllByType('Pressable' as any).find(n => n.props.accessibilityRole === 'button' && n.findAllByType('Text' as any).some(t => t.props.children === 'Submit feedback or report'))!.props.onPress());
+      assert.equal(state.writes.filter((write: {path:string}) => write.path === '/feedback').length, 1);
+      assert.equal(state.requests.filter((p: string) => p === path).length, revision === 1 ? 0 : 1, JSON.stringify({ revision, requests:state.requests, writes:state.writes }));
+      if (revision === 2) assert.ok(tree.root.findAllByType('Text' as any).some(n => n.props.children === 'Existing reply'));
+    } finally { await act(async () => tree.unmount()); }
+  }
 });

@@ -55,6 +55,7 @@ export function NativeSkills({ api, active: pageActive = true }: { api: NativeAp
   const patch = (value: Partial<Skill>) => setEditor(current => current ? { ...current, draft: { ...current.draft, ...value } } : current);
   const save = () => run(async () => {
     if (!editor) return;
+    if (editor.original && JSON.stringify(editor.draft) === editor.baseline) { setEditor(undefined); return; }
     setCatalog(await saveSkills(api, [editor.draft], { create: !editor.original, expected: editor.original }));
     setEditor(undefined);
   });

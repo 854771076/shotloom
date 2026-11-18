@@ -20,6 +20,7 @@ export type { UserRow, SessionRow };
 export interface DecryptedSession {
   sessionId: string;
   userId: string;
+  user: Pick<UserRow, 'id' | 'sub' | 'username' | 'email'>;
   accessToken: string;
   refreshToken: string | null;
   expiresAt: number;
@@ -88,16 +89,16 @@ export async function createSession(
 
 export async function loadSession(sessionId: string): Promise<DecryptedSession | null> {
   if (!/^[0-9a-f-]{36}$/i.test(sessionId)) return null;
-  const { data, error } = await admin.from("sessions").select("*").eq("id", sessionId).maybeSingle();
+  const { data, error } = await admin.from("sessions")
+    .select('*,owner:users!inner(id,sub,username,email)')
+    .eq('id', sessionId).eq('owner.client_id', env.GATEWAY_CLIENT_ID).maybeSingle();
   if (error) throw supabaseError(error.message);
   if (!data) return null;
-  const { data: owner, error: ownerError } = await admin.from("users").select("id")
-    .eq("id", data.user_id).eq("client_id", env.GATEWAY_CLIENT_ID).maybeSingle();
-  if (ownerError) throw supabaseError(ownerError.message);
-  if (!owner || Date.now() - Date.parse(data.created_at) >= 30 * 86400_000) return null;
+  if (!data.owner || Date.now() - Date.parse(data.created_at) >= 30 * 86400_000) return null;
   return {
     sessionId: data.id,
     userId: data.user_id,
+    user: data.owner,
     accessToken: decrypt(data.access_token_cipher),
     refreshToken: data.refresh_token_cipher ? decrypt(data.refresh_token_cipher) : null,
     expiresAt: new Date(data.expires_at).getTime(),

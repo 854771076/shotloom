@@ -15,18 +15,17 @@ import {
   fetchUsageLogs,
 } from "./lib/gateway";
 import {
-  admin,
   upsertUser,
   createSession,
   loadSession,
   updateSessionTokens,
   deleteSession,
 } from "./lib/supabase";
-import { HttpError, unauthorized, supabaseError, badRequest } from "./lib/errors";
+import { HttpError, unauthorized, badRequest } from "./lib/errors";
 import { envelope } from "./lib/respond";
 import type { AppEnv } from "./lib/types";
 import { nativeCallback, nativeSession, issueNativeTicket, consumeNativeTicket, issueNativeToken } from './lib/nativeAuth';
-import { workspacePreloadFiles } from './lib/workspacePreload';
+import { workspacePreloadFiles, workspacePreloadHtml } from './lib/workspacePreload';
 
 // 会话 Cookie 名与站点前缀统一从环境读取。
 function cookieOptions(maxAge?: number) {
@@ -110,6 +109,7 @@ export const requireAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
   }
 
   c.set("userId", session.userId);
+  c.set('user', session.user);
   c.set("accessToken", accessToken);
   c.set("sessionId", session.sessionId);
   await next();
@@ -211,18 +211,13 @@ authApp.post('/native/workspace', async c => {
   c.header('Referrer-Policy', 'no-referrer');
   c.header('Cache-Control', 'no-store');
   if (new URL(ticket.redirect).searchParams.get('native') === 'prewarm') {
-    const message = JSON.stringify({ type: 'workspace-session-ready', userId: session.userId }).replace(/</g, '\\u003c');
-    const files = JSON.stringify(await workspacePreloadFiles());
-    return c.html(`<!doctype html><html><head><meta name="viewport" content="width=device-width"></head><body><script>Promise.allSettled(${files}.map(async file=>{const response=await fetch('/'+file,{cache:'force-cache',credentials:'same-origin'});if(response.ok)await response.arrayBuffer();})).then(()=>window.ReactNativeWebView?.postMessage(JSON.stringify(${message})));</script></body></html>`);
+    return c.html(workspacePreloadHtml(session.userId, await workspacePreloadFiles()));
   }
   return c.redirect(ticket.redirect, 303);
 });
 
 authApp.get("/me", requireAuth, async (c) => {
-  const userId = c.get("userId");
-  const { data, error } = await admin.from("users").select("*").eq("id", userId).single();
-  if (error) throw supabaseError(error.message);
-  return c.json(envelope({ id: data.id, sub: data.sub, username: data.username, email: data.email }));
+  return c.json(envelope(c.get('user')));
 });
 
 authApp.get('/account', requireAuth, async c => c.json(envelope(await fetchUserInfo(c.get('accessToken')))));

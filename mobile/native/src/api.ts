@@ -8,6 +8,11 @@ export class NativeApi {
   private queued = new Map<string, NativeRequest>();
   constructor(private send: (request: NativeRequest) => void, private uuid: () => string) {}
   cached<T>(path: string): T | undefined { return this.cache.get(path)?.value as T | undefined; }
+  setCached<T>(path: string, value: T) {
+    this.reads.delete(path);
+    if (!this.cache.has(path) && this.cache.size >= 64) this.cache.delete(this.cache.keys().next().value!);
+    this.cache.set(path, { value, expires: Date.now() + 60000 });
+  }
   invalidate(paths?: string[]) {
     for (const key of new Set([...this.cache.keys(), ...this.reads.keys()])) {
       const path = key.split('?')[0]!;

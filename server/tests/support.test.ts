@@ -40,7 +40,9 @@ test('feedback, administrator reply and inbox persist through the HTTP boundary 
         sessionReads++;
         const sessionId = url.searchParams.get('id')?.slice(3) || '';
         const userId = sessions.get(sessionId);
-        return Response.json(userId ? { id: sessionId, user_id: userId, access_token_cipher: encrypt('token'),
+        assert.equal(url.searchParams.get('owner.client_id'), 'eq.nac_test');
+        const owner = await db.query('select id from shotloom.users where id=$1 and client_id=$2', [userId, 'nac_test']);
+        return Response.json(owner.rows[0] ? { id: sessionId, user_id: userId, owner: { ...owner.rows[0], sub: '1', username: null, email: null }, access_token_cipher: encrypt('token'),
           refresh_token_cipher: null, created_at: new Date().toISOString(), expires_at: new Date(Date.now() + 3600000).toISOString() } : null);
       }
       if (table === 'users') {

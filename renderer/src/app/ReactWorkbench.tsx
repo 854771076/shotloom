@@ -176,7 +176,9 @@ export function ReactWorkbench() {
       }
       const embeddedProject = cloudEnabled && new URLSearchParams(location.search).get('native') === 'embedded' && new URLSearchParams(location.search).has('project');
       if (embeddedProject) {
+        performance.mark('shotloom-preferences-start');
         await loadAppSettings({ preferencesOnly: true });
+        performance.mark('shotloom-preferences-ready');
       } else {
         await loadAppSettings();
       }
@@ -189,7 +191,9 @@ export function ReactWorkbench() {
       document.documentElement.lang = settingsStore.locale;
       if (embeddedProject) {
         // Only authoritative project data and asset integrity block the canvas.
+        performance.mark('shotloom-project-start');
         if (!await loadBoundWindowProject()) await loadRecentProjects();
+        performance.mark('shotloom-project-ready');
       } else {
         await Promise.all([loadGlobalSkills(), loadGlobalRecipes(), loadRecentProjects(), initializeResourceLibraries()]);
         await loadBoundWindowProject();

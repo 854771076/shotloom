@@ -21,3 +21,14 @@ export function collectWorkspacePreloads(chunks: Record<string, Chunk>): string[
 }
 
 export async function workspacePreloadFiles() { return collectWorkspacePreloads(await manifest); }
+
+export function workspacePreloadHtml(userId: string, files: string[]) {
+  const identity = JSON.stringify(userId).replace(/</g, '\\u003c');
+  return `<!doctype html><html><head><meta name="viewport" content="width=device-width"></head><body><script>
+const userId=${identity},files=${JSON.stringify(files)};
+const send=value=>window.ReactNativeWebView?.postMessage(JSON.stringify({...value,userId}));
+send({type:'workspace-cookie-ready'});
+Promise.allSettled(files.map(async file=>{const response=await fetch('/'+file,{cache:'force-cache',credentials:'same-origin'});if(!response.ok)throw new Error('HTTP '+response.status);await response.arrayBuffer();}))
+.then(results=>send({type:'workspace-session-ready',loaded:results.filter(r=>r.status==='fulfilled').length,total:files.length,failed:files.filter((_,i)=>results[i].status==='rejected')}));
+</script></body></html>`;
+}

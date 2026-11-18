@@ -90,3 +90,36 @@ test('bound project opening waits for the asset catalog before reconciling refer
     assert.equal(localAssetLibrary.catalog.references[0].id, 'reference');
   } finally { release(); await opening; await env.dispose(); }
 });
+
+test('embedded startup overlaps project and asset reads, shares pending loads and reconciles only after both finish', async () => {
+  const env = await createRendererEnv({ storageMode: 'cloud', storage: new Map(), withWindow: true });
+  let releaseProject, releaseCatalog;
+  const projectGate = new Promise(resolve => { releaseProject = resolve; });
+  const catalogGate = new Promise(resolve => { releaseCatalog = resolve; });
+  let opening;
+  try {
+    window.location = { search: '?native=embedded&project=fixture' };
+    const { desktopApi } = await env.load('services/desktopApi');
+    const { loadBoundWindowProject } = await env.load('store/projectStore');
+    const { loadLocalAssetLibrary, localAssetLibrary } = await env.load('store/localAssetLibraryStore');
+    let projectReads = 0, catalogReads = 0, done = false;
+    desktopApi.project.getWindowProjectDir = async () => 'cloud/projects/fixture';
+    desktopApi.project.readFile = async () => { projectReads++; await projectGate; return { id:'fixture', schema:'shotloom-project', schemaVersion:2, nodes:[], edges:[], assets:[], materials:[], tasks:[] }; };
+    desktopApi.localAssets.getCatalog = async () => { catalogReads++; await catalogGate; return { assets:[], materials:[], references:[] }; };
+    desktopApi.recent.add = async () => [];
+    opening = loadBoundWindowProject().then(value => { done = true; return value; });
+    await new Promise(resolve => setTimeout(resolve, 30));
+    assert.equal(projectReads, 1);
+    assert.equal(catalogReads, 1, 'asset read starts while project read is still pending');
+    const concurrent = loadLocalAssetLibrary(true);
+    assert.equal(catalogReads, 1);
+    let catalogDone = false; void concurrent.then(() => { catalogDone = true; });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(catalogDone, false, 'concurrent callers cannot receive a stale catalog');
+    releaseCatalog(); await concurrent;
+    assert.equal(localAssetLibrary.loaded, true);
+    assert.equal(done, false, 'catalog alone cannot open the project');
+    releaseProject(); assert.equal(await opening, true);
+    assert.equal(catalogReads, 1, 'reconciliation reuses the prefetched catalog even when it finished first');
+  } finally { releaseCatalog(); releaseProject(); await opening?.catch(() => {}); await env.dispose(); }
+});

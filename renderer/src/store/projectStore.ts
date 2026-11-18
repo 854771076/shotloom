@@ -759,6 +759,9 @@ export async function loadBoundWindowProject() {
   // skipping the read in that case lets the stale session overwrite disk on
   // the first touch/autosave.
   const filePath = `${projectDir.replace(/[\\/]$/, '')}/project.sqlite`;
+  const catalogReady = cloudEnabled && new URLSearchParams(window.location.search).get('native') === 'embedded'
+    ? import('@/store/localAssetLibraryStore').then(module => module.loadLocalAssetLibrary(true)) : undefined;
+  void catalogReady?.catch(() => {});
   let timer: number | undefined;
   let project: AnyRecord;
   try {
@@ -788,7 +791,7 @@ export async function loadBoundWindowProject() {
   } finally {
     if (timer) window.clearTimeout(timer);
   }
-  return applyOpenedProject({ project, filePath, projectDir });
+  return applyOpenedProject({ project, filePath, projectDir }, catalogReady);
 }
 
 /**
@@ -825,7 +828,7 @@ export async function restoreProjectSnapshot(snapshotId: string) {
   return { ok: true as const };
 }
 
-async function applyOpenedProject(result: AnyRecord) {
+async function applyOpenedProject(result: AnyRecord, catalogReady?: Promise<unknown>) {
   if (!canChangeProjectContext()) return false;
   stopActiveTaskPolling();
   store.project = normalizeProject(result.project);
@@ -840,7 +843,7 @@ async function applyOpenedProject(result: AnyRecord) {
     '@/store/localAssetLibraryStore'
   );
   const [references, restoredFiles] = await Promise.allSettled([
-    reconcileCurrentProjectLocalAssetReferences(),
+    (catalogReady || Promise.resolve()).then(() => reconcileCurrentProjectLocalAssetReferences(!catalogReady)),
     restoreMissingGeneratedFiles(store.project),
   ]);
   if (references.status === 'rejected') throw references.reason;

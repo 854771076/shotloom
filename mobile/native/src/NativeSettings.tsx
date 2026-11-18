@@ -47,6 +47,7 @@ export function NativeSettings({ api, onChanged }: { api: NativeApi; onChanged: 
     running.current = true; setBusy(true); setError('');
     try {
       const value = await api.request<MobileSettings>('/settings/mobile', 'PATCH', patch);
+      api.setCached('/settings/mobile', value);
       setSettings(value);
       if (value.locale) setLanguage(value.locale);
       onChanged(); setPicker(undefined);

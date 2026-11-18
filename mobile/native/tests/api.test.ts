@@ -3,6 +3,20 @@ import test from 'node:test';
 import { NativeApi, createNativeApi } from '../src/api';
 import { nativeRequestAllowed, type NativeRequest } from '../../../shared/nativeBridge';
 
+test('a confirmed write snapshot replaces cache and fences an older in-flight detail read', async () => {
+  const sent: NativeRequest[] = []; let id = 0;
+  const api = new NativeApi(request => sent.push(request), () => String(++id));
+  const path = '/feedback/11111111-1111-4111-8111-111111111111';
+  const old = api.read(path);
+  const confirmed = { item: { revision: 1 }, replies: [] };
+  api.setCached(path, confirmed);
+  api.receive({ type: 'response', id: sent[0]!.id, data: { stale: true } });
+  await old;
+  assert.deepEqual(await api.read(path), confirmed);
+  assert.equal(sent.length, 1);
+  api.invalidate(); assert.equal(api.cached(path), undefined);
+});
+
 test('native requests only expose the user-facing API, never admin, relay or arbitrary URLs', () => {
   for (const path of ['/auth/me', '/auth/account', '/auth/usage?page=2&page_size=10', '/projects', '/library-folders', '/feedback?offset=20&limit=20', '/notifications']) assert.ok(nativeRequestAllowed('GET', path));
   assert.ok(nativeRequestAllowed('POST', '/library-folders'));
