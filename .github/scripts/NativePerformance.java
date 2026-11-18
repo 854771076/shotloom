@@ -19,6 +19,7 @@ import org.json.JSONObject;
 /** Runs beside the unchanged signed release. Timings include network and layout. */
 public final class NativePerformance extends Instrumentation {
     private Bundle args;
+    private String currentAction="startup";
     private UiAutomation ui;
     private final JSONArray pages = new JSONArray();
     private final JSONArray apis = new JSONArray();
@@ -78,6 +79,7 @@ public final class NativePerformance extends Instrumentation {
         SystemClock.sleep(200);
     }
     private void page(String name,String target,String ready,int round) throws Exception {
+        currentAction=name;
         // Locate controls before timing: automated scrolling is outside the page transition.
         AccessibilityNodeInfo node=null;
         for(int i=0;i<5;i++){node=find(ui.getRootInActiveWindow(),target);if(node!=null)break;swipe();}
@@ -111,21 +113,26 @@ public final class NativePerformance extends Instrumentation {
     }
     private void tapNode(AccessibilityNodeInfo node){Rect b=new Rect();node.getBoundsInScreen(b);long t=SystemClock.uptimeMillis();pointer(b.centerX(),b.centerY(),0,t);pointer(b.centerX(),b.centerY(),1,t);}
     private void event(String name,String target,Condition done) throws Exception {
+        currentAction=name;
         AccessibilityNodeInfo node=locate(target);long start=SystemClock.elapsedRealtime();tapNode(node);until(done);
         pages.put(new JSONObject().put("page",name).put("round",0).put("ms",SystemClock.elapsedRealtime()-start).put("kind","interaction"));SystemClock.sleep(120);
     }
     private void text(String name,String label,String value,Condition done) throws Exception {
+        currentAction=name;
         AccessibilityNodeInfo node=locate(label);Bundle b=new Bundle();b.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,value);
         long start=SystemClock.elapsedRealtime();if(!node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT,b))throw new Exception("Text entry unavailable: "+label);until(done);
         pages.put(new JSONObject().put("page",name).put("round",0).put("ms",SystemClock.elapsedRealtime()-start).put("kind","interaction"));SystemClock.sleep(120);
     }
     private boolean enabled(AccessibilityNodeInfo root,String label){AccessibilityNodeInfo n=find(root,label);return n!=null&&n.isEnabled()&&!spinning(root);}
     private void changeSwitch(String name,String label) throws Exception {
+        currentAction=name;
         AccessibilityNodeInfo node=locate(label);final boolean before=node.isChecked();long start=SystemClock.elapsedRealtime();tapNode(node);
+        until(root->{AccessibilityNodeInfo n=find(root,label);return n!=null&&(!n.isEnabled()||spinning(root));});
         until(root->{AccessibilityNodeInfo n=find(root,label);return n!=null&&n.isChecked()!=before&&n.isEnabled()&&!spinning(root);});
         pages.put(new JSONObject().put("page",name).put("round",0).put("ms",SystemClock.elapsedRealtime()-start).put("kind","interaction"));SystemClock.sleep(120);
     }
     private void measuredBack(String name,String ready) throws Exception {
+        currentAction=name;
         long start=SystemClock.elapsedRealtime();long now=SystemClock.uptimeMillis();ui.injectInputEvent(new KeyEvent(now,now,0,KeyEvent.KEYCODE_BACK,0),true);ui.injectInputEvent(new KeyEvent(now,now,1,KeyEvent.KEYCODE_BACK,0),true);waitReady(ready);
         pages.put(new JSONObject().put("page",name).put("round",0).put("ms",SystemClock.elapsedRealtime()-start).put("kind","interaction"));
     }
@@ -217,7 +224,7 @@ public final class NativePerformance extends Instrumentation {
         try {
             String[] paths={"/auth/me","/projects","/library-folders","/catalog/skills","/auth/account","/auth/usage?page=1&page_size=10","/notifications?offset=0&limit=1","/notifications?offset=0&limit=20","/settings/mobile","/models","/feedback?offset=0&limit=20","/feedback/"+args.getString("feedbackId"),"/project/"+args.getString("projectId")};
             if(!"login".equals(args.getString("mode")))for(int round=0;round<5;round++)for(String path:paths)api(path,round);
-            report.put("pages",pages).put("apis",apis).put("failure",failure==null?JSONObject.NULL:failure).put("pollIntervalMs",25);
+            report.put("failedAction",failure==null?JSONObject.NULL:currentAction).put("pages",pages).put("apis",apis).put("failure",failure==null?JSONObject.NULL:failure).put("pollIntervalMs",25);
             result.putString("stream","PERFORMANCE_JSON "+report.toString()+"\n");
         }catch(Exception error){result.putString("stream","PERFORMANCE_FAILED "+error.getMessage()+"\n");failure=error.getMessage();}
         finish(failure==null?-1:1,result);
