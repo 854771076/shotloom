@@ -107,8 +107,13 @@ public final class NativePerformance extends Instrumentation {
         while(SystemClock.elapsedRealtime()<limit){AccessibilityNodeInfo root=ui.getRootInActiveWindow();if(root!=null && condition.check(root))return;SystemClock.sleep(25);}
         throw new Exception("Interaction condition timed out");
     }
+    private AccessibilityNodeInfo findControl(AccessibilityNodeInfo node,String label,boolean buttonOnly) {
+        if(node==null)return null;
+        if(node.isVisibleToUser()&&label.contentEquals(node.getContentDescription()==null?"":node.getContentDescription())&&(!buttonOnly||String.valueOf(node.getClassName()).equals("android.widget.Button")))return node;
+        for(int i=0;i<node.getChildCount();i++){AccessibilityNodeInfo hit=findControl(node.getChild(i),label,buttonOnly);if(hit!=null)return hit;}return null;
+    }
     private AccessibilityNodeInfo locate(String label) throws Exception {
-        for(int i=0;i<7;i++){AccessibilityNodeInfo node=find(ui.getRootInActiveWindow(),label);if(node!=null)return node;swipe();}
+        for(int i=0;i<7;i++){AccessibilityNodeInfo root=ui.getRootInActiveWindow();AccessibilityNodeInfo node=findControl(root,label,true);if(node==null)node=findControl(root,label,false);if(node==null)node=find(root,label);if(node!=null)return node;swipe();}
         throw new Exception("Interaction target missing: "+label);
     }
     private void tapNode(AccessibilityNodeInfo node){Rect b=new Rect();node.getBoundsInScreen(b);long t=SystemClock.uptimeMillis();pointer(b.centerX(),b.centerY(),0,t);pointer(b.centerX(),b.centerY(),1,t);}
